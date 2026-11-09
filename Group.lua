@@ -51,12 +51,12 @@ local function Style(b, kind)
     inner:SetColorTexture(0.09, 0.08, 0.07, 1)
 
     -- cases larges : portrait encadré + niveau à gauche, comme nos cadres
-    local X0 = big and 56 or 1
+    local X0 = big and 52 or 1
     if big then
         local MEDIA = "Interface\\AddOns\\NZRForever\\Media\\uf\\"
         local square = DB().ufPortrait == "square"
         local pf = CreateFrame("Frame", nil, b)
-        pf:SetSize(48, 48); pf:SetPoint("LEFT", b, "LEFT", 4, 0)
+        pf:SetSize(40, 40); pf:SetPoint("TOPLEFT", b, "TOPLEFT", 6, -2)
         pf:SetFrameLevel(b:GetFrameLevel() + 2)
         local port = pf:CreateTexture(nil, "ARTWORK")
         port:SetPoint("TOPLEFT", 4, -4); port:SetPoint("BOTTOMRIGHT", -4, 4)
@@ -67,7 +67,7 @@ local function Style(b, kind)
         back:SetAllPoints(port); back:SetColorTexture(0.05, 0.04, 0.03, 1); back:AddMaskTexture(mask)
         if square then
             local host = CreateFrame("Frame", nil, pf)
-            host:SetScale(0.5); host:SetPoint("TOPLEFT"); host:SetSize(48 / 0.5, 48 / 0.5)
+            host:SetScale(0.5); host:SetPoint("TOPLEFT"); host:SetSize(40 / 0.5, 40 / 0.5)
             local ns = CreateFrame("Frame", nil, host, "NineSlicePanelTemplate")
             ns:SetAllPoints()
             if not (NineSliceUtil and pcall(NineSliceUtil.ApplyLayoutByName, ns, "Dialog")) then ns:Hide() end
@@ -80,18 +80,18 @@ local function Style(b, kind)
         b.port = port
         -- niveau dans un petit cadre doré, centré sous le portrait
         local lv = CreateFrame("Frame", nil, pf)
-        lv:SetSize(28, 18); lv:SetPoint("CENTER", pf, "BOTTOM", 0, 3)   -- sous le portrait, bien dans la case
+        lv:SetSize(32, 16); lv:SetPoint("TOP", pf, "BOTTOM", 0, -1)   -- sous le portrait, sans le cacher
         lv:SetFrameLevel(pf:GetFrameLevel() + 4)
         local lbg = lv:CreateTexture(nil, "BACKGROUND"); lbg:SetPoint("TOPLEFT", 2, -2); lbg:SetPoint("BOTTOMRIGHT", -2, 2)
         lbg:SetColorTexture(0.05, 0.04, 0.03, 0.95)
         local lhost = CreateFrame("Frame", nil, lv)
-        lhost:SetScale(0.5); lhost:SetPoint("TOPLEFT"); lhost:SetSize(28 / 0.5, 18 / 0.5)
+        lhost:SetScale(0.5); lhost:SetPoint("TOPLEFT"); lhost:SetSize(32 / 0.5, 16 / 0.5)
         local lns = CreateFrame("Frame", nil, lhost, "NineSlicePanelTemplate")
         lns:SetAllPoints()
         if not (NineSliceUtil and pcall(NineSliceUtil.ApplyLayoutByName, lns, "Dialog")) then lns:Hide() end
         if lns.Center then lns.Center:Hide() end
         local ltop = CreateFrame("Frame", nil, lv); ltop:SetAllPoints(); ltop:SetFrameLevel(lv:GetFrameLevel() + 3)
-        b.level = ltop:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        b.level = ltop:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         b.level:SetPoint("CENTER", 0, 0); b.level:SetJustifyH("CENTER"); b.level:SetJustifyV("MIDDLE")
         -- fond un peu plus sombre derrière le portrait
         local col = b:CreateTexture(nil, "BACKGROUND", nil, -6)
