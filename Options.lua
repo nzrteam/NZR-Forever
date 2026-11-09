@@ -31,6 +31,8 @@ local PAGES = {
         { t = "slider", key = "meterAlpha", section = "L'essentiel", label = "Opacité du fond", desc = "Plus bas = on voit le jeu à travers.", min = 0.3, max = 1, step = 0.05,
           apply = function() if NZR.MeterRefresh then NZR.MeterRefresh(false) end end },
         { t = "switch", key = "meterAuto", section = "Quand l'afficher", label = "Caché en solo hors combat", desc = "Apparaît en combat ou en groupe, disparaît 20 s après. Le bouton « réduire » du meter le range en petite icône quand tu veux.", meter = true },
+        { t = "switch", key = "meterShiftBars", section = "Quand l'afficher", label = "Réduit : les barres prennent sa place", desc = "Quand tu réduis le meter, tes barres de sorts et tes buffs collés à sa droite glissent à sa place, l'icône DPS au-dessus. Ils reviennent quand tu le rouvres (hors combat).",
+          apply = function() if NZR.MeterShiftRefresh then NZR.MeterShiftRefresh() end end },
         { t = "switch", key = "meterLock", section = "Quand l'afficher", label = "Verrouiller", desc = "Empêche de le déplacer ou de le redimensionner par erreur.", meter = true },
         { t = "multi", key = "meterInfo", section = "Présentation Détaillé", label = "Infos sous le nom", desc = "Clique pour afficher ou masquer.", meter = true,
           choices = function() return { { "dmg", "Total" }, { "heal", "Soins" }, { "hps", "HPS" }, { "taken", "Subis" }, { "abs", "Absorptions" }, { "int", "Interruptions" }, { "disp", "Dissipations" }, { "death", "Morts" } } end },

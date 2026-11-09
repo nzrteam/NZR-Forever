@@ -978,6 +978,56 @@ end
 -- affichage automatique : en combat, en groupe, ou dans les 20 s après un combat
 -- meter réduit : une petite icône à la place, un clic le rouvre
 local mini
+-- meter réduit : les barres de sorts / buffs collées à sa droite glissent à sa place
+local BAR_NAMES = { "MainMenuBar", "MainActionBar", "MultiBarBottomLeft", "MultiBarBottomRight",
+    "MultiBarRight", "MultiBarLeft", "MultiBar5", "MultiBar6", "MultiBar7", "StanceBar",
+    "PetActionBar", "PossessActionBar", "BuffFrame", "DebuffFrame" }
+local shifted = nil          -- { [frame] = points d'origine }, nil = rien de décalé
+local shiftTop, shiftLeft
+local function ShiftBars(on)
+    if on and not DB().meterShiftBars then on = false end
+    if on == (shifted ~= nil) then return end
+    if InCombatLockdown() then return end          -- réessayé à la sortie du combat (minuterie)
+    if not on then
+        for f, pts in pairs(shifted) do
+            f:ClearAllPoints()
+            for _, pt in ipairs(pts) do pcall(f.SetPoint, f, unpack(pt)) end
+        end
+        shifted = nil
+        return
+    end
+    if not win then return end
+    local wl, wr, wt, wb = win:GetLeft(), win:GetRight(), win:GetTop(), win:GetBottom()
+    if not (wl and wr) then return end
+    local list, minLeft, top = {}, nil, nil
+    for _, n in ipairs(BAR_NAMES) do
+        local f = _G[n]
+        if f and f.IsShown and f:IsShown() and f.GetLeft then
+            local l, t, b = f:GetLeft(), f:GetTop(), f:GetBottom()
+            -- juste à droite du meter et à peu près à la même hauteur
+            if l and t and b and l >= wr - 12 and l <= wr + 90 and t >= wb - 260 and b <= wt + 260 then
+                table.insert(list, f)
+                minLeft = math.min(minLeft or l, l)
+                top = math.max(top or t, t)
+            end
+        end
+    end
+    shifted = {}
+    if #list == 0 then return end
+    local dx = minLeft - wl
+    for _, f in ipairs(list) do
+        local pts = {}
+        for i = 1, f:GetNumPoints() do
+            local a, rel, r, x, y = f:GetPoint(i)
+            pts[i] = { a, rel, r, x, y }
+        end
+        shifted[f] = pts
+        f:ClearAllPoints()
+        for _, pt in ipairs(pts) do pcall(f.SetPoint, f, pt[1], pt[2], pt[3], (pt[4] or 0) - dx, pt[5] or 0) end
+    end
+    shiftTop, shiftLeft = top, wl
+end
+
 local function ShowMini(show)
     if show and not mini then
         mini = CreateFrame("Button", "NZRF_MeterMini", UIParent)
@@ -1020,8 +1070,25 @@ local function ShowMini(show)
         end)
         mini:SetScript("OnLeave", function() GameTooltip:Hide() end)
     end
-    if mini then mini:SetShown(show) end
+    ShiftBars(show)
+    if mini then
+        -- barres décalées : l'icône se pose au-dessus d'elles, en haut à gauche
+        if show and shifted and shiftTop and not mini.nzrDocked then
+            mini:ClearAllPoints()
+            mini:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", shiftLeft, shiftTop + 18)
+            mini.nzrDocked = true
+        elseif (not show or not shifted) and mini.nzrDocked then
+            mini.nzrDocked = nil
+            mini:ClearAllPoints()
+            local p = DB().meterMiniPos
+            if p then mini:SetPoint(p[1], UIParent, p[2], p[3], p[4])
+            elseif win then mini:SetPoint("TOPLEFT", win, "TOPLEFT", 0, 0) end
+        end
+        mini:SetShown(show)
+    end
 end
+
+NZR.MeterShiftRefresh = function() ShowMini(DB().meterMin and true or false) end
 
 local function UpdateVisibility()
     if not win then return end
@@ -1382,7 +1449,9 @@ function M:Init()
         pcall(ev.RegisterEvent, ev, e)
     end
     local pending = false
+    ev:RegisterEvent("EDIT_MODE_LAYOUTS_UPDATED")
     ev:SetScript("OnEvent", function(_, e)
+        if e == "EDIT_MODE_LAYOUTS_UPDATED" then shifted = nil end   -- le jeu a replacé les barres
         if e == "PLAYER_REGEN_ENABLED" or e == "PLAYER_REGEN_DISABLED" then lastCombat = GetTime() end
         UpdateVisibility()
         if pending then return end
