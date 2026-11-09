@@ -158,8 +158,15 @@ local function OnMouseoverUnit()
     local hostile = UnitCanAttack("player", "mouseover")
     if hostile and not DB().hlMobs then return end
     if not hostile and not DB().hlNPCs then return end
-    if not UnitIsQuest("mouseover") then return end
     local guid = UnitGUID("mouseover")
+    -- monstre mort : seulement s'il reste quelque chose à fouiller
+    local okd, dead = pcall(UnitIsDead, "mouseover")
+    if okd and plain(dead) and dead then
+        if not (CanLootUnit and plain(guid)) then return end
+        local okl, hasLoot, canLoot = pcall(CanLootUnit, guid)
+        if not (okl and plain(hasLoot) and hasLoot and canLoot ~= false) then return end
+    end
+    if not UnitIsQuest("mouseover") then return end
     Trigger(plain(guid) and guid or UnitName("mouseover"))
 end
 
