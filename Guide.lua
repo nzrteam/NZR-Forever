@@ -268,6 +268,7 @@ end
 -- Onglet Leveling : feuille de route par niveau, zone mise en avant, flèche vers la zone
 ---------------------------------------------------------------------------
 local ROW_H = 24
+local RefreshLeveling      -- défini plus bas
 local mapCache
 
 local function Norm(s)
@@ -384,13 +385,28 @@ local function BuildLeveling(pg)
     local lv = {}
     win.lv = lv
     lv.head = pg:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    lv.head:SetPoint("TOPLEFT", 18, -62)
+    -- choix de la voie : Rapide / Tranquille / Histoire / toutes les zones
+    lv.modes = {}
+    local bx = 14
+    local modes = {}
+    for _, pth in ipairs(NZR.GuideData.PATHS or {}) do modes[#modes + 1] = { pth.id, pth.name } end
+    modes[#modes + 1] = { "zones", "Toutes les zones" }
+    for _, m in ipairs(modes) do
+        local b = CreateFrame("Button", nil, pg, "UIPanelButtonTemplate")
+        b:SetSize(m[1] == "zones" and 140 or 110, 22)
+        b:SetPoint("TOPLEFT", bx, -58)
+        b:SetText(m[2]); b.id = m[1]
+        b:SetScript("OnClick", function() DB().guideRoute = m[1]; lv.scrolled = nil; PlaySound(841); RefreshLeveling() end)
+        lv.modes[#lv.modes + 1] = b
+        bx = bx + b:GetWidth() + 4
+    end
+    lv.head:SetPoint("TOPLEFT", 18, -88)
     lv.sub = pg:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     lv.sub:SetPoint("TOPLEFT", lv.head, "BOTTOMLEFT", 0, -4)
     lv.sub:SetPoint("RIGHT", pg, "RIGHT", -18, 0); lv.sub:SetJustifyH("LEFT")
 
     local box = CreateFrame("Frame", nil, pg)
-    box:SetPoint("TOPLEFT", 14, -100); box:SetPoint("BOTTOMRIGHT", -14, 34)
+    box:SetPoint("TOPLEFT", 14, -124); box:SetPoint("BOTTOMRIGHT", -14, 34)
     local bg = box:CreateTexture(nil, "BACKGROUND"); bg:SetAllPoints(); bg:SetColorTexture(0, 0, 0, 0.35)
     local edge = box:CreateTexture(nil, "BACKGROUND", nil, -1)
     edge:SetPoint("TOPLEFT", -1, 1); edge:SetPoint("BOTTOMRIGHT", 1, -1); edge:SetColorTexture(0.45, 0.36, 0.18, 0.7)
@@ -399,11 +415,94 @@ local function BuildLeveling(pg)
     local list = CreateFrame("Frame", nil, scroll)
     list:SetSize(W - 70, 10)
     scroll:SetScrollChild(list)
-    lv.scroll, lv.list, lv.rows = scroll, list, {}
+    lv.scroll, lv.list, lv.rows, lv.srows = scroll, list, {}, {}
 
     local note = pg:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     note:SetPoint("BOTTOMLEFT", 16, 12); note:SetPoint("RIGHT", pg, "RIGHT", -16, 0); note:SetJustifyH("LEFT")
-    note:SetText("Repères de niveau généraux ; le pas à pas quête par quête reste le travail de RestedXP et Questie.")
+    note:SetText("Repères tirés des guides publics de WoW Forever ; le pas à pas quête par quête reste le travail de RestedXP et Questie.")
+end
+
+local STEP_H = 40
+local function StepRow(i)
+    local lv = win.lv
+    if lv.srows[i] then return lv.srows[i] end
+    local r = CreateFrame("Frame", nil, lv.list)
+    r:SetHeight(STEP_H)
+    r:SetPoint("TOPLEFT", 0, -(i - 1) * STEP_H); r:SetPoint("RIGHT", lv.list, "RIGHT", 0, 0)
+    r.bg = r:CreateTexture(nil, "BACKGROUND"); r.bg:SetAllPoints()
+    r.num = r:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    r.num:SetPoint("LEFT", 8, 0); r.num:SetWidth(22); r.num:SetJustifyH("CENTER")
+    r.range = r:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    r.range:SetPoint("TOPLEFT", 36, -5); r.range:SetWidth(50); r.range:SetJustifyH("LEFT")
+    r.title = r:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    r.title:SetPoint("TOPLEFT", 90, -5); r.title:SetPoint("RIGHT", r, "RIGHT", -86, 0); r.title:SetJustifyH("LEFT")
+    r.title:SetWordWrap(false)
+    r.note = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    r.note:SetPoint("TOPLEFT", r.title, "BOTTOMLEFT", 0, -2); r.note:SetPoint("RIGHT", r, "RIGHT", -86, 0)
+    r.note:SetJustifyH("LEFT"); r.note:SetWordWrap(false)
+    r.go = CreateFrame("Button", nil, r, "UIPanelButtonTemplate")
+    r.go:SetSize(70, 20); r.go:SetPoint("RIGHT", -6, 0); r.go:SetText("Flèche")
+    r.go:SetScript("OnClick", function(s) PointTo(s.target, s.targetId, s.alias) end)
+    r:EnableMouse(true)
+    r:SetScript("OnEnter", function(s)
+        if not s.step then return end
+        GameTooltip:SetOwner(s, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(s.step.title, 1, 0.82, 0)
+        GameTooltip:AddLine(("Niveaux %d-%d"):format(s.step.min, s.step.max), 1, 1, 1)
+        if s.step.note ~= "" then GameTooltip:AddLine(s.step.note, 0.9, 0.9, 0.9, true) end
+        GameTooltip:Show()
+    end)
+    r:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    lv.srows[i] = r
+    return r
+end
+
+local function PathSteps(path)
+    local _, race = UnitRace("player")
+    local start = (NZR.GuideData.START or {})[race]
+    local second = (NZR.GuideData.SECOND or {})[race] or NZR.GuideData.SECOND.Dwarf
+    local out = {}
+    for _, s in ipairs(path.steps) do
+        local title, note, target, tid = s[3], s[4] or "", s[5], s[6]
+        if title == "$START" then
+            title = start and start[1] or "Zone de départ de ta race"; target, tid = start and start[1], start and start[2]
+        elseif title == "$SECOND" then
+            title, target, tid = second[1], second[1], second[2]
+        end
+        note = note:gsub("%$SECONDNOTE", second[3] or "")
+        out[#out + 1] = { min = s[1], max = s[2], title = title, note = note, target = target, tid = tid }
+    end
+    return out
+end
+
+local function RenderPath(path, level)
+    local lv = win.lv
+    for _, r in ipairs(lv.rows) do r:Hide() end
+    local steps = PathSteps(path)
+    local firstCur
+    for i, s in ipairs(steps) do
+        local r = StepRow(i)
+        r:Show(); r.step = s
+        r.num:SetText(i)
+        r.range:SetText(s.min == s.max and tostring(s.min) or (s.min .. "-" .. s.max))
+        r.title:SetText(s.title)
+        r.note:SetText(s.note)
+        r.go.target, r.go.targetId = s.target, s.tid
+        r.go.alias = s.target == "Les Rives claires" and { "Rives claires", "Riverglades" } or nil
+        r.go:SetShown(s.target ~= nil)
+        local cur, past = level >= s.min and level <= s.max, level > s.max
+        if cur then
+            r.bg:SetColorTexture(1, 0.82, 0, 0.16); r.title:SetTextColor(1, 0.82, 0); r.num:SetTextColor(1, 0.82, 0)
+            firstCur = firstCur or i
+        elseif past then
+            r.bg:SetColorTexture(0, 0, 0, 0); r.title:SetTextColor(0.5, 0.5, 0.5); r.num:SetTextColor(0.4, 0.4, 0.4)
+        else
+            r.bg:SetColorTexture(1, 1, 1, (i % 2 == 0) and 0.03 or 0); r.title:SetTextColor(0.9, 0.9, 0.9); r.num:SetTextColor(0.7, 0.7, 0.7)
+        end
+    end
+    for i = #steps + 1, #lv.srows do lv.srows[i]:Hide() end
+    lv.list:SetHeight(#steps * STEP_H + 4)
+    return firstCur, STEP_H
 end
 
 local function LevelRow(i)
@@ -566,7 +665,6 @@ local function CreateWindow()
     src:SetText("Builds : conquestcapped.com · arbres : wowforevertools")
 end
 
-local RefreshLeveling
 Refresh = function()
     if not win or not win:IsShown() then return end
     local page = DB().guidePage or 1
@@ -652,6 +750,24 @@ end
 RefreshLeveling = function()
     local lv = win.lv
     local level = PlayerLevel()
+    -- voie choisie
+    local mode = DB().guideRoute or "fast"
+    for _, b in ipairs(lv.modes) do
+        if b.id == mode then b:LockHighlight(); b:SetAlpha(1) else b:UnlockHighlight(); b:SetAlpha(0.75) end
+    end
+    local path
+    for _, pth in ipairs(NZR.GuideData.PATHS or {}) do if pth.id == mode then path = pth end end
+    if path and UnitFactionGroup("player") ~= "Horde" then
+        local firstCur, rowH = RenderPath(path, level)
+        lv.head:SetText(("Voie %s · niveau %d"):format(path.name, level))
+        lv.sub:SetText(path.desc)
+        if firstCur and not lv.scrolled then
+            lv.scrolled = true
+            C_Timer.After(0, function() pcall(lv.scroll.SetVerticalScroll, lv.scroll, math.max(0, (firstCur - 2) * rowH)) end)
+        end
+        return
+    end
+    for _, r in ipairs(lv.srows) do r:Hide() end
     local route = RouteFor()
     local here = GetZoneText and GetZoneText() or ""
     local firstCur, hereInfo
@@ -777,4 +893,4 @@ end
 
 -- pour les tests hors jeu
 NZR.GuideInternals = { Decode = Decode, AtLevel = AtLevel, Valid = Valid, Spent = Spent,
-    SetData = function(d) data = d end }
+    SetData = function(d) data = d end, Refresh = function() Refresh() end }

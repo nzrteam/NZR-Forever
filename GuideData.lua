@@ -154,3 +154,78 @@ NZR.GuideData.ROUTE = {
     { 58, 60, "Pic Blackrock supérieur", en = "Upper Blackrock Spire", d = true, zone = "Steppes ardentes", zid = 1428 },
     { 60, 60, "Mont Hyjal", new = true, alias = { "Mont Hyjal", "Mount Hyjal", "Hyjal" }, en = "Mount Hyjal" },
 }
+
+-- Voies de leveling Alliance (WoW Forever). Repères tirés des guides publics de Forever,
+-- recoupés entre plusieurs sources ; « $START » / « $SECOND » = zones selon ta race.
+-- { min, max, titre, note, cible (zone pour la flèche), id de carte de secours }
+NZR.GuideData.SECOND = {
+    Dwarf = { "Loch Modan", 1432, "hub : Thelsamar, juste à l'est de Dun Morogh par le tunnel" },
+    Gnome = { "Loch Modan", 1432, "hub : Thelsamar, juste à l'est de Dun Morogh par le tunnel" },
+    Human = { "Marche de l'Ouest", 1436, "hub : Colline des sentinelles" },
+    NightElf = { "Sombrivage", 1439, "hub : Auberdine" },
+}
+NZR.GuideData.PATHS = {
+    {
+        id = "fast", name = "Rapide", desc = "Monter vite : les zones dans le bon ordre, seulement les quêtes qui rapportent, donjons quand tu as leurs quêtes. Tu changes de zone dès que les quêtes deviennent grises.",
+        steps = {
+            { 1, 10, "$START", "Toutes les quêtes de la zone de départ, puis la capitale pour tes sorts." },
+            { 10, 16, "$SECOND", "$SECONDNOTE. Prends tout ce que le hub propose, boucle, puis repars." },
+            { 14, 14, "Marche de l'Ouest", "Chaîne du sac de couchage (ferme Alexston, 37,50) : jusqu'à +3 % d'XP pour toute la suite.", "Marche de l'Ouest", 1436 },
+            { 13, 18, "La Salle des thanes", "Sous Forgefer. Prends ses quêtes avant (Incursion dans le Vieux Forgefer…), un seul passage en groupe.", "Forgefer", 1455 },
+            { 16, 20, "Les Carmines", "Hub : Comté-du-Lac.", "Les Carmines", 1433 },
+            { 20, 26, "Les Paluns", "Hub : Port de Menethil.", "Les Paluns", 1437 },
+            { 22, 28, "Bois de la Pénombre", "Hub : Sombre-Comté. Fais les quêtes proches, laisse les longues chaînes.", "Bois de la Pénombre", 1431 },
+            { 24, 29, "Site de fouilles des Paluns", "Nouveau donjon : seulement avec ses quêtes en poche.", "Les Paluns", 1437 },
+            { 28, 31, "Contreforts de Hautebrande", "Hub : Austrivage (bateau direct depuis Menethil).", "Contreforts de Hautebrande", 1424 },
+            { 30, 38, "Vallée de Strangleronce", "Camp rebelle au nord, Baie-du-Butin au sud. Complète avec les Hautes-terres d'Arathi si besoin.", "Vallée de Strangleronce", 1434 },
+            { 35, 45, "Les Rives claires", "Nouvelle zone (150+ quêtes) : ton gros morceau des niveaux 35 à 45.", "Les Rives claires", 2548 },
+            { 40, 40, "Monture", "Niveau 40 : monture. Ça accélère tout le reste.", nil },
+            { 42, 50, "Tanaris et Féralas", "Puis les Hinterlands si tu manques de quêtes.", "Tanaris", 1446 },
+            { 48, 55, "Cratère d'Un'Goro et Gangrebois", "Ramasse les cristaux de puissance à Un'Goro au passage.", "Cratère d'Un'Goro", 1449 },
+            { 52, 58, "Steppes ardentes et Maleterres de l'Ouest", "", "Steppes ardentes", 1428 },
+            { 55, 60, "Maleterres de l'Est, Berceau-de-l'Hiver, Silithus", "La dernière ligne droite.", "Maleterres de l'Est", 1423 },
+        },
+    },
+    {
+        id = "chill", name = "Tranquille", desc = "Rapide mais sans stress : surtout en solo, des zones finies proprement, peu de trajets, donjons facultatifs.",
+        steps = {
+            { 1, 12, "$START", "Finis toute la zone de départ, sans te presser." },
+            { 10, 18, "$SECOND", "$SECONDNOTE. Finis la zone avant de bouger." },
+            { 14, 14, "Marche de l'Ouest", "Chaîne du sac de couchage (ferme Alexston, 37,50) : +3 % d'XP, à faire quand tu passes.", "Marche de l'Ouest", 1436 },
+            { 16, 22, "Les Carmines", "Hub : Comté-du-Lac.", "Les Carmines", 1433 },
+            { 20, 28, "Les Paluns", "Hub : Port de Menethil.", "Les Paluns", 1437 },
+            { 20, 30, "Bois de la Pénombre", "Hub : Sombre-Comté. Beaucoup de quêtes au même endroit.", "Bois de la Pénombre", 1431 },
+            { 28, 32, "Contreforts de Hautebrande", "Austrivage.", "Contreforts de Hautebrande", 1424 },
+            { 30, 40, "Hautes-terres d'Arathi et Vallée de Strangleronce", "Refuge de l'Ornière, Camp rebelle, Baie-du-Butin.", "Hautes-terres d'Arathi", 1417 },
+            { 35, 45, "Les Rives claires", "Nouvelle zone pleine de quêtes : idéale pour monter tranquillement.", "Les Rives claires", 2548 },
+            { 40, 40, "Monture", "Niveau 40 : monture.", nil },
+            { 42, 50, "Féralas, Tanaris, les Hinterlands", "Choisis celle qui te plaît, change quand c'est vide.", "Féralas", 1444 },
+            { 48, 56, "Cratère d'Un'Goro, Gangrebois, Steppes ardentes", "", "Cratère d'Un'Goro", 1449 },
+            { 54, 60, "Maleterres, Berceau-de-l'Hiver, Silithus", "", "Maleterres de l'Ouest", 1422 },
+        },
+    },
+    {
+        id = "story", name = "Histoire", desc = "Toutes les grandes quêtes et leurs donjons, pour l'histoire et les récompenses. Plus long, mais rien de raté.",
+        steps = {
+            { 1, 12, "$START", "Toutes les quêtes, y compris celles de la capitale." },
+            { 10, 18, "$SECOND", "$SECONDNOTE. Toute la zone." },
+            { 13, 18, "La Salle des thanes", "Ses 5 quêtes : Incursion dans le Vieux Forgefer (depuis Kharanos), Les morts sans repos, Précieux héritages, Une rancune ancestrale, Le traité d'entente.", "Forgefer", 1455 },
+            { 14, 14, "Marche de l'Ouest", "Chaîne du sac de couchage (ferme Alexston, 37,50) : +3 % d'XP.", "Marche de l'Ouest", 1436 },
+            { 15, 22, "Marche de l'Ouest", "La Confrérie défias jusqu'aux Mortemines (17-26).", "Marche de l'Ouest", 1436 },
+            { 18, 30, "Bois de la Pénombre", "La légende de Stalvan et la traque de Mor'ladim : récompenses améliorées dans Forever.", "Bois de la Pénombre", 1431 },
+            { 20, 28, "Les Paluns et Les Carmines", "Toutes les quêtes, puis le Site de fouilles des Paluns (24-29) avec ses quêtes.", "Les Paluns", 1437 },
+            { 24, 32, "La Prison de Hurlevent", "Avec les quêtes de Hurlevent, des Paluns et des Carmines.", "Hurlevent", 1453 },
+            { 28, 33, "Cité de Dalaran", "Accès par une suite de quêtes qui commence auprès de l'émissaire Jacques à Austrivage.", "Contreforts de Hautebrande", 1424 },
+            { 29, 38, "Gnomeregan", "Quêtes à Forgefer et en Dun Morogh.", "Dun Morogh", 1426 },
+            { 30, 45, "Vallée de Strangleronce", "Les chasses de Hemet Nesingwary (récompenses améliorées) et La Cité engloutie (35-40).", "Vallée de Strangleronce", 1434 },
+            { 30, 40, "Désolace", "Quêtes des centaures : contenu et réputation ajoutés dans Forever.", "Désolace", 1443 },
+            { 35, 45, "Les Rives claires", "Toute l'histoire de la zone (Fort de Farholde), puis le Bastion de Krol'dok (40-45).", "Les Rives claires", 2548 },
+            { 41, 51, "Uldaman", "Grosses chaînes depuis Forgefer et le Loch Modan (Ligue des explorateurs).", "Terres ingrates", 1418 },
+            { 42, 52, "Tanaris, Féralas, les Hinterlands", "Zul'Farrak (44-54) avec ses quêtes de Tanaris.", "Tanaris", 1446 },
+            { 48, 53, "Prison d'Alcaz", "Nouveau donjon sur l'île d'Alcaz (marécage d'Âprefange).", "Marécage d'Âprefange", 1445 },
+            { 48, 56, "Cratère d'Un'Goro et Gangrebois", "Cristaux de puissance pour la terrasse du Façonneur (58-60).", "Cratère d'Un'Goro", 1449 },
+            { 52, 60, "Profondeurs de Blackrock", "La suite de la princesse Moira et toutes les quêtes du donjon.", "Gorge des Vents brûlants", 1427 },
+            { 55, 60, "Maleterres, Berceau-de-l'Hiver, Silithus", "Repaire des Noiregueules (55-60) en Azshara, puis le Mont Hyjal au 60.", "Maleterres de l'Est", 1423 },
+        },
+    },
+}
