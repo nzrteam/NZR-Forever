@@ -42,12 +42,6 @@ end
 local function Style(b, kind)
     if b.nzr then return end
     b.nzr, b.kind = true, kind
-    -- clic droit = menu du jeu (inviter, chuchoter, inspecter…) : il faut aussi écouter le clic droit
-    if not InCombatLockdown() then
-        b:RegisterForClicks("AnyUp")
-        b:SetAttribute("*type1", "target")
-        b:SetAttribute("*type2", "togglemenu")
-    end
     local big = kind == "party" and PartyBig()
 
     local bg = b:CreateTexture(nil, "BACKGROUND", nil, -8)
@@ -500,7 +494,12 @@ local function MakeHeader(kind, name, holder)
     hdr:HookScript("OnAttributeChanged", function(self, attr)
         if type(attr) == "string" and attr:match("^child%d+$") then
             local b = self:GetAttribute(attr)
-            if b then Style(b, kind); b:SetFrameLevel(self:GetFrameLevel() + 1) end
+            if b then
+                -- une erreur d'habillage ne doit jamais casser le placement des cases par le jeu
+                local ok, err = pcall(Style, b, kind)
+                if not ok and NZR.LogError then pcall(NZR.LogError, NZR, err, "Group") end
+                pcall(b.SetFrameLevel, b, self:GetFrameLevel() + 1)
+            end
         end
     end)
     headers[kind] = hdr
@@ -531,6 +530,8 @@ function M:Init()
         hdr:SetAttribute("startingIndex", 1)
         hdr:Hide()
     end
+    -- clic droit = menu du jeu (inviter, chuchoter, inspecter…) : les cases écoutent aussi le clic droit
+    for _, b in ipairs(buttons) do pcall(b.RegisterForClicks, b, "AnyUp") end
     RegisterAttributeDriver(party, "state-visibility", "[group:raid] hide; [group:party] show; hide")
     RegisterAttributeDriver(raid, "state-visibility", "[group:raid] show; hide")
     for _, h in pairs(headers) do h:SetScale(DB().grpScale or 1); boxes[h.kind]:SetScale(DB().grpScale or 1) end
