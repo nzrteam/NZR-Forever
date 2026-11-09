@@ -20,7 +20,7 @@ local boxes = {}
 local function PartyBig() return DB().grpPartyStyle ~= "compact" end
 local function CellSize(kind)
     local s = DB().grpCellScale or 1
-    if kind == "party" and PartyBig() then return math.floor(176 * s), math.floor(42 * s) end
+    if kind == "party" and PartyBig() then return math.floor(176 * s), math.floor(58 * s) end
     return math.floor(84 * s), math.floor(42 * s)
 end
 
@@ -53,8 +53,11 @@ local function Style(b, kind)
     -- vie
     local hp = CreateFrame("StatusBar", nil, b)
     hp:SetStatusBarTexture(UF.BAR)
+    -- cases larges : bandeau du nom, vie, mana, puis une ligne pour les buffs / débuffs
+    local hasPow = DB().grpPower ~= false
     hp:SetPoint("TOPLEFT", 1, big and -14 or -1)
-    hp:SetPoint("BOTTOMRIGHT", -1, DB().grpPower == false and 1 or (big and 6 or 4))
+    if big then hp:SetPoint("BOTTOMRIGHT", -1, hasPow and 22 or 17)
+    else hp:SetPoint("BOTTOMRIGHT", -1, hasPow and 4 or 1) end
     hp:SetMinMaxValues(0, 1); hp:SetValue(1)
     local hbg = hp:CreateTexture(nil, "BACKGROUND")
     hbg:SetAllPoints(); hbg:SetColorTexture(0.16, 0.05, 0.04, 1)
@@ -75,7 +78,8 @@ local function Style(b, kind)
     -- mana / énergie (fine, en bas)
     local pw = CreateFrame("StatusBar", nil, b)
     pw:SetStatusBarTexture(UF.BAR)
-    pw:SetPoint("TOPLEFT", hp, "BOTTOMLEFT", 0, -1); pw:SetPoint("BOTTOMRIGHT", -1, 1)
+    pw:SetPoint("TOPLEFT", hp, "BOTTOMLEFT", 0, -1); pw:SetPoint("TOPRIGHT", hp, "BOTTOMRIGHT", 0, -1)
+    pw:SetHeight(big and 4 or 3)
     pw:SetMinMaxValues(0, 1); pw:SetValue(1)
     local pbg = pw:CreateTexture(nil, "BACKGROUND")
     pbg:SetAllPoints(); pbg:SetColorTexture(0, 0, 0, 1)
@@ -99,7 +103,7 @@ local function Style(b, kind)
     else
         b.name:SetPoint("TOPLEFT", hp, "TOPLEFT", 3, -4); b.name:SetPoint("TOPRIGHT", hp, "TOPRIGHT", -3, -4)
         b.name:SetJustifyH("CENTER")
-        b.info:SetPoint("BOTTOM", hp, "BOTTOM", 0, 4)
+        b.info:SetPoint("CENTER", hp, "CENTER", 0, -3)
     end
 
     -- rôle, chef, marque
@@ -114,11 +118,13 @@ local function Style(b, kind)
     b.mark:SetPoint("CENTER", b, "TOP", 0, -2)
 
     -- petites icônes : buffs en bas à gauche, débuffs en bas à droite (comme le jeu)
-    local isz = big and 16 or 13
+    local isz = big and 15 or 11
     local function Icon(list, i, corner, dir)
         local d = CreateFrame("Frame", nil, top)
         d:SetSize(isz, isz)
-        if i == 1 then d:SetPoint(corner, hp, corner, corner:find("LEFT") and 1 or -1, 1)
+        -- grandes cases : sous les barres ; cases de raid : dans les coins du bas
+        local anchor = big and b or hp
+        if i == 1 then d:SetPoint(corner, anchor, corner, corner:find("LEFT") and 2 or -2, big and 2 or 1)
         else d:SetPoint(dir == 1 and "LEFT" or "RIGHT", list[i - 1], dir == 1 and "RIGHT" or "LEFT", dir, 0) end
         d.edge = d:CreateTexture(nil, "BACKGROUND"); d.edge:SetAllPoints()
         d.icon = d:CreateTexture(nil, "ARTWORK")
@@ -134,7 +140,7 @@ local function Style(b, kind)
     end
     b.debuffs, b.buffs = {}, {}
     for i = 1, 3 do Icon(b.debuffs, i, "BOTTOMRIGHT", -1) end
-    for i = 1, (big and 6 or 3) do Icon(b.buffs, i, "BOTTOMLEFT", 1) end
+    for i = 1, (big and 7 or 3) do Icon(b.buffs, i, "BOTTOMLEFT", 1) end
 
     -- liseré : cible (blanc) ou menace (rouge)
     b.hl = top:CreateTexture(nil, "OVERLAY", nil, 2)
