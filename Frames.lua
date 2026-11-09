@@ -8,7 +8,7 @@ local plain = NZR.plain
 local MEDIA = "Interface\\AddOns\\NZRForever\\Media\\uf\\"
 local BAR = "Interface\\TargetingFrame\\UI-StatusBar"
 
-local PANEL_W, PORT, PANEL_H = 214, 62, 56
+local PANEL_W, PORT, PANEL_H = 214, 62, 52
 local frames = {}
 
 local function DB() return NZR.db end
@@ -63,20 +63,30 @@ end
 ---------------------------------------------------------------------------
 -- Construction (style du jeu : panneau sombre, liseré doré)
 ---------------------------------------------------------------------------
-local function GameBorder(f)
-    local bg = f:CreateTexture(nil, "BACKGROUND")
-    bg:SetPoint("TOPLEFT", 3, -3); bg:SetPoint("BOTTOMRIGHT", -3, 3)
-    bg:SetColorTexture(0.03, 0.03, 0.05, 0.85)
-    local ns = CreateFrame("Frame", nil, f, "NineSlicePanelTemplate")
-    ns:SetAllPoints()
-    ns:SetFrameLevel(f:GetFrameLevel() + 1)
-    if NineSliceUtil and pcall(NineSliceUtil.ApplyLayoutByName, ns, "TooltipDefaultLayout") then
-        if ns.Center then ns.Center:Hide() end
-        if ns.SetBorderColor then pcall(ns.SetBorderColor, ns, 0.62, 0.62, 0.66, 1) end
-    else
-        ns:Hide()
+-- boîte comme celles de WoW Forever : liseré noir, liseré or, fond sombre
+local GOLD = { 0.78, 0.62, 0.30 }
+local function ForeverBox(f, top, bottom)
+    local function edge(layer, sub, inset, r, g, b, a)
+        for _, side in ipairs({ "TOP", "BOTTOM", "LEFT", "RIGHT" }) do
+            local t = f:CreateTexture(nil, layer, nil, sub)
+            t:SetColorTexture(r, g, b, a or 1)
+            if side == "TOP" or side == "BOTTOM" then
+                t:SetPoint(side .. "LEFT", inset, side == "TOP" and -inset or inset)
+                t:SetPoint(side .. "RIGHT", -inset, side == "TOP" and -inset or inset)
+                t:SetHeight(1)
+            else
+                t:SetPoint("TOP" .. side, side == "LEFT" and inset or -inset, -inset)
+                t:SetPoint("BOTTOM" .. side, side == "LEFT" and inset or -inset, inset)
+                t:SetWidth(1)
+            end
+        end
     end
-    f.nzrBg = bg
+    local bg = f:CreateTexture(nil, "BACKGROUND")
+    bg:SetPoint("TOPLEFT", 1, -1); bg:SetPoint("BOTTOMRIGHT", -1, 1)
+    bg:SetColorTexture(1, 1, 1, 1)
+    bg:SetGradient("VERTICAL", CreateColor(bottom[1], bottom[2], bottom[3], bottom[4] or 1), CreateColor(top[1], top[2], top[3], top[4] or 1))
+    edge("BORDER", 0, 0, 0, 0, 0, 1)
+    edge("BORDER", 1, 1, GOLD[1], GOLD[2], GOLD[3], 1)
 end
 
 local function Bar(parent, h)
@@ -89,7 +99,7 @@ local function Bar(parent, h)
     edge:SetPoint("TOPLEFT", -1, 1); edge:SetPoint("BOTTOMRIGHT", 1, -1); edge:SetColorTexture(0, 0, 0, 1)
     local shine = b:CreateTexture(nil, "OVERLAY")
     shine:SetPoint("TOPLEFT"); shine:SetPoint("TOPRIGHT"); shine:SetHeight(1)
-    shine:SetColorTexture(1, 1, 1, 0.18)
+    shine:SetColorTexture(1, 1, 1, 0.10)
     local function Text(size, justify)
         local fs = b:CreateFontString(nil, "OVERLAY")
         fs:SetFont(STANDARD_TEXT_FONT, size, "OUTLINE")
@@ -117,28 +127,32 @@ local function Create(unit, holderKey, default, mirror)
     f:RegisterForClicks("AnyUp")
     f:SetScale(DB().ufScale or 1)
 
-    -- panneau
+    -- panneau : bandeau du nom (brun doré) + boîte des barres (sombre), comme Forever
     local p = CreateFrame("Frame", nil, f)
     p:SetSize(PANEL_W, PANEL_H)
-    -- le portrait chevauche le bord du panneau, centré verticalement
     if mirror then p:SetPoint("RIGHT", f, "RIGHT", -(PORT - 12), 0) else p:SetPoint("LEFT", f, "LEFT", PORT - 12, 0) end
-    GameBorder(p)
     f.panel = p
 
-    f.name = p:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    f.name:SetPoint("TOPLEFT", mirror and 10 or 18, -7)
-    f.name:SetPoint("TOPRIGHT", mirror and -18 or -10, -7)
-    f.name:SetJustifyH(mirror and "RIGHT" or "LEFT")
+    local nameBox = CreateFrame("Frame", nil, p)
+    nameBox:SetPoint("TOPLEFT"); nameBox:SetPoint("TOPRIGHT"); nameBox:SetHeight(20)
+    ForeverBox(nameBox, { 0.30, 0.22, 0.12, 0.95 }, { 0.16, 0.11, 0.06, 0.95 })
+    f.name = nameBox:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    f.name:SetPoint("LEFT", mirror and 8 or 16, 0)
+    f.name:SetPoint("RIGHT", mirror and -16 or -8, 0)
+    f.name:SetJustifyH("CENTER")
     f.name:SetWordWrap(false)
-    local sep = p:CreateTexture(nil, "ARTWORK")
-    sep:SetColorTexture(1, 1, 1, 0.07); sep:SetHeight(1)
-    sep:SetPoint("TOPLEFT", 6, -22); sep:SetPoint("TOPRIGHT", -6, -22)
 
-    local l, r = mirror and 8 or 16, mirror and -16 or -8
-    f.health = Bar(p, 16)
-    f.health:SetPoint("TOPLEFT", l, -26); f.health:SetPoint("TOPRIGHT", r, -26)
-    f.power = Bar(p, 8)
-    f.power:SetPoint("TOPLEFT", f.health, "BOTTOMLEFT", 0, -3); f.power:SetPoint("TOPRIGHT", f.health, "BOTTOMRIGHT", 0, -3)
+    local barBox = CreateFrame("Frame", nil, p)
+    barBox:SetPoint("TOPLEFT", nameBox, "BOTTOMLEFT", 0, -1); barBox:SetPoint("TOPRIGHT", nameBox, "BOTTOMRIGHT", 0, -1)
+    barBox:SetHeight(PANEL_H - 21)
+    ForeverBox(barBox, { 0.05, 0.05, 0.05, 0.85 }, { 0.02, 0.02, 0.02, 0.85 })
+    f.barBox = barBox
+
+    local l, r = mirror and 4 or 12, mirror and -12 or -4
+    f.health = Bar(barBox, 15)
+    f.health:SetPoint("TOPLEFT", l, -4); f.health:SetPoint("TOPRIGHT", r, -4)
+    f.power = Bar(barBox, 9)
+    f.power:SetPoint("TOPLEFT", f.health, "BOTTOMLEFT", 0, -2); f.power:SetPoint("TOPRIGHT", f.health, "BOTTOMRIGHT", 0, -2)
 
     -- portrait rond ou carré, cerclé d'or
     local pf = CreateFrame("Frame", nil, f)
@@ -168,7 +182,7 @@ local function Create(unit, holderKey, default, mirror)
 
     -- élite / rare : petit mot doré sous le nom
     f.tag = p:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    f.tag:SetPoint(mirror and "TOPLEFT" or "TOPRIGHT", p, mirror and "TOPLEFT" or "TOPRIGHT", mirror and 10 or -10, -8)
+    f.tag:SetPoint("BOTTOM", p, "TOP", 0, 2)
     f.tag:SetTextColor(1, 0.82, 0)
 
     frames[unit] = f
@@ -236,7 +250,7 @@ local function UpdatePower(f)
     if plain(max) then hasPower = max > 0; f.lastHasPower = hasPower
     else hasPower = f.lastHasPower ~= false end
     f.power:SetShown(hasPower)
-    f.panel:SetHeight(hasPower and PANEL_H or PANEL_H - 10)
+    f.barBox:SetHeight(hasPower and PANEL_H - 21 or PANEL_H - 32)
     if not hasPower then return end
     local cur = UnitPower(u)
     f.power:SetMinMaxValues(0, max)
