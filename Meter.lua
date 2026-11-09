@@ -569,6 +569,8 @@ local function FillCard(c, i, d, n, dpsCi, dmgCi, total, maxAmount)
     if not loc and isMe then loc = UnitClass("player") end
     c.cls:ClearAllPoints()
     c.cls:SetPoint("LEFT", isMe and c.moi or c.name, "RIGHT", 6, 0)
+    c.cls:SetPoint("RIGHT", c.dpsLbl, "LEFT", -6, 0)          -- jamais sous « DPS »
+    c.cls:SetWordWrap(false)
     c.cls:SetText(loc or "")
     c.cls:SetTextColor(cr, cg, cb)
 
@@ -663,6 +665,25 @@ local function RenderCards(maxCards)
 end
 
 -- barre de vie de la cible (vue Détaillé)
+-- le contenu commence juste sous le titre, sauf s'il y a une ligne à montrer dessous
+-- (colonnes du Tableau, onglets des Barres, vie de la cible en Détaillé)
+local function SubShown()
+    local v = DB().meterView
+    if v == "cards" then return DB().meterTargetBar ~= false and UnitExists("target") end
+    return true
+end
+function NZR.MeterAnchorBody()
+    if not win or not win.body then return end
+    local collapse = not SubShown()
+    if win.bodyCollapsed == collapse then return end
+    win.bodyCollapsed = collapse
+    -- teinte « Jeu » : le cadre doré du jeu est plus épais, on reste à l'intérieur
+    local inX = win.nzrRock and 7 or 2
+    win.body:ClearAllPoints()
+    win.body:SetPoint("TOPLEFT", win.colHead, collapse and "TOPLEFT" or "BOTTOMLEFT", inX, collapse and -4 or -2)
+    win.body:SetPoint("BOTTOMRIGHT", -inX, DB().meterFooter and (FOOTER_H + 1) or (win.nzrRock and 6 or 3))
+end
+
 local function UpdateTargetBar()
     local t = win.tgt
     if not t then return end
@@ -840,7 +861,8 @@ end
 Render = function()
     if not win or not win:IsShown() then return end
     local view = DB().meterView or "cards"
-    local bodyH = win:GetHeight() - HEADER_H - SUB_H - (DB().meterFooter and FOOTER_H or 0) - 4
+    NZR.MeterAnchorBody()
+    local bodyH = win:GetHeight() - HEADER_H - (SubShown() and SUB_H or 0) - (DB().meterFooter and FOOTER_H or 0) - 4
     local function logErr(ok, res)
         if not ok and NZR.LogError and res ~= win.lastErr then
             win.lastErr = res
@@ -942,11 +964,8 @@ local function ApplySettings(resize)
     end
     NZR:ApplyOpacity()
     win.foot:SetShown(DB().meterFooter)
-    win.body:ClearAllPoints()
-    -- teinte « Jeu » : le cadre doré du jeu est plus épais, on reste à l'intérieur
-    local inX = win.nzrRock and 7 or 2
-    win.body:SetPoint("TOPLEFT", win.colHead, "BOTTOMLEFT", inX, -2)
-    win.body:SetPoint("BOTTOMRIGHT", -inX, DB().meterFooter and (FOOTER_H + 1) or (win.nzrRock and 6 or 3))
+    win.bodyCollapsed = nil
+    NZR.MeterAnchorBody()
     win.grip:SetShown(not DB().meterLock)
     if win.lock then win.lock.Refresh() end
     for _, r in ipairs(tabRows) do r.layoutKey = nil end
