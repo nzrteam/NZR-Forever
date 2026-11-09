@@ -337,7 +337,8 @@ local function RouteFor()
                 if s then name, id = s[1], s[2] end
             end
             out[#out + 1] = { min = e[1], max = e[2], name = name, d = e.d, zone = e.zone, zid = e.zid,
-                id = id, alias = e.alias, start = e.start, rec = e.rec, new = e.new, known = not e.start or id ~= nil }
+                id = id, alias = e.alias, zalias = e.zalias, en = e.en, start = e.start, rec = e.rec, new = e.new,
+                known = not e.start or id ~= nil }
         end
     end
     return out
@@ -386,6 +387,20 @@ local function LevelRow(i)
     r.go = CreateFrame("Button", nil, r, "UIPanelButtonTemplate")
     r.go:SetSize(70, 20); r.go:SetPoint("RIGHT", -6, 0); r.go:SetText("Flèche")
     r.go:SetScript("OnClick", function(s) PointTo(s.target, s.targetId, s.alias) end)
+    -- survol : nom d'origine (anglais) et où c'est
+    r:EnableMouse(true)
+    r:SetScript("OnEnter", function(s)
+        local e = s.entry
+        if not e then return end
+        GameTooltip:SetOwner(s, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(e.name, 1, 0.82, 0)
+        if e.en and e.en ~= e.name then GameTooltip:AddLine("Nom d'origine : " .. e.en, 0.75, 0.75, 0.75) end
+        GameTooltip:AddLine(("Niveaux %d-%d"):format(e.min, e.max), 1, 1, 1)
+        if e.d then GameTooltip:AddLine("Donjon · entrée : " .. (e.zone or "?"), 0.8, 0.8, 0.8) end
+        if e.new then GameTooltip:AddLine("Nouveau dans WoW Forever", 0.31, 0.76, 1) end
+        GameTooltip:Show()
+    end)
+    r:SetScript("OnLeave", function() GameTooltip:Hide() end)
     r.tag = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     r.tag:SetPoint("RIGHT", r.go, "LEFT", -10, 0)
     lv.rows[i] = r
@@ -611,7 +626,8 @@ RefreshLeveling = function()
         r.where:SetText(e.d and ("Donjon · " .. (e.zone or "")) or "")
         r.go.target = e.d and e.zone or e.name
         r.go.targetId = e.d and e.zid or e.id
-        r.go.alias = not e.d and e.alias or nil
+        r.go.alias = e.d and e.zalias or e.alias
+        r.entry = e
         r.go:SetShown(e.known)
         local tags = {}
         if e.new then tags[#tags + 1] = "|cff4fc3ffNouveau|r" end
@@ -630,7 +646,12 @@ RefreshLeveling = function()
             r.bg:SetColorTexture(1, 1, 1, (i % 2 == 0) and 0.03 or 0)
             r.name:SetTextColor(0.9, 0.9, 0.9); r.range:SetTextColor(0.8, 0.8, 0.8)
         end
-        if Norm(e.name) == Norm(here) and not e.d then hereInfo = e end
+        if not e.d then
+            local h = Norm(here)
+            local match = Norm(e.name) == h or (e.en and Norm(e.en) == h)
+            for _, a in ipairs(e.alias or {}) do match = match or Norm(a) == h end
+            if match then hereInfo = e end
+        end
     end
     for i = #route + 1, #lv.rows do lv.rows[i]:Hide() end
     lv.list:SetHeight(#route * ROW_H + 4)
