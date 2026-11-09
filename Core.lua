@@ -589,6 +589,7 @@ local function LoadSettings()
         NZRF_DB.v102 = true
         NZRF_DB.theme, NZRF_DB.auras, NZRF_DB.tooltips = false, false, false
     end
+    NZRF_DB.tooltips = false          -- ancien habillage NZR des infobulles : retiré (on garde celui du jeu)
     if (NZRF_DB.dbVersion or 0) < 5 then
         NZRF_DB.dbVersion = 5
         NZRF_DB.meterMode = 1

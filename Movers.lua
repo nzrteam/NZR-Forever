@@ -303,7 +303,7 @@ end
 
 function M:Init()
     if NZR.withUI then return end           -- NZR UI s'en charge déjà
-    if NZR.db.tooltipOpaque ~= false and not NZR.db.tooltips then pcall(SetupOpaqueTooltips) end
+    if NZR.db.tooltipOpaque ~= false then pcall(SetupOpaqueTooltips) end
     if NZR.db.lootAll or NZR.db.lootAutoClose ~= false then pcall(SetupLoot) end
     if NZR.db.moveTooltip or NZR.db.tooltipCursor then pcall(SetupTooltip) end
     if NZR.db.moveBags then pcall(SetupBags) end

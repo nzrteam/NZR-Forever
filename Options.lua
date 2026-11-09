@@ -63,7 +63,6 @@ local PAGES = {
       items = {
         { t = "switch", key = "theme", label = "Barres d'action (sorts)", desc = "Coins arrondis discrets, bord fin, raccourcis lisibles, survol coloré.", r = true },
         { t = "switch", key = "auras", label = "Buffs et débuffs", desc = "Icônes arrondies, bord fin (rouge pour les débuffs), durée lisible.", r = true },
-        { t = "switch", key = "tooltips", label = "Infobulles", desc = "Fond sombre, bord à la couleur de la qualité.", r = true },
         { t = "choice", key = "meterTheme", label = "Teinte", r = true, desc = "La même que le meter. Jeu : se fond dans WoW. Noir : sobre. Violet : couleurs NZR.",
           choices = function() return { { "jeu", "Jeu" }, { "noir", "Noir" }, { "violet", "Violet" } } end },
       } },

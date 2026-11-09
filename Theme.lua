@@ -196,7 +196,7 @@ end
 function M:Init()
     if not NZR.db.theme then return end
     StyleAllButtons()
-    if NZR.db.tooltips ~= false then StyleTooltips() end
+    -- les infobulles gardent l'apparence du jeu (réglages dans Pratique > Infobulles)
     -- les barres peuvent être (re)créées par le mode Édition
     local f = CreateFrame("Frame")
     f:RegisterEvent("PLAYER_ENTERING_WORLD")
