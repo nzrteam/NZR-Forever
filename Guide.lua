@@ -547,6 +547,7 @@ end
 
 local function CreateWindow()
     win = CreateFrame("Frame", "NZRF_Guide", UIParent)
+    win:Hide()            -- créée cachée : le premier clic l'ouvre (sinon il la refermait aussitôt)
     win:SetSize(W, H)
     win:SetPoint("CENTER")
     win:SetFrameStrata("HIGH")
