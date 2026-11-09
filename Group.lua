@@ -20,7 +20,7 @@ local boxes = {}
 local function PartyBig() return DB().grpPartyStyle ~= "compact" end
 local function CellSize(kind)
     local s = DB().grpCellScale or 1
-    if kind == "party" and PartyBig() then return math.floor(226 * s), math.floor(58 * s) end
+    if kind == "party" and PartyBig() then return math.floor(240 * s), math.floor(66 * s) end
     return math.floor(84 * s), math.floor(42 * s)
 end
 
@@ -51,12 +51,12 @@ local function Style(b, kind)
     inner:SetColorTexture(0.09, 0.08, 0.07, 1)
 
     -- cases larges : portrait encadré + niveau à gauche, comme nos cadres
-    local X0 = big and 54 or 1
+    local X0 = big and 62 or 1
     if big then
         local MEDIA = "Interface\\AddOns\\NZRForever\\Media\\uf\\"
         local square = DB().ufPortrait == "square"
         local pf = CreateFrame("Frame", nil, b)
-        pf:SetSize(46, 46); pf:SetPoint("LEFT", b, "LEFT", 4, 0)
+        pf:SetSize(54, 54); pf:SetPoint("LEFT", b, "LEFT", 4, 0)
         pf:SetFrameLevel(b:GetFrameLevel() + 2)
         local port = pf:CreateTexture(nil, "ARTWORK")
         port:SetPoint("TOPLEFT", 4, -4); port:SetPoint("BOTTOMRIGHT", -4, 4)
@@ -67,7 +67,7 @@ local function Style(b, kind)
         back:SetAllPoints(port); back:SetColorTexture(0.05, 0.04, 0.03, 1); back:AddMaskTexture(mask)
         if square then
             local host = CreateFrame("Frame", nil, pf)
-            host:SetScale(0.5); host:SetPoint("TOPLEFT"); host:SetSize(46 / 0.5, 46 / 0.5)
+            host:SetScale(0.5); host:SetPoint("TOPLEFT"); host:SetSize(54 / 0.5, 54 / 0.5)
             local ns = CreateFrame("Frame", nil, host, "NineSlicePanelTemplate")
             ns:SetAllPoints()
             if not (NineSliceUtil and pcall(NineSliceUtil.ApplyLayoutByName, ns, "Dialog")) then ns:Hide() end
@@ -80,18 +80,18 @@ local function Style(b, kind)
         b.port = port
         -- niveau dans un petit cadre doré, en bas à gauche du portrait
         local lv = CreateFrame("Frame", nil, pf)
-        lv:SetSize(22, 17); lv:SetPoint("CENTER", pf, "BOTTOMLEFT", 5, 5)
+        lv:SetSize(28, 20); lv:SetPoint("CENTER", pf, "BOTTOMLEFT", 7, 6)
         lv:SetFrameLevel(pf:GetFrameLevel() + 4)
         local lbg = lv:CreateTexture(nil, "BACKGROUND"); lbg:SetPoint("TOPLEFT", 2, -2); lbg:SetPoint("BOTTOMRIGHT", -2, 2)
         lbg:SetColorTexture(0.05, 0.04, 0.03, 0.95)
         local lhost = CreateFrame("Frame", nil, lv)
-        lhost:SetScale(0.5); lhost:SetPoint("TOPLEFT"); lhost:SetSize(22 / 0.5, 17 / 0.5)
+        lhost:SetScale(0.5); lhost:SetPoint("TOPLEFT"); lhost:SetSize(28 / 0.5, 20 / 0.5)
         local lns = CreateFrame("Frame", nil, lhost, "NineSlicePanelTemplate")
         lns:SetAllPoints()
         if not (NineSliceUtil and pcall(NineSliceUtil.ApplyLayoutByName, lns, "Dialog")) then lns:Hide() end
         if lns.Center then lns.Center:Hide() end
         local ltop = CreateFrame("Frame", nil, lv); ltop:SetAllPoints(); ltop:SetFrameLevel(lv:GetFrameLevel() + 3)
-        b.level = ltop:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        b.level = ltop:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         b.level:SetPoint("CENTER", 0, 0); b.level:SetJustifyH("CENTER"); b.level:SetJustifyV("MIDDLE")
         -- fond un peu plus sombre derrière le portrait
         local col = b:CreateTexture(nil, "BACKGROUND", nil, -6)
@@ -105,7 +105,7 @@ local function Style(b, kind)
     -- cases larges : bandeau du nom, vie, mana, puis une ligne pour les buffs / débuffs
     local hasPow = DB().grpPower ~= false
     hp:SetPoint("TOPLEFT", X0, big and -14 or -1)
-    if big then hp:SetPoint("BOTTOMRIGHT", -1, hasPow and 22 or 17)
+    if big then hp:SetPoint("BOTTOMRIGHT", -1, hasPow and 25 or 20)
     else hp:SetPoint("BOTTOMRIGHT", -1, hasPow and 4 or 1) end
     hp:SetMinMaxValues(0, 1); hp:SetValue(1)
     local hbg = hp:CreateTexture(nil, "BACKGROUND")
@@ -140,7 +140,7 @@ local function Style(b, kind)
     top:SetAllPoints(); top:SetFrameLevel(hp:GetFrameLevel() + 4)
     b.top = top
     b.name = top:CreateFontString(nil, "OVERLAY")
-    SetFont(b.name, big and 11 or 10)
+    SetFont(b.name, big and 12 or 10)
     b.name:SetWordWrap(false)
     b.info = top:CreateFontString(nil, "OVERLAY")
     SetFont(b.info, big and 11 or 9)
@@ -167,7 +167,7 @@ local function Style(b, kind)
     b.mark:SetPoint("CENTER", b, "TOP", 0, -2)
 
     -- petites icônes : buffs en bas à gauche, débuffs en bas à droite (comme le jeu)
-    local isz = big and 15 or 11
+    local isz = big and 17 or 11
     local function Icon(list, i, corner, dir)
         local d = CreateFrame("Frame", nil, top)
         d:SetSize(isz, isz)
