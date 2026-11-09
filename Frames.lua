@@ -8,7 +8,7 @@ local plain = NZR.plain
 local MEDIA = "Interface\\AddOns\\NZRForever\\Media\\uf\\"
 local BAR = "Interface\\TargetingFrame\\UI-StatusBar"
 
-local PANEL_W, PORT, PANEL_H = 214, 62, 58
+local PANEL_W, PORT, PANEL_H = 214, 66, 66
 local frames = {}
 
 local function DB() return NZR.db end
@@ -146,9 +146,9 @@ local function Create(unit, holderKey, default, mirror)
     f.name:SetWordWrap(false)
 
     local l, r = mirror and 9 or 16, mirror and -16 or -9
-    f.health = Bar(barBox, 15)
-    f.health:SetPoint("TOPLEFT", l, -24); f.health:SetPoint("TOPRIGHT", r, -24)
-    f.power = Bar(barBox, 9)
+    f.health = Bar(barBox, 16)
+    f.health:SetPoint("TOPLEFT", l, -25); f.health:SetPoint("TOPRIGHT", r, -25)
+    f.power = Bar(barBox, 10)
     f.power:SetPoint("TOPLEFT", f.health, "BOTTOMLEFT", 0, -2); f.power:SetPoint("TOPRIGHT", f.health, "BOTTOMRIGHT", 0, -2)
 
     -- portrait rond ou carré, cerclé d'or
@@ -247,7 +247,7 @@ local function UpdatePower(f)
     if plain(max) then hasPower = max > 0; f.lastHasPower = hasPower
     else hasPower = f.lastHasPower ~= false end
     f.power:SetShown(hasPower)
-    f.panel:SetHeight(hasPower and PANEL_H or PANEL_H - 11)
+    f.power:SetShown(hasPower)            -- la hauteur ne change pas : le bord reste entier
     if not hasPower then return end
     local cur = UnitPower(u)
     f.power:SetMinMaxValues(0, max)
