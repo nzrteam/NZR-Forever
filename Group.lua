@@ -20,7 +20,7 @@ local boxes = {}
 local function PartyBig() return DB().grpPartyStyle ~= "compact" end
 local function CellSize(kind)
     local s = DB().grpCellScale or 1
-    if kind == "party" and PartyBig() then return math.floor(176 * s), math.floor(58 * s) end
+    if kind == "party" and PartyBig() then return math.floor(226 * s), math.floor(58 * s) end
     return math.floor(84 * s), math.floor(42 * s)
 end
 
@@ -50,12 +50,61 @@ local function Style(b, kind)
     inner:SetPoint("TOPLEFT", 1, -1); inner:SetPoint("BOTTOMRIGHT", -1, 1)
     inner:SetColorTexture(0.09, 0.08, 0.07, 1)
 
+    -- cases larges : portrait encadré + niveau à gauche, comme nos cadres
+    local X0 = big and 54 or 1
+    if big then
+        local MEDIA = "Interface\\AddOns\\NZRForever\\Media\\uf\\"
+        local square = DB().ufPortrait == "square"
+        local pf = CreateFrame("Frame", nil, b)
+        pf:SetSize(46, 46); pf:SetPoint("LEFT", b, "LEFT", 4, 0)
+        pf:SetFrameLevel(b:GetFrameLevel() + 2)
+        local port = pf:CreateTexture(nil, "ARTWORK")
+        port:SetPoint("TOPLEFT", 4, -4); port:SetPoint("BOTTOMRIGHT", -4, 4)
+        local mask = pf:CreateMaskTexture()
+        mask:SetTexture(MEDIA .. (square and "mask_square" or "mask_round"), "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+        mask:SetAllPoints(port); port:AddMaskTexture(mask)
+        local back = pf:CreateTexture(nil, "BACKGROUND")
+        back:SetAllPoints(port); back:SetColorTexture(0.05, 0.04, 0.03, 1); back:AddMaskTexture(mask)
+        if square then
+            local host = CreateFrame("Frame", nil, pf)
+            host:SetScale(0.5); host:SetPoint("TOPLEFT"); host:SetSize(46 / 0.5, 46 / 0.5)
+            local ns = CreateFrame("Frame", nil, host, "NineSlicePanelTemplate")
+            ns:SetAllPoints()
+            if not (NineSliceUtil and pcall(NineSliceUtil.ApplyLayoutByName, ns, "Dialog")) then ns:Hide() end
+            if ns.Center then ns.Center:Hide() end
+            ns:SetFrameLevel(pf:GetFrameLevel() + 1)
+        else
+            local ring = pf:CreateTexture(nil, "OVERLAY")
+            ring:SetAllPoints(); ring:SetTexture(MEDIA .. "ring_round")
+        end
+        b.port = port
+        -- niveau dans un petit cadre doré, en bas à gauche du portrait
+        local lv = CreateFrame("Frame", nil, pf)
+        lv:SetSize(22, 17); lv:SetPoint("CENTER", pf, "BOTTOMLEFT", 5, 5)
+        lv:SetFrameLevel(pf:GetFrameLevel() + 4)
+        local lbg = lv:CreateTexture(nil, "BACKGROUND"); lbg:SetPoint("TOPLEFT", 2, -2); lbg:SetPoint("BOTTOMRIGHT", -2, 2)
+        lbg:SetColorTexture(0.05, 0.04, 0.03, 0.95)
+        local lhost = CreateFrame("Frame", nil, lv)
+        lhost:SetScale(0.5); lhost:SetPoint("TOPLEFT"); lhost:SetSize(22 / 0.5, 17 / 0.5)
+        local lns = CreateFrame("Frame", nil, lhost, "NineSlicePanelTemplate")
+        lns:SetAllPoints()
+        if not (NineSliceUtil and pcall(NineSliceUtil.ApplyLayoutByName, lns, "Dialog")) then lns:Hide() end
+        if lns.Center then lns.Center:Hide() end
+        local ltop = CreateFrame("Frame", nil, lv); ltop:SetAllPoints(); ltop:SetFrameLevel(lv:GetFrameLevel() + 3)
+        b.level = ltop:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        b.level:SetPoint("CENTER", 0, 0); b.level:SetJustifyH("CENTER"); b.level:SetJustifyV("MIDDLE")
+        -- fond un peu plus sombre derrière le portrait
+        local col = b:CreateTexture(nil, "BACKGROUND", nil, -6)
+        col:SetPoint("TOPLEFT", 1, -1); col:SetPoint("BOTTOMLEFT", 1, 1); col:SetWidth(X0 - 2)
+        col:SetColorTexture(0.04, 0.035, 0.03, 1)
+    end
+
     -- vie
     local hp = CreateFrame("StatusBar", nil, b)
     hp:SetStatusBarTexture(UF.BAR)
     -- cases larges : bandeau du nom, vie, mana, puis une ligne pour les buffs / débuffs
     local hasPow = DB().grpPower ~= false
-    hp:SetPoint("TOPLEFT", 1, big and -14 or -1)
+    hp:SetPoint("TOPLEFT", X0, big and -14 or -1)
     if big then hp:SetPoint("BOTTOMRIGHT", -1, hasPow and 22 or 17)
     else hp:SetPoint("BOTTOMRIGHT", -1, hasPow and 4 or 1) end
     hp:SetMinMaxValues(0, 1); hp:SetValue(1)
@@ -97,7 +146,7 @@ local function Style(b, kind)
     SetFont(b.info, big and 11 or 9)
     if big then
         -- nom doré dans le bandeau du haut, vie au centre de la barre
-        b.name:SetPoint("TOPLEFT", 5, -1); b.name:SetPoint("TOPRIGHT", -24, -1); b.name:SetHeight(13)
+        b.name:SetPoint("TOPLEFT", X0 + 3, -1); b.name:SetPoint("TOPRIGHT", -24, -1); b.name:SetHeight(13)
         b.name:SetJustifyH("LEFT")
         b.info:SetPoint("CENTER", hp, "CENTER", 0, 0)
     else
@@ -112,7 +161,7 @@ local function Style(b, kind)
     if big then b.role:SetPoint("TOPRIGHT", -4, -1) else b.role:SetPoint("TOPLEFT", 2, -2) end
     b.lead = top:CreateTexture(nil, "OVERLAY")
     b.lead:SetSize(11, 11); b.lead:SetTexture("Interface\\GroupFrame\\UI-Group-LeaderIcon")
-    b.lead:SetPoint("BOTTOMLEFT", b, "TOPLEFT", 2, -5)
+    b.lead:SetPoint("BOTTOMLEFT", b, "TOPLEFT", big and X0 + 2 or 2, -5)
     b.mark = top:CreateTexture(nil, "OVERLAY")
     b.mark:SetSize(14, 14); b.mark:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcons")
     b.mark:SetPoint("CENTER", b, "TOP", 0, -2)
@@ -124,7 +173,7 @@ local function Style(b, kind)
         d:SetSize(isz, isz)
         -- grandes cases : sous les barres ; cases de raid : dans les coins du bas
         local anchor = big and b or hp
-        if i == 1 then d:SetPoint(corner, anchor, corner, corner:find("LEFT") and 2 or -2, big and 2 or 1)
+        if i == 1 then d:SetPoint(corner, anchor, corner, corner:find("LEFT") and (big and X0 + 1 or 2) or -2, big and 2 or 1)
         else d:SetPoint(dir == 1 and "LEFT" or "RIGHT", list[i - 1], dir == 1 and "RIGHT" or "LEFT", dir, 0) end
         d.edge = d:CreateTexture(nil, "BACKGROUND"); d.edge:SetAllPoints()
         d.icon = d:CreateTexture(nil, "ARTWORK")
@@ -334,8 +383,24 @@ local function UpdateBorder(b)
     end
 end
 
+local function UpdatePortrait(b)
+    local u = b.unit
+    if not b.port or not u or not UnitExists(u) then return end
+    pcall(SetPortraitTexture, b.port, u)
+    local okC, conn = pcall(UnitIsConnected, u)
+    b.port:SetDesaturated(okC and plain(conn) ~= nil and conn == false)
+    local okL, lv = pcall(UnitLevel, u)
+    if okL and plain(lv) then
+        b.level:SetText(lv > 0 and lv or "??")
+        b.level:SetTextColor(1, 0.82, 0)
+    else
+        b.level:SetText("")
+    end
+end
+
 local function UpdateButton(b)
     if not b.unit or not UnitExists(b.unit) then return end
+    pcall(UpdatePortrait, b)
     pcall(UpdateName, b); pcall(UpdateHealth, b); pcall(UpdatePower, b)
     pcall(UpdateIcons, b); pcall(UpdateAuras, b); pcall(UpdateBorder, b)
 end
@@ -471,13 +536,15 @@ function M:Init()
                          "PLAYER_REGEN_ENABLED" }) do ev:RegisterEvent(e) end
     for _, e in ipairs({ "UNIT_HEALTH", "UNIT_MAXHEALTH", "UNIT_HEAL_PREDICTION", "UNIT_POWER_UPDATE",
                          "UNIT_MAXPOWER", "UNIT_DISPLAYPOWER", "UNIT_NAME_UPDATE", "UNIT_CONNECTION",
-                         "UNIT_FLAGS", "UNIT_AURA", "UNIT_THREAT_SITUATION_UPDATE" }) do ev:RegisterEvent(e) end
+                         "UNIT_FLAGS", "UNIT_AURA", "UNIT_THREAT_SITUATION_UPDATE",
+                         "UNIT_PORTRAIT_UPDATE", "UNIT_MODEL_CHANGED", "UNIT_LEVEL" }) do ev:RegisterEvent(e) end
     ev:SetScript("OnEvent", function(_, e, u)
         if e == "UNIT_HEALTH" or e == "UNIT_MAXHEALTH" or e == "UNIT_HEAL_PREDICTION"
            or e == "UNIT_CONNECTION" or e == "UNIT_FLAGS" then ForUnit(u, UpdateHealth)
         elseif e == "UNIT_POWER_UPDATE" or e == "UNIT_MAXPOWER" or e == "UNIT_DISPLAYPOWER" then ForUnit(u, UpdatePower)
         elseif e == "UNIT_AURA" then ForUnit(u, UpdateAuras)
         elseif e == "UNIT_NAME_UPDATE" then ForUnit(u, UpdateName)
+        elseif e == "UNIT_PORTRAIT_UPDATE" or e == "UNIT_MODEL_CHANGED" or e == "UNIT_LEVEL" then ForUnit(u, UpdatePortrait)
         elseif e == "UNIT_THREAT_SITUATION_UPDATE" then ForUnit(u, UpdateBorder)
         elseif e == "PLAYER_TARGET_CHANGED" then for _, b in ipairs(buttons) do pcall(UpdateBorder, b) end
         elseif e == "RAID_TARGET_UPDATE" or e == "PARTY_LEADER_CHANGED" or e == "PLAYER_ROLES_ASSIGNED" then
