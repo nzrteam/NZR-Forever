@@ -352,6 +352,22 @@ local function MakeButton(i)
     return b
 end
 
+-- largeur : icône + texte centrés dans le cadre, la barre suit le contenu
+local function FitBar()
+    if not bar or InCombatLockdown() then return end
+    local shown = bar.count or 0
+    local content = 100
+    for i = 1, shown do
+        local b = buttons[i]
+        local w = 39 + math.max(b.name:GetStringWidth() or 0, b.state:GetStringWidth() or 0)
+        if w > content then content = w end
+    end
+    content = math.min(content, 220)
+    for i = 1, shown do buttons[i]:SetWidth(content) end
+    bar:SetWidth(math.max(140, content + 28, (bar.info:GetStringWidth() or 0) + 24))
+    bar.empty:SetWidth(bar:GetWidth() - 20)
+end
+
 local function LayoutBar()
     if not bar then return end
     if InCombatLockdown() then pending = true; return end
@@ -367,7 +383,7 @@ local function LayoutBar()
             b.icon:SetTexture(bl.icon)
             SetClassIcon(b.cls, cls)
             b:ClearAllPoints()
-            b:SetPoint("TOPLEFT", bar, "TOPLEFT", 8, -22 - (shown - 1) * 36)
+            b:SetPoint("TOP", bar, "TOP", 0, -22 - (shown - 1) * 36)
             b:Show()
         end
     end
@@ -375,14 +391,7 @@ local function LayoutBar()
     bar.count = shown
     -- la taille suit le nombre de classes : seul = un bouton, en raid = un par classe
     bar:SetHeight(42 + math.max(1, shown) * 36)
-    local widest = 120
-    for i = 1, shown do
-        local b = buttons[i]
-        local w = 44 + math.max(b.name:GetStringWidth() or 0, b.state:GetStringWidth() or 0, 60)
-        if w > widest then widest = w end
-    end
-    bar:SetWidth(math.max(150, math.min(240, widest + 16)))
-    bar.empty:SetWidth(bar:GetWidth() - 20)
+    FitBar()
     bar.empty:SetShown(shown == 0)
 end
 
@@ -417,6 +426,7 @@ local function UpdateButtons()
     local form = GetShapeshiftForm and GetShapeshiftForm() or 0
     local syms = (C_Item and C_Item.GetItemCount and C_Item.GetItemCount(SYMBOL_OF_KINGS)) or (GetItemCount and GetItemCount(SYMBOL_OF_KINGS)) or 0
     bar.info:SetText(((form == 0) and "|cffff5050Aucune aura|r   " or "") .. ("Symboles : %d"):format(syms))
+    FitBar()
 end
 
 local function CreateBar()
