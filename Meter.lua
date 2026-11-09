@@ -978,13 +978,26 @@ end
 -- affichage automatique : en combat, en groupe, ou dans les 20 s après un combat
 -- meter réduit : une petite icône à la place, un clic le rouvre
 local mini
--- meter réduit : les barres de sorts / buffs collées à sa droite glissent à sa place
+-- meter réduit : les barres de sorts / buffs collées à sa droite vont à l'emplacement choisi
+-- (bloc « Barres, meter réduit » à placer avec Déplacer), l'icône DPS au-dessus
 local BAR_NAMES = { "MainMenuBar", "MainActionBar", "MultiBarBottomLeft", "MultiBarBottomRight",
-    "MultiBarRight", "MultiBarLeft", "MultiBar5", "MultiBar6", "MultiBar7", "StanceBar",
-    "PetActionBar", "PossessActionBar", "BuffFrame", "DebuffFrame" }
+    "MultiBarRight", "MultiBarLeft", "MultiBar5", "MultiBar6", "MultiBar7", "StanceBar", "StanceBarFrame",
+    "PetActionBar", "PetActionBarFrame", "PossessActionBar", "PossessBarFrame", "MultiCastActionBarFrame",
+    "BuffFrame", "DebuffFrame" }
 local shifted = nil          -- { [frame] = points d'origine }, nil = rien de décalé
 local shiftTop, shiftLeft
+local shiftHolder
+local function ShiftHolder()
+    if not shiftHolder then
+        shiftHolder = NZR:Holder("meterbars", "Barres quand le meter est réduit", 300, 260, { "TOPLEFT", "TOPLEFT", 12, -330 })
+        shiftHolder:HookScript("OnDragStop", function()
+            if shifted and NZR.MeterShiftRefresh then NZR.MeterShiftRefresh(true) end
+        end)
+    end
+    return shiftHolder
+end
 local function ShiftBars(on)
+    if DB().meterShiftBars then ShiftHolder() end   -- le bloc existe pour pouvoir le placer
     if on and not DB().meterShiftBars then on = false end
     if on == (shifted ~= nil) then return end
     if InCombatLockdown() then return end          -- réessayé à la sortie du combat (minuterie)
@@ -999,22 +1012,29 @@ local function ShiftBars(on)
     if not win then return end
     local wl, wr, wt, wb = win:GetLeft(), win:GetRight(), win:GetTop(), win:GetBottom()
     if not (wl and wr) then return end
-    local list, minLeft, top = {}, nil, nil
+    local list, minLeft, top, maxRight, bottom = {}, nil, nil, nil, nil
+    local seen = {}
     for _, n in ipairs(BAR_NAMES) do
         local f = _G[n]
-        if f and f.IsShown and f:IsShown() and f.GetLeft then
-            local l, t, b = f:GetLeft(), f:GetTop(), f:GetBottom()
+        if f and not seen[f] and f.IsShown and f:IsShown() and f.GetLeft then
+            seen[f] = true
+            local l, r, t, b = f:GetLeft(), f:GetRight(), f:GetTop(), f:GetBottom()
             -- juste à droite du meter et à peu près à la même hauteur
-            if l and t and b and l >= wr - 12 and l <= wr + 90 and t >= wb - 260 and b <= wt + 260 then
+            if l and r and t and b and l >= wr - 12 and l <= wr + 90 and t >= wb - 260 and b <= wt + 260 then
                 table.insert(list, f)
-                minLeft = math.min(minLeft or l, l)
-                top = math.max(top or t, t)
+                minLeft, maxRight = math.min(minLeft or l, l), math.max(maxRight or r, r)
+                top, bottom = math.max(top or t, t), math.min(bottom or b, b)
             end
         end
     end
     shifted = {}
     if #list == 0 then return end
-    local dx = minLeft - wl
+    -- destination : le bloc à placer (sa taille suit celle des barres)
+    local hd = ShiftHolder()
+    hd:SetSize(maxRight - minLeft, top - bottom)
+    local tl, tt = hd:GetLeft(), hd:GetTop()
+    if not (tl and tt) then tl, tt = wl, wt end
+    local dx, dy = minLeft - tl, top - tt
     for _, f in ipairs(list) do
         local pts = {}
         for i = 1, f:GetNumPoints() do
@@ -1023,9 +1043,9 @@ local function ShiftBars(on)
         end
         shifted[f] = pts
         f:ClearAllPoints()
-        for _, pt in ipairs(pts) do pcall(f.SetPoint, f, pt[1], pt[2], pt[3], (pt[4] or 0) - dx, pt[5] or 0) end
+        for _, pt in ipairs(pts) do pcall(f.SetPoint, f, pt[1], pt[2], pt[3], (pt[4] or 0) - dx, (pt[5] or 0) - dy) end
     end
-    shiftTop, shiftLeft = top, wl
+    shiftTop, shiftLeft = tt, tl
 end
 
 local function ShowMini(show)
@@ -1075,7 +1095,7 @@ local function ShowMini(show)
         -- barres décalées : l'icône se pose au-dessus d'elles, en haut à gauche
         if show and shifted and shiftTop and not mini.nzrDocked then
             mini:ClearAllPoints()
-            mini:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", shiftLeft, shiftTop + 18)
+            mini:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", shiftLeft, shiftTop + 16)
             mini.nzrDocked = true
         elseif (not show or not shifted) and mini.nzrDocked then
             mini.nzrDocked = nil
@@ -1088,7 +1108,10 @@ local function ShowMini(show)
     end
 end
 
-NZR.MeterShiftRefresh = function() ShowMini(DB().meterMin and true or false) end
+NZR.MeterShiftRefresh = function(redo)
+    if redo and shifted then ShiftBars(false); if mini then mini.nzrDocked = nil end end
+    ShowMini(DB().meterMin and true or false)
+end
 
 local function UpdateVisibility()
     if not win then return end
