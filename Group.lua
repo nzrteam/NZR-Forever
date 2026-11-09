@@ -42,6 +42,12 @@ end
 local function Style(b, kind)
     if b.nzr then return end
     b.nzr, b.kind = true, kind
+    -- clic droit = menu du jeu (inviter, chuchoter, inspecter…) : il faut aussi écouter le clic droit
+    if not InCombatLockdown() then
+        b:RegisterForClicks("AnyUp")
+        b:SetAttribute("*type1", "target")
+        b:SetAttribute("*type2", "togglemenu")
+    end
     local big = kind == "party" and PartyBig()
 
     local bg = b:CreateTexture(nil, "BACKGROUND", nil, -8)
@@ -449,6 +455,7 @@ local function InitConfig(w, h)
         self:SetWidth(%d); self:SetHeight(%d)
         self:SetAttribute("*type1", "target")
         self:SetAttribute("*type2", "togglemenu")
+        self:RegisterForClicks("AnyUp")
     ]]):format(w, h)
 end
 
