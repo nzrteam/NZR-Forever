@@ -522,6 +522,11 @@ local function BuildGrid()
             c.icon = c:CreateTexture(nil, "ARTWORK"); c.icon:SetPoint("TOPLEFT", 2, -2); c.icon:SetPoint("BOTTOMRIGHT", -2, 2)
             c.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
             local hl = c:CreateTexture(nil, "HIGHLIGHT"); hl:SetAllPoints(); hl:SetColorTexture(1, 0.82, 0, 0.25)
+            c.plus = c:CreateFontString(nil, "OVERLAY", "GameFontDisableLarge")
+            c.plus:SetPoint("CENTER", 0, 1); c.plus:SetText("+")
+            local edge = c:CreateTexture(nil, "BORDER")
+            edge:SetPoint("TOPLEFT", -1, 1); edge:SetPoint("BOTTOMRIGHT", 1, -1); edge:SetColorTexture(0.55, 0.45, 0.25, 0.6)
+            c.edge = edge
             win.cells[ci] = c
         end
         c:Show()
@@ -535,8 +540,10 @@ local function BuildGrid()
         local h = Cell()
         h:ClearAllPoints(); h:SetPoint("TOPLEFT", x0 + (i - 1) * (CELL + 6), y0)
         h:SetScript("OnClick", nil)
+        h.icon:SetTexCoord(0, 1, 0, 1)
         SetClassIcon(h.icon, cls)
-        h.icon:SetDesaturated(false)
+        h.icon:SetAlpha(1); h.icon:Show()
+        h.plus:Hide(); h.edge:Hide()
         h.bg:SetColorTexture(0, 0, 0, 0)
         h:SetScript("OnEnter", function(s)
             GameTooltip:SetOwner(s, "ANCHOR_TOP")
@@ -565,8 +572,10 @@ local function BuildGrid()
             c:ClearAllPoints(); c:SetPoint("TOPLEFT", x0 + (i - 1) * (CELL + 6), y)
             c.bg:SetColorTexture(0, 0, 0, 0.55)
             local key = Assign(pal, cls)
-            if key then c.icon:SetTexture(BY_KEY[key].icon); c.icon:SetAlpha(1)
-            else c.icon:SetTexture("Interface\\Buttons\\UI-EmptySlot-Disabled"); c.icon:SetAlpha(0.6) end
+            c.edge:Show()
+            c.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+            if key then c.icon:SetTexture(BY_KEY[key].icon); c.icon:Show(); c.plus:Hide()
+            else c.icon:Hide(); c.plus:Show() end
             c:SetScript("OnClick", function(_, btn)
                 local newKey
                 if IsShiftKeyDown() then newKey = nil
@@ -586,8 +595,8 @@ local function BuildGrid()
             c:SetScript("OnLeave", function() GameTooltip:Hide() end)
         end
     end
-    local w = math.max(420, x0 + #classes * (CELL + 6) + 20)
-    local h = 140 + (CELL + 10) + #pals * (CELL + 8)
+    local w = math.max(520, x0 + #classes * (CELL + 6) + 24)
+    local h = 170 + (CELL + 10) + #pals * (CELL + 8)
     win:SetSize(w, h)
 end
 
@@ -619,7 +628,7 @@ local function CreateWindow()
     hint:SetText("Une ligne par paladin, une colonne par classe. Clique une case pour choisir la bénédiction. "
         .. "Les autres paladins qui ont NZR Forever voient la même répartition.")
     win.grid = CreateFrame("Frame", nil, win)
-    win.grid:SetPoint("TOPLEFT", 10, -64); win.grid:SetPoint("BOTTOMRIGHT", -10, 44)
+    win.grid:SetPoint("TOPLEFT", 10, -70); win.grid:SetPoint("BOTTOMRIGHT", -10, 70)
 
     local function Btn(text, onClick, anchor, x)
         local b = CreateFrame("Button", nil, win, "UIPanelButtonTemplate")
@@ -639,7 +648,7 @@ local function CreateWindow()
     clear:SetPoint("LEFT", auto, "RIGHT", 6, 0)
     local all = CreateFrame("CheckButton", nil, win, "UICheckButtonTemplate")
     all:SetSize(24, 24)
-    all:SetPoint("LEFT", clear, "RIGHT", 12, 0)
+    all:SetPoint("BOTTOMLEFT", auto, "TOPLEFT", -2, 6)
     local allT = win:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     allT:SetPoint("LEFT", all, "RIGHT", 2, 0); allT:SetText("Toutes les classes")
     all:SetScript("OnShow", function(s) s:SetChecked(DB().blessAllClasses and true or false) end)
