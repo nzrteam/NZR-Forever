@@ -82,14 +82,16 @@ local function Style(b, kind)
         local lv = CreateFrame("Frame", nil, pf)
         lv:SetSize(32, 16); lv:SetPoint("TOP", pf, "BOTTOM", 0, -1)   -- sous le portrait, sans le cacher
         lv:SetFrameLevel(pf:GetFrameLevel() + 4)
-        local lbg = lv:CreateTexture(nil, "BACKGROUND"); lbg:SetPoint("TOPLEFT", 2, -2); lbg:SetPoint("BOTTOMRIGHT", -2, 2)
+        -- petit cadre net : fond sombre + liseré doré d'1 px (le bord « Dialog » est trop épais à cette taille)
+        local lbg = lv:CreateTexture(nil, "BACKGROUND"); lbg:SetAllPoints()
         lbg:SetColorTexture(0.05, 0.04, 0.03, 0.95)
-        local lhost = CreateFrame("Frame", nil, lv)
-        lhost:SetScale(0.5); lhost:SetPoint("TOPLEFT"); lhost:SetSize(32 / 0.5, 16 / 0.5)
-        local lns = CreateFrame("Frame", nil, lhost, "NineSlicePanelTemplate")
-        lns:SetAllPoints()
-        if not (NineSliceUtil and pcall(NineSliceUtil.ApplyLayoutByName, lns, "Dialog")) then lns:Hide() end
-        if lns.Center then lns.Center:Hide() end
+        for _, side in ipairs({ { "TOPLEFT", "TOPRIGHT", true }, { "BOTTOMLEFT", "BOTTOMRIGHT", true },
+                                { "TOPLEFT", "BOTTOMLEFT" }, { "TOPRIGHT", "BOTTOMRIGHT" } }) do
+            local t = lv:CreateTexture(nil, "BORDER")
+            t:SetPoint(side[1]); t:SetPoint(side[2])
+            if side[3] then t:SetHeight(1) else t:SetWidth(1) end
+            t:SetColorTexture(0.78, 0.62, 0.28, 1)
+        end
         local ltop = CreateFrame("Frame", nil, lv); ltop:SetAllPoints(); ltop:SetFrameLevel(lv:GetFrameLevel() + 3)
         b.level = ltop:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         b.level:SetPoint("CENTER", 0, 0); b.level:SetJustifyH("CENTER"); b.level:SetJustifyV("MIDDLE")
