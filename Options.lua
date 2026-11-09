@@ -74,7 +74,7 @@ local PAGES = {
           apply = function() if NZR.FramesRefresh then NZR.FramesRefresh() end end },
         { t = "switch", key = "ufShort", section = "Texte des barres", label = "Grands nombres raccourcis", desc = "12,4k au lieu de 12 400.",
           apply = function() if NZR.FramesRefresh then NZR.FramesRefresh() end end },
-        { t = "choice", key = "ufColor", section = "Couleurs", label = "Barre de vie", desc = "Verte comme le jeu, ou à la couleur de la classe (monstres : rouge, jaune ou vert selon leur attitude).",
+        { t = "choice", key = "ufColor", section = "Couleurs", label = "Barre de vie", desc = "Verte comme le jeu, ou couleur de classe pour les joueurs, rouge pour les monstres à combattre, vert pour les PNJ amicaux.",
           choices = function() return { { "green", "Verte" }, { "class", "Couleur de classe" } } end,
           apply = function() if NZR.FramesRefresh then NZR.FramesRefresh() end end },
         { t = "slider", key = "ufScale", section = "Taille et place", label = "Taille", desc = "Taille des deux cadres.", min = 0.7, max = 1.5, step = 0.05,

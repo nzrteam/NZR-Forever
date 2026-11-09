@@ -8,7 +8,7 @@ local plain = NZR.plain
 local MEDIA = "Interface\\AddOns\\NZRForever\\Media\\uf\\"
 local BAR = "Interface\\TargetingFrame\\UI-StatusBar"
 
-local PANEL_W, PORT = 236, 66
+local PANEL_W, PORT, PANEL_H = 214, 62, 56
 local frames = {}
 
 local function DB() return NZR.db end
@@ -36,6 +36,9 @@ end
 local function ReactionRGB(unit)
     local ok, tapped = pcall(UnitIsTapDenied, unit)
     if ok and plain(tapped) and tapped then return 0.5, 0.5, 0.5 end
+    -- tout ce qu'on peut attaquer (ennemi ou neutre) : rouge
+    local oka, atk = pcall(UnitCanAttack, "player", unit)
+    if oka and plain(atk) and atk then return 0.8, 0.1, 0.08 end
     local ok2, r = pcall(UnitReaction, unit, "player")
     if ok2 and plain(r) then
         if r <= 2 then return 0.85, 0.15, 0.12
@@ -60,31 +63,20 @@ end
 ---------------------------------------------------------------------------
 -- Construction (style du jeu : panneau sombre, liseré doré)
 ---------------------------------------------------------------------------
-local function GoldBorder(f)
-    local function edge(p1, p2, w, h)
-        local t = f:CreateTexture(nil, "BORDER")
-        t:SetColorTexture(0, 0, 0, 1)
-        t:SetPoint(p1); t:SetPoint(p2)
-        if w then t:SetWidth(w) end
-        if h then t:SetHeight(h) end
-    end
-    edge("TOPLEFT", "TOPRIGHT", nil, 1); edge("BOTTOMLEFT", "BOTTOMRIGHT", nil, 1)
-    edge("TOPLEFT", "BOTTOMLEFT", 1, nil); edge("TOPRIGHT", "BOTTOMRIGHT", 1, nil)
-    local g = { 0.55, 0.43, 0.17 }
-    local top = f:CreateTexture(nil, "BORDER", nil, 1); top:SetColorTexture(g[1], g[2], g[3]); top:SetHeight(2)
-    top:SetPoint("TOPLEFT", 1, -1); top:SetPoint("TOPRIGHT", -1, -1)
-    local bot = f:CreateTexture(nil, "BORDER", nil, 1); bot:SetColorTexture(g[1], g[2], g[3]); bot:SetHeight(2)
-    bot:SetPoint("BOTTOMLEFT", 1, 1); bot:SetPoint("BOTTOMRIGHT", -1, 1)
-    local l = f:CreateTexture(nil, "BORDER", nil, 1); l:SetColorTexture(g[1], g[2], g[3]); l:SetWidth(2)
-    l:SetPoint("TOPLEFT", 1, -1); l:SetPoint("BOTTOMLEFT", 1, 1)
-    local r = f:CreateTexture(nil, "BORDER", nil, 1); r:SetColorTexture(g[1], g[2], g[3]); r:SetWidth(2)
-    r:SetPoint("TOPRIGHT", -1, -1); r:SetPoint("BOTTOMRIGHT", -1, 1)
-    local hl = f:CreateTexture(nil, "BORDER", nil, 2); hl:SetColorTexture(1, 0.85, 0.4, 0.35); hl:SetHeight(1)
-    hl:SetPoint("TOPLEFT", 3, -3); hl:SetPoint("TOPRIGHT", -3, -3)
+local function GameBorder(f)
     local bg = f:CreateTexture(nil, "BACKGROUND")
     bg:SetPoint("TOPLEFT", 3, -3); bg:SetPoint("BOTTOMRIGHT", -3, 3)
-    bg:SetColorTexture(1, 1, 1, 1)
-    bg:SetGradient("VERTICAL", CreateColor(0.10, 0.08, 0.055, 0.95), CreateColor(0.17, 0.13, 0.09, 0.95))
+    bg:SetColorTexture(0.03, 0.03, 0.05, 0.85)
+    local ns = CreateFrame("Frame", nil, f, "NineSlicePanelTemplate")
+    ns:SetAllPoints()
+    ns:SetFrameLevel(f:GetFrameLevel() + 1)
+    if NineSliceUtil and pcall(NineSliceUtil.ApplyLayoutByName, ns, "TooltipDefaultLayout") then
+        if ns.Center then ns.Center:Hide() end
+        if ns.SetBorderColor then pcall(ns.SetBorderColor, ns, 0.62, 0.62, 0.66, 1) end
+    else
+        ns:Hide()
+    end
+    f.nzrBg = bg
 end
 
 local function Bar(parent, h)
@@ -105,7 +97,7 @@ local function Bar(parent, h)
         fs:SetJustifyH(justify)
         return fs
     end
-    b.center = Text(h >= 14 and 12 or 10, "CENTER")
+    b.center = Text(h >= 14 and 11 or 9, "CENTER")
     b.center:SetPoint("CENTER", 0, 0)
     b.right = Text(10, "RIGHT")
     b.right:SetPoint("RIGHT", -4, 0)
@@ -114,10 +106,10 @@ local function Bar(parent, h)
 end
 
 local function Create(unit, holderKey, default, mirror)
-    local hd = NZR:Holder(holderKey, unit == "player" and "Joueur" or "Cible", PANEL_W + PORT, PORT + 8, default)
+    local hd = NZR:Holder(holderKey, unit == "player" and "Joueur" or "Cible", PANEL_W + PORT - 12, PORT + 6, default)
     local f = CreateFrame("Button", "NZRF_UF_" .. unit, UIParent, "SecureUnitButtonTemplate")
     f.unit, f.mirror = unit, mirror
-    f:SetSize(PANEL_W + PORT - 10, PORT + 8)
+    f:SetSize(PANEL_W + PORT - 12, PORT + 6)
     f:SetPoint("CENTER", hd, "CENTER")
     f:SetAttribute("unit", unit)
     f:SetAttribute("*type1", "target")
@@ -127,22 +119,25 @@ local function Create(unit, holderKey, default, mirror)
 
     -- panneau
     local p = CreateFrame("Frame", nil, f)
-    p:SetSize(PANEL_W, 52)
-    if mirror then p:SetPoint("RIGHT", f, "RIGHT", -(PORT - 14), -2) else p:SetPoint("LEFT", f, "LEFT", PORT - 14, -2) end
-    GoldBorder(p)
+    p:SetSize(PANEL_W, PANEL_H)
+    -- le portrait chevauche le bord du panneau, centré verticalement
+    if mirror then p:SetPoint("RIGHT", f, "RIGHT", -(PORT - 12), 0) else p:SetPoint("LEFT", f, "LEFT", PORT - 12, 0) end
+    GameBorder(p)
     f.panel = p
 
     f.name = p:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    f.name:SetPoint("TOP", 0, -6)
-    f.name:SetWidth(PANEL_W - 28)
+    f.name:SetPoint("TOPLEFT", mirror and 10 or 18, -7)
+    f.name:SetPoint("TOPRIGHT", mirror and -18 or -10, -7)
+    f.name:SetJustifyH(mirror and "RIGHT" or "LEFT")
     f.name:SetWordWrap(false)
     local sep = p:CreateTexture(nil, "ARTWORK")
-    sep:SetColorTexture(0.55, 0.43, 0.17, 0.6); sep:SetHeight(1)
-    sep:SetPoint("TOPLEFT", 6, -20); sep:SetPoint("TOPRIGHT", -6, -20)
+    sep:SetColorTexture(1, 1, 1, 0.07); sep:SetHeight(1)
+    sep:SetPoint("TOPLEFT", 6, -22); sep:SetPoint("TOPRIGHT", -6, -22)
 
-    f.health = Bar(p, 15)
-    f.health:SetPoint("TOPLEFT", 6, -23); f.health:SetPoint("TOPRIGHT", -6, -23)
-    f.power = Bar(p, 9)
+    local l, r = mirror and 8 or 16, mirror and -16 or -8
+    f.health = Bar(p, 16)
+    f.health:SetPoint("TOPLEFT", l, -26); f.health:SetPoint("TOPRIGHT", r, -26)
+    f.power = Bar(p, 8)
     f.power:SetPoint("TOPLEFT", f.health, "BOTTOMLEFT", 0, -3); f.power:SetPoint("TOPRIGHT", f.health, "BOTTOMRIGHT", 0, -3)
 
     -- portrait rond ou carré, cerclé d'or
@@ -173,7 +168,7 @@ local function Create(unit, holderKey, default, mirror)
 
     -- élite / rare : petit mot doré sous le nom
     f.tag = p:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    f.tag:SetPoint(mirror and "TOPLEFT" or "TOPRIGHT", p, mirror and "TOPLEFT" or "TOPRIGHT", mirror and 8 or -8, -7)
+    f.tag:SetPoint(mirror and "TOPLEFT" or "TOPRIGHT", p, mirror and "TOPLEFT" or "TOPRIGHT", mirror and 10 or -10, -8)
     f.tag:SetTextColor(1, 0.82, 0)
 
     frames[unit] = f
@@ -237,9 +232,11 @@ local function UpdatePower(f)
     local u = f.unit
     if not UnitExists(u) then return end
     local max = UnitPowerMax(u)
-    local hasPower = not plain(max) or max > 0
+    local hasPower
+    if plain(max) then hasPower = max > 0; f.lastHasPower = hasPower
+    else hasPower = f.lastHasPower ~= false end
     f.power:SetShown(hasPower)
-    f.panel:SetHeight(hasPower and 52 or 42)
+    f.panel:SetHeight(hasPower and PANEL_H or PANEL_H - 10)
     if not hasPower then return end
     local cur = UnitPower(u)
     f.power:SetMinMaxValues(0, max)
@@ -253,6 +250,7 @@ end
 local function UpdateInfo(f)
     local u = f.unit
     if not UnitExists(u) then return end
+    f.lastHasPower = nil
     NZR.SafeText(f.name, UnitName(u))
     if UnitIsPlayer(u) and DB().ufColor == "class" then
         local r, g, b = ClassRGB(u); if r then f.name:SetTextColor(r, g, b) end
