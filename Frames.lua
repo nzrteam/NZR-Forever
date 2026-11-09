@@ -8,7 +8,7 @@ local plain = NZR.plain
 local MEDIA = "Interface\\AddOns\\NZRForever\\Media\\uf\\"
 local BAR = "Interface\\TargetingFrame\\UI-StatusBar"
 
-local PANEL_W, PORT, PANEL_H = 214, 62, 56
+local PANEL_W, PORT, PANEL_H = 214, 60, 58
 local frames = {}
 
 local function DB() return NZR.db end
@@ -134,21 +134,21 @@ local function Create(unit, holderKey, default, mirror)
     f.panel = p
 
     -- même cadre que le DPS meter (fenêtre du jeu en réduit) : le nom dans la barre de titre
-    local SCALE = 0.72
+    local SCALE = 0.58                          -- assez petit pour que les pièces du jeu tiennent sans dépasser
     local over = NZR:WowFrame(p, nil, 0.9, SCALE)
     over:SetFrameLevel(p:GetFrameLevel() + 6)
     local barBox = over
     f.barBox = barBox
     f.name = barBox:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    f.name:SetPoint("TOPLEFT", mirror and 8 or 14, -2)
-    f.name:SetPoint("TOPRIGHT", mirror and -14 or -8, -2)
-    f.name:SetHeight(13)
+    f.name:SetPoint("TOPLEFT", mirror and 8 or 14, -1)
+    f.name:SetPoint("TOPRIGHT", mirror and -14 or -8, -1)
+    f.name:SetHeight(12)
     f.name:SetJustifyH("CENTER")
     f.name:SetWordWrap(false)
 
     local l, r = mirror and 9 or 16, mirror and -16 or -9
     f.health = Bar(barBox, 16)
-    f.health:SetPoint("TOPLEFT", l, -20); f.health:SetPoint("TOPRIGHT", r, -20)
+    f.health:SetPoint("TOPLEFT", l, -17); f.health:SetPoint("TOPRIGHT", r, -17)
     f.power = Bar(barBox, 10)
     f.power:SetPoint("TOPLEFT", f.health, "BOTTOMLEFT", 0, -2); f.power:SetPoint("TOPRIGHT", f.health, "BOTTOMRIGHT", 0, -2)
 
@@ -166,17 +166,41 @@ local function Create(unit, holderKey, default, mirror)
     f.portrait:AddMaskTexture(mask)
     local back = pf:CreateTexture(nil, "BACKGROUND")
     back:SetAllPoints(f.portrait); back:SetColorTexture(0.05, 0.04, 0.03, 1); back:AddMaskTexture(mask)
-    local ring = pf:CreateTexture(nil, "OVERLAY")
-    ring:SetAllPoints(); ring:SetTexture(MEDIA .. (square and "ring_square" or "ring_round"))
+    if square then
+        local nsH = CreateFrame("Frame", nil, pf)
+        nsH:SetScale(0.5)
+        nsH:SetPoint("TOPLEFT", pf, "TOPLEFT", 0, 0)
+        nsH:SetSize(PORT / 0.5, PORT / 0.5)
+        local ns = CreateFrame("Frame", nil, nsH, "NineSlicePanelTemplate")
+        ns:SetAllPoints()
+        if not (NineSliceUtil and pcall(NineSliceUtil.ApplyLayoutByName, ns, "Dialog")) then ns:Hide() end
+        if ns.Center then ns.Center:Hide() end
+        ns:SetFrameLevel(pf:GetFrameLevel() + 1)
+        f.portrait:ClearAllPoints()
+        f.portrait:SetPoint("TOPLEFT", 4, -4); f.portrait:SetPoint("BOTTOMRIGHT", -4, 4)
+        mask:SetAllPoints(f.portrait)
+    else
+        local ring = pf:CreateTexture(nil, "OVERLAY")
+        ring:SetAllPoints(); ring:SetTexture(MEDIA .. "ring_round")
+    end
 
-    -- pastille de niveau
+    -- niveau : petite boîte au même bord doré, chiffre centré
     local lv = CreateFrame("Frame", nil, pf)
-    lv:SetSize(26, 26)
-    lv:SetFrameLevel(pf:GetFrameLevel() + 2)
-    if mirror then lv:SetPoint("CENTER", pf, "BOTTOMRIGHT", -6, 6) else lv:SetPoint("CENTER", pf, "BOTTOMLEFT", 6, 6) end
-    local lvt = lv:CreateTexture(nil, "ARTWORK"); lvt:SetAllPoints(); lvt:SetTexture(MEDIA .. "level")
-    f.level = lv:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    f.level:SetPoint("CENTER", 0, 0)
+    lv:SetSize(24, 20)
+    lv:SetFrameLevel(pf:GetFrameLevel() + 4)
+    if mirror then lv:SetPoint("CENTER", pf, "BOTTOMRIGHT", -4, 4) else lv:SetPoint("CENTER", pf, "BOTTOMLEFT", 4, 4) end
+    local lvbg = lv:CreateTexture(nil, "BACKGROUND")
+    lvbg:SetPoint("TOPLEFT", 2, -2); lvbg:SetPoint("BOTTOMRIGHT", -2, 2); lvbg:SetColorTexture(0.05, 0.04, 0.03, 0.95)
+    local lvH = CreateFrame("Frame", nil, lv)
+    lvH:SetScale(0.5); lvH:SetPoint("TOPLEFT", lv, "TOPLEFT", 0, 0); lvH:SetSize(24 / 0.5, 20 / 0.5)
+    local lvns = CreateFrame("Frame", nil, lvH, "NineSlicePanelTemplate")
+    lvns:SetAllPoints()
+    if not (NineSliceUtil and pcall(NineSliceUtil.ApplyLayoutByName, lvns, "Dialog")) then lvns:Hide() end
+    if lvns.Center then lvns.Center:Hide() end
+    local lvTop = CreateFrame("Frame", nil, lv); lvTop:SetAllPoints(); lvTop:SetFrameLevel(lv:GetFrameLevel() + 3)
+    f.level = lvTop:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    f.level:SetPoint("TOPLEFT", 0, 0); f.level:SetPoint("BOTTOMRIGHT", 0, 0)
+    f.level:SetJustifyH("CENTER"); f.level:SetJustifyV("MIDDLE")
 
     -- élite / rare : petit mot doré sous le nom
     f.tag = p:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
