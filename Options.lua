@@ -125,6 +125,7 @@ local PAGES = {
               else NZR:Print("active d'abord la flèche, puis clique sur Recharger.") end
           end },
         { t = "switch", key = "squareMinimap", section = "Minicarte", label = "Minicarte carrée", desc = "Carte carrée avec le bord des infobulles du jeu ; boutons et nom de zone inchangés. Molette = zoom.", r = true },
+        { t = "switch", key = "menuButton", section = "Menu Échap", label = "Bouton « NZR Forever » dans le menu Échap", desc = "Tout en haut du menu, pour ouvrir ces réglages. Sinon : /nzr." },
         { t = "switch", key = "tooltipOpaque", section = "Infobulles", label = "Infobulles opaques", desc = "Fond plein (plus de décor qui transparaît) et toujours au-dessus du reste.", r = true },
         { t = "slider", key = "tooltipAlpha", section = "Infobulles", label = "Opacité des infobulles", desc = "100 % = complètement opaque.", min = 0.5, max = 1, step = 0.05 },
         { t = "switch", key = "moveTooltip", section = "Déplacer", label = "Infobulle déplaçable", desc = "Puis « Placer l'infobulle et les sacs » pour choisir l'endroit.", r = true },
@@ -498,7 +499,20 @@ function M:Init()
     -- bouton "NZR Forever" dans le menu Échap (le menu garde le look du jeu)
     if GameMenuFrame and GameMenuFrame.InitButtons and GameMenuFrame.AddButton then
         hooksecurefunc(GameMenuFrame, "InitButtons", function(self)
+            if NZR.db.menuButton == false then return end
             pcall(self.AddButton, self, "NZR Forever", OpenFromMenu)
+            -- tout en haut du menu, avec un petit espace en dessous
+            local pool = self.buttonPool
+            if pool and pool.EnumerateActive then
+                for b in pool:EnumerateActive() do
+                    if b.GetText and b:GetText() == "NZR Forever" then
+                        b.layoutIndex = 0
+                        b.bottomPadding = 10
+                    end
+                end
+                if self.MarkDirty then pcall(self.MarkDirty, self) end
+                if self.Layout then pcall(self.Layout, self) end
+            end
         end)
         -- (NZR Forever ne touche pas au reste du menu Échap)
     elseif GameMenuFrame then
