@@ -39,26 +39,50 @@ local function Inside(r, bar)
     return x >= l and x <= rr and y >= b - 1 and y <= t + 1
 end
 
--- textes du jeu posés sur la barre (valeur, %) : on les éteint et on garde leur police
-local function MuteGameText(bar)
+-- textes du jeu posés sur la barre (valeur, %) : on les cherche dans toute la barre
+-- de nom, on les éteint et on garde leur police pour les nôtres
+local function LooksLikeHealth(r)
+    local t = TextOf(r)
+    if not t then return false end
+    return t:find("%d") ~= nil and (t:find("%%") ~= nil or t:match("^[%d%s%.,kKmM/]+$") ~= nil)
+end
+
+-- la case de niveau : un nombre seul, hors de la barre
+local function IsLevel(r)
+    local t = TextOf(r)
+    return t and t:match("^%s*%d+%s*$") ~= nil and #t:gsub("%s", "") <= 2
+end
+
+local function Mute(r)
+    r:SetAlpha(0)
+    if not r.nzrMuted then
+        r.nzrMuted = true
+        hooksecurefunc(r, "SetAlpha", function(s, a)
+            if s.nzrMuted and DB().plates and a ~= 0 then s:SetAlpha(0) end
+        end)
+    end
+end
+
+local function MuteGameText(plate, bar)
     local font, size, flags
-    local function scan(f)
+    local found = 0
+    local function scan(f, depth)
+        if depth > 6 then return end
         for _, r in ipairs({ f:GetRegions() }) do
-            if r.GetObjectType and r:GetObjectType() == "FontString" and not r.nzrOwn and Inside(r, bar) then
-                if not font then font, size, flags = r:GetFont() end
-                r:SetAlpha(0)
-                if not r.nzrMuted then
-                    r.nzrMuted = true
-                    hooksecurefunc(r, "SetAlpha", function(s, a)
-                        if s.nzrMuted and DB().plates and a ~= 0 then s:SetAlpha(0) end
-                    end)
+            if r.GetObjectType and r:GetObjectType() == "FontString" and not r.nzrOwn then
+                -- sur la barre, ou un texte de vie (« 345 », « 100% ») : jamais le nom ni le niveau seul
+                local onBar = Inside(r, bar)
+                if onBar or LooksLikeHealth(r) and not IsLevel(r) then
+                    if not font then font, size, flags = r:GetFont() end
+                    Mute(r)
+                    found = found + 1
                 end
             end
         end
+        for _, c in ipairs({ f:GetChildren() }) do scan(c, depth + 1) end
     end
-    scan(bar)
-    for _, c in ipairs({ bar:GetChildren() }) do scan(c) end
-    return font, size, flags
+    scan(plate, 0)
+    return font, size, flags, found
 end
 
 local function Color(bar, unit)
@@ -87,6 +111,11 @@ end
 
 local function UpdateText(plate)
     local bar, unit = plate.nzrBar, plate.nzrUnit
+    -- le jeu peut créer ou réafficher son texte plus tard : on revérifie
+    if bar and (plate.nzrFound or 0) == 0 then
+        local _, _, _, found = MuteGameText(plate, bar)
+        plate.nzrFound = found
+    end
     if not bar or not unit or not UnitExists(unit) then return end
     local mode = DB().npText or "both"
     local cur, max = UnitHealth(unit), UnitHealthMax(unit)
@@ -105,7 +134,8 @@ local function Style(plate, unit)
     if not bar then return end
     plate.nzrBar = bar
     if not bar.nzrC then
-        local font, size, flags = MuteGameText(bar)
+        local font, size, flags, found = MuteGameText(plate, bar)
+        plate.nzrFound = found
         font = font or STANDARD_TEXT_FONT
         size = size or 10
         flags = flags or "OUTLINE"
@@ -118,7 +148,8 @@ local function Style(plate, unit)
             Color(b, plate.nzrUnit)
         end)
     else
-        MuteGameText(bar)
+        local _, _, _, found = MuteGameText(plate, bar)
+        plate.nzrFound = (plate.nzrFound or 0) + found
     end
     Color(bar, plate.nzrUnit)
     UpdateText(plate)
