@@ -77,7 +77,7 @@ local PAGES = {
         { t = "choice", key = "ufColor", section = "Couleurs", label = "Barre de vie", desc = "Verte comme le jeu, ou couleur de classe pour les joueurs, rouge pour les monstres à combattre, vert pour les PNJ amicaux.",
           choices = function() return { { "green", "Verte" }, { "class", "Couleur de classe" } } end,
           apply = function() if NZR.FramesRefresh then NZR.FramesRefresh() end end },
-        { t = "switch", key = "plates", section = "Barres au-dessus des monstres", label = "Texte et couleur NZR", desc = "Garde le look de WoW Forever ; change seulement le texte de la vie et, si tu veux, sa couleur.", r = true },
+        { t = "switch", key = "plates", section = "Barres au-dessus des monstres", label = "Personnaliser ces barres", desc = "Coche pour appliquer les deux choix ci-dessous. Décoché : les barres restent exactement comme dans le jeu.", r = true },
         { t = "choice", key = "npText", section = "Barres au-dessus des monstres", label = "Afficher", desc = "Comme pour tes cadres.",
           choices = function() return { { "both", "Vie + %" }, { "values", "Vie" }, { "percent", "%" }, { "none", "Rien" } } end,
           apply = function() if NZR.PlatesRefresh then NZR.PlatesRefresh() end end },
