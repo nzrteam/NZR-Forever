@@ -66,23 +66,57 @@ end
 local function MuteGameText(plate, bar)
     local font, size, flags
     local found = 0
-    local function scan(f, depth)
-        if depth > 6 then return end
+    local function take(r)
+        if not font then font, size, flags = r:GetFont() end
+        Mute(r)
+        found = found + 1
+    end
+    -- 1) tout texte rangé dans la barre de vie elle-même (ou ses sous-cadres) = texte de vie
+    local function under(f, depth)
+        if depth > 4 then return end
         for _, r in ipairs({ f:GetRegions() }) do
-            if r.GetObjectType and r:GetObjectType() == "FontString" and not r.nzrOwn then
-                -- sur la barre, ou un texte de vie (« 345 », « 100% ») : jamais le nom ni le niveau seul
-                local onBar = Inside(r, bar)
-                if onBar or LooksLikeHealth(r) and not IsLevel(r) then
-                    if not font then font, size, flags = r:GetFont() end
-                    Mute(r)
-                    found = found + 1
-                end
+            if r.GetObjectType and r:GetObjectType() == "FontString" and not r.nzrOwn then take(r) end
+        end
+        for _, c in ipairs({ f:GetChildren() }) do under(c, depth + 1) end
+    end
+    under(bar, 0)
+    -- 2) ailleurs dans la barre de nom : seulement ce qui est posé sur la barre ou ressemble à de la vie
+    local function scan(f, depth)
+        if depth > 6 or f == bar then return end
+        for _, r in ipairs({ f:GetRegions() }) do
+            if r.GetObjectType and r:GetObjectType() == "FontString" and not r.nzrOwn and not r.nzrMuted then
+                if Inside(r, bar) or (LooksLikeHealth(r) and not IsLevel(r)) then take(r) end
             end
         end
         for _, c in ipairs({ f:GetChildren() }) do scan(c, depth + 1) end
     end
     scan(plate, 0)
     return font, size, flags, found
+end
+
+-- /nzr plaque : décrit les textes de la barre de ta cible (pour régler ce module)
+function NZR.InspectPlateText()
+    local plate = C_NamePlate.GetNamePlateForUnit("target")
+    if not plate then NZR:Print("cible un monstre dont la barre est affichée (touche V), puis recommence.") return end
+    local bar = plate.nzrBar or HealthBar(plate)
+    local lines = { "Barre de vie : " .. tostring(bar and (bar:GetDebugName() or "?")) }
+    local function scan(f, depth, path)
+        if depth > 7 then return end
+        for _, r in ipairs({ f:GetRegions() }) do
+            if r.GetObjectType and r:GetObjectType() == "FontString" then
+                local t = TextOf(r)
+                lines[#lines + 1] = ("%s | texte=%s | sur la barre=%s | dans la barre=%s | caché=%s | à nous=%s"):format(
+                    path, t and ("« " .. t .. " »") or "secret/vide", tostring(bar and Inside(r, bar)),
+                    tostring(f == bar), tostring(r.nzrMuted == true), tostring(r.nzrOwn == true))
+            end
+        end
+        for i, c in ipairs({ f:GetChildren() }) do
+            local key = c.GetParentKey and c:GetParentKey() or c:GetObjectType()
+            scan(c, depth + 1, path .. ">" .. tostring(key or i))
+        end
+    end
+    scan(plate, 0, "plaque")
+    if NZR.ShowCopy then NZR:ShowCopy("Barre de la cible", table.concat(lines, "\n")) else for _, l in ipairs(lines) do print(l) end end
 end
 
 local function Color(bar, unit)

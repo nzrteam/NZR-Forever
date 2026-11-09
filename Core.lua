@@ -647,6 +647,8 @@ SlashCmdList.NZRF = function(msg)
         NZR:Print("positions par défaut restaurées.")
     elseif cmd == "reset" then
         if NZR.ResetMeterData then NZR.ResetMeterData() end
+    elseif cmd == "plaque" or cmd == "plate" then
+        if NZR.InspectPlateText then NZR.InspectPlateText() else NZR:Print("active d'abord « Personnaliser ces barres » (Cadres), puis recharge.") end
     elseif cmd == "bene" or cmd == "benedictions" or cmd == "pally" then
         if NZR.BlessOpen then NZR.BlessOpen() else NZR:Print("active l'assistant de bénédictions dans les réglages (onglet Paladin).") end
     elseif cmd == "inspecte" or cmd == "inspect" then
