@@ -943,8 +943,10 @@ local function ApplySettings(resize)
     NZR:ApplyOpacity()
     win.foot:SetShown(DB().meterFooter)
     win.body:ClearAllPoints()
-    win.body:SetPoint("TOPLEFT", win.colHead, "BOTTOMLEFT", 2, -2)
-    win.body:SetPoint("BOTTOMRIGHT", -2, DB().meterFooter and (FOOTER_H + 1) or 3)
+    -- teinte « Jeu » : le cadre doré du jeu est plus épais, on reste à l'intérieur
+    local inX = win.nzrRock and 7 or 2
+    win.body:SetPoint("TOPLEFT", win.colHead, "BOTTOMLEFT", inX, -2)
+    win.body:SetPoint("BOTTOMRIGHT", -inX, DB().meterFooter and (FOOTER_H + 1) or (win.nzrRock and 6 or 3))
     win.grip:SetShown(not DB().meterLock)
     if win.lock then win.lock.Refresh() end
     for _, r in ipairs(tabRows) do r.layoutKey = nil end

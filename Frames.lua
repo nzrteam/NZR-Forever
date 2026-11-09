@@ -66,7 +66,15 @@ local function ReactionRGB(unit)
     return 0.1, 0.8, 0.1
 end
 
-local function HealthRGB(unit)
+-- nuance : < 100 % = plus foncé, > 100 % = plus clair
+local function Shade(r, g, b, s)
+    s = s or 1
+    if s <= 1 then return r * s, g * s, b * s end
+    local t = math.min(1, s - 1)
+    return r + (1 - r) * t, g + (1 - g) * t, b + (1 - b) * t
+end
+
+local function BaseHealthRGB(unit)
     if DB().ufColor == "class" then
         if UnitIsPlayer(unit) then
             local r, g, b = ClassRGB(unit)
@@ -76,6 +84,11 @@ local function HealthRGB(unit)
         end
     end
     return 0.1, 0.8, 0.1                      -- vert du jeu
+end
+
+local function HealthRGB(unit)
+    local r, g, b = BaseHealthRGB(unit)
+    return Shade(r, g, b, DB().ufHealthShade)
 end
 
 ---------------------------------------------------------------------------
@@ -309,8 +322,14 @@ local function UpdatePower(f)
     f.power:SetMinMaxValues(0, max)
     f.power:SetValue(cur)
     local _, token = UnitPowerType(u)
+    local r, g, b = 0, 0.4, 1
     local c = plain(token) and PowerBarColor and PowerBarColor[token]
-    if c then f.power:SetStatusBarColor(c.r, c.g, c.b) else f.power:SetStatusBarColor(0, 0.4, 1) end
+    if c then r, g, b = c.r, c.g, c.b end
+    if DB().ufPowerColor == "class" and UnitIsPlayer(u) then
+        local cr, cg, cb = ClassRGB(u)
+        if cr then r, g, b = cr, cg, cb end
+    end
+    f.power:SetStatusBarColor(Shade(r, g, b, DB().ufPowerShade))
     SetBarText(f.power, u, cur, max, true)
 end
 
