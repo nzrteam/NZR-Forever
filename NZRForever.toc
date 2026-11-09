@@ -2,7 +2,7 @@
 ## Title: |cff9b6bf2NZR|r Forever
 ## Notes: DPS meter + petits plus pour WoW Forever, sans dénaturer le jeu. /nzr
 ## Author: NZR TEAM
-## Version: 1.0.1
+## Version: 1.0.2
 ## SavedVariables: NZRF_DB
 ## IconTexture: Interface\Icons\Ability_Warrior_BattleShout
 
