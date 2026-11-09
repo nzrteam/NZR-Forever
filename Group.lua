@@ -224,8 +224,14 @@ end
 local function UpdateName(b)
     local u = b.unit
     if not u or not UnitExists(u) then return end
-    local n = UnitName(u) or ""
-    if plain(n) and DB().ufName == "first" then n = n:match("^(%S+)") or n end
+    -- nom complet (prénom + nom, comme au-dessus des têtes) ou prénom seul
+    local n
+    if DB().grpName ~= "first" and UnitPVPName then
+        local ok, v = pcall(UnitPVPName, u)
+        if ok and v and plain(v) and v ~= "" then n = v end
+    end
+    n = n or UnitName(u) or ""
+    if plain(n) and DB().grpName == "first" then n = n:match("^(%S+)") or n end
     NZR.SafeText(b.name, n)
     if DB().grpNameColor == "class" then
         local r, g, bb = UF.ClassRGB(u)

@@ -131,6 +131,8 @@ local PAGES = {
           choices = function() return { { "big", "Larges" }, { "compact", "Cases de raid" } } end },
         { t = "choice", key = "grpColor", section = "Groupe et raid", label = "Barre de vie", desc = "Couleur de classe ou verte. La nuance suit le réglage « Nuance de la vie ».",
           choices = function() return { { "class", "Classe" }, { "green", "Verte" } } end, apply = function() if NZR.GroupRefresh then NZR.GroupRefresh() end end },
+        { t = "choice", key = "grpName", section = "Groupe et raid", label = "Nom affiché", desc = "Nom complet (prénom + nom) ou prénom seul (pratique en raid).",
+          choices = function() return { { "full", "Nom complet" }, { "first", "Prénom seul" } } end, apply = function() if NZR.GroupRefresh then NZR.GroupRefresh() end end },
         { t = "choice", key = "grpNameColor", section = "Groupe et raid", label = "Nom", desc = "Doré (groupe) / blanc (raid), ou couleur de classe.",
           choices = function() return { { "default", "Doré / blanc" }, { "class", "Classe" } } end, apply = function() if NZR.GroupRefresh then NZR.GroupRefresh() end end },
         { t = "choice", key = "grpText", section = "Groupe et raid", label = "Texte de vie", desc = "Auto : valeurs dans les cases larges, % dans les cases de raid.",
