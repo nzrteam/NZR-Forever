@@ -1153,12 +1153,11 @@ local function CreateWindow()
     hsep:SetHeight(1); hsep:SetPoint("BOTTOMLEFT"); hsep:SetPoint("BOTTOMRIGHT")
 
     local tagBox = CreateFrame("Frame", nil, head)
-    tagBox:SetSize(26, 22); tagBox:SetPoint("LEFT", 9, 0)
+    tagBox:SetSize(1, 22); tagBox:SetPoint("LEFT", 2, 0)       -- plus de logo NZR : le titre commence à gauche
     NZR:FlatBackdrop(tagBox, true, 1, 5)
     tagBox:SetBackdropColor(unpack(P.tag))
     tagBox:SetBackdropBorderColor(unpack(P.tagEdge))
-    local tag = NZR:Text(tagBox, 8.5, { 1, 1, 1 }, "CENTER", true)
-    tag:SetPoint("CENTER", 0, 0); tag:SetText("NZR")
+    tagBox:SetAlpha(0)
 
     win.title = NZR:Text(head, 12.5, nil, "LEFT", true)
     if P.jeu then win.title:SetFontObject(GameFontNormal); win.title:SetTextColor(1, 0.82, 0) end

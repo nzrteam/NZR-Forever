@@ -215,43 +215,49 @@ end
 
 -- cadre comme les fenêtres du jeu (et la fenêtre des réglages NZR Forever) :
 -- fond de pierre sombre, bord en métal avec barre de titre, titre doré
--- small = petit élément (cadres, barres) : bord métal fin, sans barre de titre
-function NZR:WowFrame(f, title, alpha, small)
-    local bg = f:CreateTexture(nil, "BACKGROUND", nil, -7)
+-- Cadre des fenêtres du jeu (même que le meter et les réglages) : fond de pierre,
+-- bord en métal avec barre de titre, titre doré. scale < 1 = même cadre en réduit
+-- (pour les petits éléments : coins plus petits, rien ne dépasse).
+function NZR:WowFrame(f, title, alpha, scale)
+    local host = f
+    if scale and scale < 1 then
+        host = CreateFrame("Frame", nil, f)
+        host:SetScale(scale)
+        host:SetPoint("TOPLEFT", f, "TOPLEFT", 0, 0)
+        local function size()
+            local w, h = f:GetSize()
+            if w and h then host:SetSize(w / scale, h / scale) end
+        end
+        size()
+        f:HookScript("OnSizeChanged", size)
+        host:SetFrameLevel(f:GetFrameLevel())
+    end
+    local bg = host:CreateTexture(nil, "BACKGROUND", nil, -7)
     bg:SetTexture("Interface\\FrameGeneral\\UI-Background-Rock", "REPEAT", "REPEAT")
     bg:SetHorizTile(true); bg:SetVertTile(true)
-    if small then bg:SetPoint("TOPLEFT", 3, -3) else bg:SetPoint("TOPLEFT", 2, -21) end
-    bg:SetPoint("BOTTOMRIGHT", small and -3 or -2, small and 3 or 2)
+    bg:SetPoint("TOPLEFT", 2, -21); bg:SetPoint("BOTTOMRIGHT", -2, 2)
     bg:SetAlpha(alpha or 1)
-    local dark = f:CreateTexture(nil, "BACKGROUND", nil, -8)
+    local dark = host:CreateTexture(nil, "BACKGROUND", nil, -8)
     dark:SetPoint("TOPLEFT", 2, -2); dark:SetPoint("BOTTOMRIGHT", -2, 2)
     dark:SetColorTexture(0, 0, 0, (alpha or 1) * 0.6)
-    local ns = CreateFrame("Frame", nil, f, "NineSlicePanelTemplate")
+    local ns = CreateFrame("Frame", nil, host, "NineSlicePanelTemplate")
     ns:SetAllPoints()
-    ns:SetFrameLevel(f:GetFrameLevel() + 1)
-    local ok = NineSliceUtil and pcall(NineSliceUtil.ApplyLayoutByName, ns, small and "SimplePanelTemplate" or "ButtonFrameTemplateNoPortrait")
-    if not ok then
-        ok = NineSliceUtil and pcall(NineSliceUtil.ApplyLayoutByName, ns, "TooltipDefaultLayout")
-        if ns.Center then ns.Center:Hide() end
-    end
-    if ns.Center then ns.Center:Hide() end            -- notre fond de pierre reste visible
-    -- petit bord : teinté du même doré que le bord des fenêtres (meter, réglages)
-    if small then
-        for _, r in ipairs({ ns:GetRegions() }) do
-            if r.SetVertexColor and r ~= ns.Center then r:SetVertexColor(1, 0.80, 0.48) end
-        end
-    end
+    ns:SetFrameLevel(host:GetFrameLevel() + 1)
+    local ok = NineSliceUtil and pcall(NineSliceUtil.ApplyLayoutByName, ns, "ButtonFrameTemplateNoPortrait")
+    if not ok and NineSliceUtil then pcall(NineSliceUtil.ApplyLayoutByName, ns, "TooltipDefaultLayout") end
+    if ns.Center then ns.Center:Hide() end
+    -- tout ce qu'on pose ensuite passe au-dessus du bord
+    local over = CreateFrame("Frame", nil, f)
+    over:SetAllPoints()
+    over:SetFrameLevel(ns:GetFrameLevel() + 2)
     local t
     if title then
-        -- le titre passe au-dessus du bord (sinon le cadre en métal le cache)
-        local over = CreateFrame("Frame", nil, f)
-        over:SetAllPoints(); over:SetFrameLevel(ns:GetFrameLevel() + 2)
-        t = over:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        t:SetPoint("TOP", 0, small and -7 or -5)
+        t = over:CreateFontString(nil, "OVERLAY", scale and scale < 1 and "GameFontNormalSmall" or "GameFontNormal")
+        t:SetPoint("TOP", 0, -5 * (scale or 1))
         t:SetText(title)
     end
-    f.nzrRock, f.nzrDark, f.nzrMetal, f.nzrTitle = bg, dark, ns, t
-    return ns, bg, t
+    f.nzrRock, f.nzrDark, f.nzrMetal, f.nzrTitle, f.nzrOver = bg, dark, ns, t, over
+    return over, t
 end
 
 function NZR:WowFrameAlpha(f, a)

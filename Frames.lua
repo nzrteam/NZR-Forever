@@ -8,7 +8,7 @@ local plain = NZR.plain
 local MEDIA = "Interface\\AddOns\\NZRForever\\Media\\uf\\"
 local BAR = "Interface\\TargetingFrame\\UI-StatusBar"
 
-local PANEL_W, PORT, PANEL_H = 214, 66, 66
+local PANEL_W, PORT, PANEL_H = 214, 62, 56
 local frames = {}
 
 local function DB() return NZR.db end
@@ -133,21 +133,22 @@ local function Create(unit, holderKey, default, mirror)
     if mirror then p:SetPoint("RIGHT", f, "RIGHT", -(PORT - 12), 0) else p:SetPoint("LEFT", f, "LEFT", PORT - 12, 0) end
     f.panel = p
 
-    -- même habillage que l'UI du jeu : fond de pierre, bord métal fin
-    NZR:WowFrame(p, nil, 0.9, true)
-    local barBox = CreateFrame("Frame", nil, p)           -- au-dessus du bord : rien n'est caché
-    barBox:SetAllPoints()
-    barBox:SetFrameLevel(p:GetFrameLevel() + 4)
+    -- même cadre que le DPS meter (fenêtre du jeu en réduit) : le nom dans la barre de titre
+    local SCALE = 0.72
+    local over = NZR:WowFrame(p, nil, 0.9, SCALE)
+    over:SetFrameLevel(p:GetFrameLevel() + 6)
+    local barBox = over
     f.barBox = barBox
-    f.name = barBox:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    f.name:SetPoint("TOPLEFT", mirror and 10 or 16, -7)
-    f.name:SetPoint("TOPRIGHT", mirror and -16 or -10, -7)
+    f.name = barBox:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    f.name:SetPoint("TOPLEFT", mirror and 8 or 14, -2)
+    f.name:SetPoint("TOPRIGHT", mirror and -14 or -8, -2)
+    f.name:SetHeight(13)
     f.name:SetJustifyH("CENTER")
     f.name:SetWordWrap(false)
 
     local l, r = mirror and 9 or 16, mirror and -16 or -9
     f.health = Bar(barBox, 16)
-    f.health:SetPoint("TOPLEFT", l, -25); f.health:SetPoint("TOPRIGHT", r, -25)
+    f.health:SetPoint("TOPLEFT", l, -20); f.health:SetPoint("TOPRIGHT", r, -20)
     f.power = Bar(barBox, 10)
     f.power:SetPoint("TOPLEFT", f.health, "BOTTOMLEFT", 0, -2); f.power:SetPoint("TOPRIGHT", f.health, "BOTTOMRIGHT", 0, -2)
 
@@ -243,6 +244,14 @@ local function UpdatePower(f)
     local u = f.unit
     if not UnitExists(u) then return end
     local max = UnitPowerMax(u)
+    if not UnitIsPlayer(u) then
+        local _, ptok = UnitPowerType(u)
+        local okc, _, cls = pcall(UnitClass, u)
+        if plain(ptok) and ptok == "MANA" and okc and plain(cls) and (cls == "WARRIOR" or cls == "ROGUE") then
+            f.power:Hide()
+            return
+        end
+    end
     local hasPower
     if plain(max) then hasPower = max > 0; f.lastHasPower = hasPower
     else hasPower = f.lastHasPower ~= false end
