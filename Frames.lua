@@ -8,7 +8,7 @@ local plain = NZR.plain
 local MEDIA = "Interface\\AddOns\\NZRForever\\Media\\uf\\"
 local BAR = "Interface\\TargetingFrame\\UI-StatusBar"
 
-local PANEL_W, PORT, PANEL_H = 214, 62, 56
+local PANEL_W, PORT, PANEL_H = 214, 62, 58
 local frames = {}
 
 local function DB() return NZR.db end
@@ -133,21 +133,21 @@ local function Create(unit, holderKey, default, mirror)
     if mirror then p:SetPoint("RIGHT", f, "RIGHT", -(PORT - 12), 0) else p:SetPoint("LEFT", f, "LEFT", PORT - 12, 0) end
     f.panel = p
 
-    -- même cadre que les fenêtres du jeu : le nom dans la barre de titre en métal
-    NZR:WowFrame(p, nil, 0.9)
-    f.name = p:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    f.name:SetPoint("TOPLEFT", mirror and 10 or 18, -5)
-    f.name:SetPoint("TOPRIGHT", mirror and -18 or -10, -5)
+    -- même habillage que l'UI du jeu : fond de pierre, bord métal fin
+    NZR:WowFrame(p, nil, 0.9, true)
+    local barBox = CreateFrame("Frame", nil, p)           -- au-dessus du bord : rien n'est caché
+    barBox:SetAllPoints()
+    barBox:SetFrameLevel(p:GetFrameLevel() + 4)
+    f.barBox = barBox
+    f.name = barBox:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    f.name:SetPoint("TOPLEFT", mirror and 10 or 16, -7)
+    f.name:SetPoint("TOPRIGHT", mirror and -16 or -10, -7)
     f.name:SetJustifyH("CENTER")
     f.name:SetWordWrap(false)
-    local barBox = CreateFrame("Frame", nil, p)
-    barBox:SetPoint("TOPLEFT", 0, -22); barBox:SetPoint("BOTTOMRIGHT", 0, 0)
-    barBox:SetFrameLevel(p:GetFrameLevel() + 3)
-    f.barBox = barBox
 
-    local l, r = mirror and 8 or 14, mirror and -14 or -8
+    local l, r = mirror and 9 or 16, mirror and -16 or -9
     f.health = Bar(barBox, 15)
-    f.health:SetPoint("TOPLEFT", l, -3); f.health:SetPoint("TOPRIGHT", r, -3)
+    f.health:SetPoint("TOPLEFT", l, -24); f.health:SetPoint("TOPRIGHT", r, -24)
     f.power = Bar(barBox, 9)
     f.power:SetPoint("TOPLEFT", f.health, "BOTTOMLEFT", 0, -2); f.power:SetPoint("TOPRIGHT", f.health, "BOTTOMRIGHT", 0, -2)
 

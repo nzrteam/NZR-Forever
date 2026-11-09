@@ -215,11 +215,13 @@ end
 
 -- cadre comme les fenêtres du jeu (et la fenêtre des réglages NZR Forever) :
 -- fond de pierre sombre, bord en métal avec barre de titre, titre doré
-function NZR:WowFrame(f, title, alpha)
+-- small = petit élément (cadres, barres) : bord métal fin, sans barre de titre
+function NZR:WowFrame(f, title, alpha, small)
     local bg = f:CreateTexture(nil, "BACKGROUND", nil, -7)
     bg:SetTexture("Interface\\FrameGeneral\\UI-Background-Rock", "REPEAT", "REPEAT")
     bg:SetHorizTile(true); bg:SetVertTile(true)
-    bg:SetPoint("TOPLEFT", 2, -21); bg:SetPoint("BOTTOMRIGHT", -2, 2)
+    if small then bg:SetPoint("TOPLEFT", 3, -3) else bg:SetPoint("TOPLEFT", 2, -21) end
+    bg:SetPoint("BOTTOMRIGHT", small and -3 or -2, small and 3 or 2)
     bg:SetAlpha(alpha or 1)
     local dark = f:CreateTexture(nil, "BACKGROUND", nil, -8)
     dark:SetPoint("TOPLEFT", 2, -2); dark:SetPoint("BOTTOMRIGHT", -2, 2)
@@ -227,15 +229,19 @@ function NZR:WowFrame(f, title, alpha)
     local ns = CreateFrame("Frame", nil, f, "NineSlicePanelTemplate")
     ns:SetAllPoints()
     ns:SetFrameLevel(f:GetFrameLevel() + 1)
-    local ok = NineSliceUtil and pcall(NineSliceUtil.ApplyLayoutByName, ns, "ButtonFrameTemplateNoPortrait")
+    local ok = NineSliceUtil and pcall(NineSliceUtil.ApplyLayoutByName, ns, small and "SimplePanelTemplate" or "ButtonFrameTemplateNoPortrait")
     if not ok then
         ok = NineSliceUtil and pcall(NineSliceUtil.ApplyLayoutByName, ns, "TooltipDefaultLayout")
         if ns.Center then ns.Center:Hide() end
     end
+    if ns.Center then ns.Center:Hide() end            -- notre fond de pierre reste visible
     local t
     if title then
-        t = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        t:SetPoint("TOP", 0, -5)
+        -- le titre passe au-dessus du bord (sinon le cadre en métal le cache)
+        local over = CreateFrame("Frame", nil, f)
+        over:SetAllPoints(); over:SetFrameLevel(ns:GetFrameLevel() + 2)
+        t = over:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        t:SetPoint("TOP", 0, small and -7 or -5)
         t:SetText(title)
     end
     f.nzrRock, f.nzrDark, f.nzrMetal, f.nzrTitle = bg, dark, ns, t
