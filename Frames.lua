@@ -545,3 +545,6 @@ function M:Init()
         for _, f in pairs(frames) do f:SetScale(DB().ufScale or 1) end
     end
 end
+
+-- outils partagés avec les cadres de groupe et de raid (Group.lua)
+NZR.UF = { BAR = BAR, ClassRGB = ClassRGB, Shade = Shade, Percent = Percent, Fmt = Fmt, HideBlizzard = HideBlizzard }

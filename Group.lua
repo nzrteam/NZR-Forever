@@ -1,0 +1,462 @@
+-- NZR Forever - Cadres de groupe et de raid (facultatif, désactivé par défaut)
+-- Même habillage que nos cadres : fenêtre du jeu (métal doré, fond pierre),
+-- cases propres à l'intérieur. Les boutons sont sécurisés : clic gauche = cibler,
+-- clic droit = menu, comme les cadres du jeu.
+local _, NZR = ...
+local M = NZR:Module("Group")
+local plain = NZR.plain
+
+local function DB() return NZR.db end
+local UF                                  -- outils partagés (Frames.lua)
+
+local buttons = {}                        -- tous les boutons créés
+local byUnit = {}                         -- unité -> { boutons }
+local headers = {}
+local boxes = {}
+
+---------------------------------------------------------------------------
+-- Tailles
+---------------------------------------------------------------------------
+local function PartyBig() return DB().grpPartyStyle ~= "compact" end
+local function CellSize(kind)
+    local s = DB().grpCellScale or 1
+    if kind == "party" and PartyBig() then return math.floor(176 * s), math.floor(42 * s) end
+    return math.floor(84 * s), math.floor(42 * s)
+end
+
+---------------------------------------------------------------------------
+-- Police (réglages « Police », « Taille », « Contour » des cadres)
+---------------------------------------------------------------------------
+local function SetFont(fs, size)
+    fs.nzrSize = size
+    local path = NZR.FontPath(DB().ufFont, STANDARD_TEXT_FONT)
+    local flags, shadow = NZR.OutlineFlags(DB().ufOutline or "shadow")
+    local sz = math.floor(size * (DB().ufFontSize or 1) + 0.5)
+    if not pcall(fs.SetFont, fs, path, sz, flags) then pcall(fs.SetFont, fs, STANDARD_TEXT_FONT, sz, flags) end
+    NZR.ApplyShadow(fs, shadow)
+end
+
+---------------------------------------------------------------------------
+-- Une case
+---------------------------------------------------------------------------
+local function Style(b, kind)
+    if b.nzr then return end
+    b.nzr, b.kind = true, kind
+    local big = kind == "party" and PartyBig()
+
+    local bg = b:CreateTexture(nil, "BACKGROUND", nil, -8)
+    bg:SetAllPoints(); bg:SetColorTexture(0, 0, 0, 0.9)
+    local inner = b:CreateTexture(nil, "BACKGROUND", nil, -7)
+    inner:SetPoint("TOPLEFT", 1, -1); inner:SetPoint("BOTTOMRIGHT", -1, 1)
+    inner:SetColorTexture(0.09, 0.08, 0.07, 1)
+
+    -- vie
+    local hp = CreateFrame("StatusBar", nil, b)
+    hp:SetStatusBarTexture(UF.BAR)
+    hp:SetPoint("TOPLEFT", 1, big and -14 or -1)
+    hp:SetPoint("BOTTOMRIGHT", -1, DB().grpPower == false and 1 or (big and 6 or 4))
+    hp:SetMinMaxValues(0, 1); hp:SetValue(1)
+    local hbg = hp:CreateTexture(nil, "BACKGROUND")
+    hbg:SetAllPoints(); hbg:SetColorTexture(0.16, 0.05, 0.04, 1)
+    b.health = hp
+
+    -- soins en approche (coupés au bord de la barre)
+    local clip = CreateFrame("Frame", nil, hp)
+    clip:SetAllPoints(); clip:SetClipsChildren(true)
+    local pred = CreateFrame("StatusBar", nil, clip)
+    local fill = hp:GetStatusBarTexture()
+    pred:SetPoint("TOPLEFT", fill, "TOPRIGHT"); pred:SetPoint("BOTTOMLEFT", fill, "BOTTOMRIGHT")
+    pred:SetStatusBarTexture(UF.BAR); pred:SetStatusBarColor(0, 0.83, 0, 0.55)
+    pred:SetMinMaxValues(0, 1); pred:SetValue(0)
+    local function psize() local w = hp:GetWidth(); if w and w > 0 then pred:SetWidth(w) end end
+    psize(); hp:HookScript("OnSizeChanged", psize)
+    b.pred = pred
+
+    -- mana / énergie (fine, en bas)
+    local pw = CreateFrame("StatusBar", nil, b)
+    pw:SetStatusBarTexture(UF.BAR)
+    pw:SetPoint("TOPLEFT", hp, "BOTTOMLEFT", 0, -1); pw:SetPoint("BOTTOMRIGHT", -1, 1)
+    pw:SetMinMaxValues(0, 1); pw:SetValue(1)
+    local pbg = pw:CreateTexture(nil, "BACKGROUND")
+    pbg:SetAllPoints(); pbg:SetColorTexture(0, 0, 0, 1)
+    pw:SetShown(DB().grpPower ~= false)
+    b.power = pw
+
+    -- textes au-dessus des barres
+    local top = CreateFrame("Frame", nil, b)
+    top:SetAllPoints(); top:SetFrameLevel(hp:GetFrameLevel() + 4)
+    b.top = top
+    b.name = top:CreateFontString(nil, "OVERLAY")
+    SetFont(b.name, big and 11 or 10)
+    b.name:SetWordWrap(false)
+    b.info = top:CreateFontString(nil, "OVERLAY")
+    SetFont(b.info, big and 11 or 9)
+    if big then
+        -- nom doré dans le bandeau du haut, vie au centre de la barre
+        b.name:SetPoint("TOPLEFT", 5, -1); b.name:SetPoint("TOPRIGHT", -24, -1); b.name:SetHeight(13)
+        b.name:SetJustifyH("LEFT")
+        b.info:SetPoint("CENTER", hp, "CENTER", 0, 0)
+    else
+        b.name:SetPoint("TOPLEFT", hp, "TOPLEFT", 3, -4); b.name:SetPoint("TOPRIGHT", hp, "TOPRIGHT", -3, -4)
+        b.name:SetJustifyH("CENTER")
+        b.info:SetPoint("BOTTOM", hp, "BOTTOM", 0, 4)
+    end
+
+    -- rôle, chef, marque
+    b.role = top:CreateTexture(nil, "OVERLAY")
+    b.role:SetSize(12, 12)
+    if big then b.role:SetPoint("TOPRIGHT", -4, -1) else b.role:SetPoint("TOPLEFT", 2, -2) end
+    b.lead = top:CreateTexture(nil, "OVERLAY")
+    b.lead:SetSize(11, 11); b.lead:SetTexture("Interface\\GroupFrame\\UI-Group-LeaderIcon")
+    b.lead:SetPoint("BOTTOMLEFT", b, "TOPLEFT", 2, -5)
+    b.mark = top:CreateTexture(nil, "OVERLAY")
+    b.mark:SetSize(14, 14); b.mark:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcons")
+    b.mark:SetPoint("CENTER", b, "TOP", 0, -2)
+
+    -- débuffs que je peux dissiper (ou tous les débuffs gênants en raid)
+    b.debuffs = {}
+    for i = 1, 3 do
+        local d = CreateFrame("Frame", nil, top)
+        d:SetSize(big and 16 or 13, big and 16 or 13)
+        if i == 1 then d:SetPoint("BOTTOMRIGHT", hp, "BOTTOMRIGHT", -1, 1)
+        else d:SetPoint("RIGHT", b.debuffs[i - 1], "LEFT", -1, 0) end
+        d.edge = d:CreateTexture(nil, "BACKGROUND"); d.edge:SetAllPoints()
+        d.icon = d:CreateTexture(nil, "ARTWORK")
+        d.icon:SetPoint("TOPLEFT", 1, -1); d.icon:SetPoint("BOTTOMRIGHT", -1, 1)
+        d.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        d:Hide()
+        b.debuffs[i] = d
+    end
+
+    -- liseré : cible (blanc) ou menace (rouge)
+    b.hl = top:CreateTexture(nil, "OVERLAY", nil, 2)
+    b.hl:SetPoint("TOPLEFT", -1, 1); b.hl:SetPoint("BOTTOMRIGHT", 1, -1)
+    b.hl:SetColorTexture(1, 1, 1, 0); b.hl:Hide()
+    local function edge(p1, p2, horiz)
+        local t = top:CreateTexture(nil, "OVERLAY", nil, 3)
+        t:SetPoint(p1); t:SetPoint(p2)
+        if horiz then t:SetHeight(2) else t:SetWidth(2) end
+        return t
+    end
+    b.frame = { edge("TOPLEFT", "TOPRIGHT", true), edge("BOTTOMLEFT", "BOTTOMRIGHT", true),
+                edge("TOPLEFT", "BOTTOMLEFT"), edge("TOPRIGHT", "BOTTOMRIGHT") }
+    for _, t in ipairs(b.frame) do t:Hide() end
+
+    b:HookScript("OnEnter", function(s)
+        if not s.unit then return end
+        GameTooltip_SetDefaultAnchor(GameTooltip, s)
+        GameTooltip:SetUnit(s.unit)
+        GameTooltip:Show()
+    end)
+    b:HookScript("OnLeave", function() GameTooltip:Hide() end)
+    table.insert(buttons, b)
+end
+
+---------------------------------------------------------------------------
+-- Mises à jour
+---------------------------------------------------------------------------
+local function HealthColor(u)
+    local r, g, b = 0.1, 0.8, 0.1
+    if DB().grpColor ~= "green" then
+        local cr, cg, cb = UF.ClassRGB(u)
+        if cr then r, g, b = cr, cg, cb end
+    end
+    return UF.Shade(r, g, b, DB().ufHealthShade)
+end
+
+local function UpdateHealth(b)
+    local u = b.unit
+    if not u or not UnitExists(u) then return end
+    local cur, max = UnitHealth(u), UnitHealthMax(u)
+    b.health:SetMinMaxValues(0, max); b.health:SetValue(cur)
+    b.health:SetStatusBarColor(HealthColor(u))
+    -- soins en approche
+    b.pred:SetMinMaxValues(0, max)
+    local inc
+    if UnitGetIncomingHeals then local ok, v = pcall(UnitGetIncomingHeals, u); if ok then inc = v end end
+    if inc == nil or not pcall(b.pred.SetValue, b.pred, inc) then b.pred:SetValue(0) end
+
+    -- texte : mort / fantôme / déconnecté, sinon % (ou valeurs en grand)
+    local okC, conn = pcall(UnitIsConnected, u)
+    local okD, dead = pcall(UnitIsDead, u)
+    local okG, ghost = pcall(UnitIsGhost, u)
+    if okC and plain(conn) ~= nil and conn == false then
+        b.info:SetText("|cff999999Déconnecté|r"); b.health:SetStatusBarColor(0.35, 0.35, 0.35)
+    elseif okG and plain(ghost) and ghost then
+        b.info:SetText("|cffaaaaaaFantôme|r")
+    elseif okD and plain(dead) and dead then
+        b.info:SetText("|cffff5050Mort|r")
+    else
+        local mode = DB().grpText or "percent"
+        if mode == "none" then b.info:SetText("")
+        elseif mode == "values" or (b.kind == "party" and PartyBig() and mode == "auto") then
+            local ok, s = pcall(string.format, "%s / %s", UF.Fmt(cur), UF.Fmt(max))
+            NZR.SafeText(b.info, ok and s or "")
+        else
+            NZR.SafeText(b.info, UF.Percent(u, cur, max) or "")
+        end
+    end
+end
+
+local function UpdatePower(b)
+    local u = b.unit
+    if not u or not UnitExists(u) or DB().grpPower == false then return end
+    local ptype, token = UnitPowerType(u)
+    b.power:SetMinMaxValues(0, UnitPowerMax(u, ptype)); b.power:SetValue(UnitPower(u, ptype))
+    local c = plain(token) and PowerBarColor and PowerBarColor[token]
+    if c then b.power:SetStatusBarColor(c.r, c.g, c.b) else b.power:SetStatusBarColor(0, 0.4, 1) end
+end
+
+local function UpdateName(b)
+    local u = b.unit
+    if not u or not UnitExists(u) then return end
+    local n = UnitName(u) or ""
+    if plain(n) and DB().ufName == "first" then n = n:match("^(%S+)") or n end
+    NZR.SafeText(b.name, n)
+    if DB().grpNameColor == "class" then
+        local r, g, bb = UF.ClassRGB(u)
+        if r then b.name:SetTextColor(r, g, bb) else b.name:SetTextColor(1, 1, 1) end
+    elseif b.kind == "party" and PartyBig() then
+        b.name:SetTextColor(1, 0.82, 0)
+    else
+        b.name:SetTextColor(1, 1, 1)
+    end
+end
+
+local ROLE = { TANK = { 0, 19/64, 22/64, 41/64 }, HEALER = { 20/64, 39/64, 1/64, 20/64 }, DAMAGER = { 20/64, 39/64, 22/64, 41/64 } }
+local function UpdateIcons(b)
+    local u = b.unit
+    if not u or not UnitExists(u) then return end
+    local role = UnitGroupRolesAssigned and UnitGroupRolesAssigned(u)
+    local tc = role and ROLE[role]
+    if tc and DB().grpRole ~= false then
+        b.role:SetTexture("Interface\\LFGFrame\\UI-LFG-ICON-PORTRAITROLES")
+        b.role:SetTexCoord(tc[1], tc[2], tc[3], tc[4]); b.role:Show()
+    else b.role:Hide() end
+    b.lead:SetShown(UnitIsGroupLeader and UnitIsGroupLeader(u) or false)
+    local idx = GetRaidTargetIndex(u)
+    if idx and plain(idx) then SetRaidTargetIconTexture(b.mark, idx); b.mark:Show() else b.mark:Hide() end
+end
+
+local DEBUFF_RGB = { Magic = { 0.2, 0.6, 1 }, Curse = { 0.6, 0, 1 }, Disease = { 0.6, 0.4, 0 }, Poison = { 0, 0.6, 0 } }
+local function UpdateAuras(b)
+    local u = b.unit
+    local n = 0
+    if u and UnitExists(u) and DB().grpDebuffs ~= false and C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
+        for _, filter in ipairs({ "HARMFUL|RAID", "HARMFUL" }) do
+            for i = 1, 20 do
+                if n >= 3 then break end
+                local ok, a = pcall(C_UnitAuras.GetAuraDataByIndex, u, i, filter)
+                if not ok or not a then break end
+                local dup = false
+                for j = 1, n do if b.debuffs[j].id == a.auraInstanceID then dup = true end end
+                if not dup then
+                    n = n + 1
+                    local d = b.debuffs[n]
+                    d.id = a.auraInstanceID
+                    pcall(d.icon.SetTexture, d.icon, a.icon)
+                    local t = plain(a.dispelName) and DEBUFF_RGB[a.dispelName]
+                    if t then d.edge:SetColorTexture(t[1], t[2], t[3], 1) else d.edge:SetColorTexture(0.8, 0.1, 0.1, 1) end
+                    d:Show()
+                end
+            end
+            if filter == "HARMFUL|RAID" and DB().grpDebuffAll ~= true then break end
+        end
+    end
+    for i = n + 1, 3 do b.debuffs[i]:Hide(); b.debuffs[i].id = nil end
+end
+
+local function UpdateBorder(b)
+    local u = b.unit
+    local r, g, bl, show
+    if u and UnitExists(u) and UnitIsUnit(u, "target") then r, g, bl, show = 1, 1, 1, true end
+    if not show and u and UnitExists(u) and UnitThreatSituation then
+        local ok, t = pcall(UnitThreatSituation, u)
+        if ok and plain(t) and t >= 2 then r, g, bl, show = 1, 0.15, 0.1, true end
+    end
+    for _, t in ipairs(b.frame) do
+        if show then t:SetColorTexture(r, g, bl, 0.9); t:Show() else t:Hide() end
+    end
+end
+
+local function UpdateButton(b)
+    if not b.unit or not UnitExists(b.unit) then return end
+    pcall(UpdateName, b); pcall(UpdateHealth, b); pcall(UpdatePower, b)
+    pcall(UpdateIcons, b); pcall(UpdateAuras, b); pcall(UpdateBorder, b)
+end
+
+local function Remap()
+    wipe(byUnit)
+    for _, b in ipairs(buttons) do
+        local u = b:GetAttribute("unit")
+        b.unit = u
+        if u and b:IsVisible() then
+            byUnit[u] = byUnit[u] or {}
+            table.insert(byUnit[u], b)
+            UpdateButton(b)
+        end
+    end
+end
+
+local function ForUnit(u, fn)
+    local list = u and byUnit[u]
+    if list then for _, b in ipairs(list) do pcall(fn, b) end end
+end
+
+-- distance : à moitié transparent hors de portée de soin
+local function UpdateRange()
+    for _, b in ipairs(buttons) do
+        if b.unit and b:IsVisible() then
+            local ok, inRange, checked = pcall(UnitInRange, b.unit)
+            if ok then
+                if b.SetAlphaFromBoolean and not plain(inRange) then
+                    pcall(b.SetAlphaFromBoolean, b, inRange, 1, 0.45)
+                elseif plain(checked) and checked and plain(inRange) then
+                    b:SetAlpha(inRange and 1 or 0.45)
+                else
+                    b:SetAlpha(1)
+                end
+            end
+        end
+    end
+end
+
+---------------------------------------------------------------------------
+-- En-têtes sécurisés (le jeu place les cases, même en combat)
+---------------------------------------------------------------------------
+local function InitConfig(w, h)
+    return ([[
+        self:SetWidth(%d); self:SetHeight(%d)
+        self:SetAttribute("*type1", "target")
+        self:SetAttribute("*type2", "togglemenu")
+    ]]):format(w, h)
+end
+
+local function MakeHeader(kind, name, holder)
+    local w, h = CellSize(kind)
+    local hdr = CreateFrame("Frame", name, UIParent, "SecureGroupHeaderTemplate")
+    hdr.kind = kind
+    hdr:SetAttribute("template", "SecureUnitButtonTemplate")
+    hdr:SetAttribute("initialConfigFunction", InitConfig(w, h))
+    hdr:SetAttribute("point", "TOP")
+    hdr:SetAttribute("yOffset", -4)
+    hdr:SetAttribute("sortMethod", "INDEX")
+    if kind == "party" then
+        hdr:SetAttribute("showParty", true)
+        hdr:SetAttribute("showPlayer", true)
+        hdr:SetAttribute("showSolo", false)
+        hdr:SetAttribute("showRaid", false)
+    else
+        hdr:SetAttribute("showRaid", true)
+        hdr:SetAttribute("groupBy", "GROUP")
+        hdr:SetAttribute("groupingOrder", "1,2,3,4,5,6,7,8")
+        hdr:SetAttribute("groupFilter", "1,2,3,4,5,6,7,8")
+        hdr:SetAttribute("maxColumns", 8)
+        hdr:SetAttribute("unitsPerColumn", 5)
+        hdr:SetAttribute("columnSpacing", 4)
+        hdr:SetAttribute("columnAnchorPoint", "LEFT")
+    end
+    hdr:SetPoint("TOPLEFT", holder, "TOPLEFT", 10, -28)
+
+    -- habillage : fenêtre du jeu autour des cases (suit la taille du groupe)
+    local box = CreateFrame("Frame", nil, UIParent)
+    box:SetFrameStrata("LOW")
+    box:SetPoint("TOPLEFT", hdr, "TOPLEFT", -10, 28)
+    box:SetPoint("BOTTOMRIGHT", hdr, "BOTTOMRIGHT", 10, -10)
+    NZR:WowFrame(box, kind == "party" and "Groupe" or "Raid", DB().grpAlpha or 0.9)
+    box:Hide()
+    hdr:HookScript("OnShow", function() box:Show() end)
+    hdr:HookScript("OnHide", function() box:Hide() end)
+    hdr:SetFrameStrata("LOW"); hdr:SetFrameLevel(box:GetFrameLevel() + 10)
+    boxes[kind] = box
+
+    -- les cases se créent à la volée : on les habille dès qu'elles existent
+    hdr:HookScript("OnAttributeChanged", function(self, attr)
+        if type(attr) == "string" and attr:match("^child%d+$") then
+            local b = self:GetAttribute(attr)
+            if b then Style(b, kind); b:SetFrameLevel(self:GetFrameLevel() + 1) end
+        end
+    end)
+    headers[kind] = hdr
+    return hdr
+end
+
+-- les cases du jeu (groupe et raid) : on les met de côté
+local function HideBlizzard()
+    if InCombatLockdown() then return end
+    for _, n in ipairs({ "PartyFrame", "CompactPartyFrame", "CompactRaidFrameContainer" }) do
+        local f = _G[n]
+        if f then UF.HideBlizzard(f) end
+    end
+    for i = 1, 4 do local f = _G["PartyMemberFrame" .. i]; if f then UF.HideBlizzard(f) end end
+end
+
+function M:Init()
+    if NZR.withUI or not DB().groupFrames then return end
+    UF = NZR.UF
+    if not UF then return end
+    local holder = NZR:Holder("group", "Groupe et raid", 200, 220, { "TOPLEFT", "TOPLEFT", 24, -170 })
+    local party = MakeHeader("party", "NZRF_PartyHeader", holder)
+    local raid = MakeHeader("raid", "NZRF_RaidHeader", holder)
+    -- toutes les cases créées tout de suite (hors combat), pour pouvoir les habiller
+    for hdr, n in pairs({ [party] = 5, [raid] = 40 }) do
+        hdr:Show()
+        hdr:SetAttribute("startingIndex", -n + 1)
+        hdr:SetAttribute("startingIndex", 1)
+        hdr:Hide()
+    end
+    RegisterAttributeDriver(party, "state-visibility", "[group:raid] hide; [group:party] show; hide")
+    RegisterAttributeDriver(raid, "state-visibility", "[group:raid] show; hide")
+    for _, h in pairs(headers) do h:SetScale(DB().grpScale or 1); boxes[h.kind]:SetScale(DB().grpScale or 1) end
+    HideBlizzard()
+
+    local ev = CreateFrame("Frame")
+    for _, e in ipairs({ "GROUP_ROSTER_UPDATE", "PLAYER_ENTERING_WORLD", "PLAYER_TARGET_CHANGED",
+                         "PARTY_LEADER_CHANGED", "RAID_TARGET_UPDATE", "PLAYER_ROLES_ASSIGNED",
+                         "PLAYER_REGEN_ENABLED" }) do ev:RegisterEvent(e) end
+    for _, e in ipairs({ "UNIT_HEALTH", "UNIT_MAXHEALTH", "UNIT_HEAL_PREDICTION", "UNIT_POWER_UPDATE",
+                         "UNIT_MAXPOWER", "UNIT_DISPLAYPOWER", "UNIT_NAME_UPDATE", "UNIT_CONNECTION",
+                         "UNIT_FLAGS", "UNIT_AURA", "UNIT_THREAT_SITUATION_UPDATE" }) do ev:RegisterEvent(e) end
+    ev:SetScript("OnEvent", function(_, e, u)
+        if e == "UNIT_HEALTH" or e == "UNIT_MAXHEALTH" or e == "UNIT_HEAL_PREDICTION"
+           or e == "UNIT_CONNECTION" or e == "UNIT_FLAGS" then ForUnit(u, UpdateHealth)
+        elseif e == "UNIT_POWER_UPDATE" or e == "UNIT_MAXPOWER" or e == "UNIT_DISPLAYPOWER" then ForUnit(u, UpdatePower)
+        elseif e == "UNIT_AURA" then ForUnit(u, UpdateAuras)
+        elseif e == "UNIT_NAME_UPDATE" then ForUnit(u, UpdateName)
+        elseif e == "UNIT_THREAT_SITUATION_UPDATE" then ForUnit(u, UpdateBorder)
+        elseif e == "PLAYER_TARGET_CHANGED" then for _, b in ipairs(buttons) do pcall(UpdateBorder, b) end
+        elseif e == "RAID_TARGET_UPDATE" or e == "PARTY_LEADER_CHANGED" or e == "PLAYER_ROLES_ASSIGNED" then
+            for _, b in ipairs(buttons) do pcall(UpdateIcons, b) end
+        else
+            if e == "PLAYER_REGEN_ENABLED" or e == "PLAYER_ENTERING_WORLD" then HideBlizzard() end
+            C_Timer.After(0.1, Remap)
+        end
+    end)
+    -- les boutons changent d'unité quand le groupe bouge
+    local t = 0
+    ev:SetScript("OnUpdate", function(_, el)
+        t = t + el
+        if t < 0.25 then return end
+        t = 0
+        local changed = false
+        for _, b in ipairs(buttons) do
+            if b:GetAttribute("unit") ~= b.unit then changed = true; break end
+        end
+        if changed then Remap() end
+        UpdateRange()
+    end)
+
+    NZR.GroupRefresh = function()
+        for _, b in ipairs(buttons) do
+            for _, fs in ipairs({ b.name, b.info }) do SetFont(fs, fs.nzrSize or 10) end
+            UpdateButton(b)
+        end
+        if not InCombatLockdown() then
+            for _, h in pairs(headers) do h:SetScale(DB().grpScale or 1); boxes[h.kind]:SetScale(DB().grpScale or 1) end
+        end
+        for _, bx in pairs(boxes) do if NZR.WowFrameAlpha then NZR:WowFrameAlpha(bx, DB().grpAlpha or 0.9) end end
+    end
+end
+
+-- pour les tests hors jeu
+NZR.GroupInternals = { Style = Style, Update = function(b) b.unit = b:GetAttribute("unit"); UpdateButton(b) end }

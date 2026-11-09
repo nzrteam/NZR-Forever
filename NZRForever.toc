@@ -17,5 +17,6 @@ Compass.lua
 Paladin.lua
 Highlight.lua
 Frames.lua
+Group.lua
 Plates.lua
 Options.lua
