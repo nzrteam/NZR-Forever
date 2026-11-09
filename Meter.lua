@@ -994,6 +994,7 @@ local function ShiftHolder()
     if not shiftHolder then
         shiftHolder = NZR:Holder("meterbars", "Barres quand le meter est réduit", 300, 260, { "TOPLEFT", "TOPLEFT", 12, -330 })
         shiftHolder:HookScript("OnDragStop", function()
+            DB().meterBarsPos = nil          -- le bloc placé à la main reprend la main
             if shifted and NZR.MeterShiftRefresh then NZR.MeterShiftRefresh(true) end
         end)
     end
@@ -1011,6 +1012,7 @@ local function ShiftBars(on)
         for f, pts in pairs(shifted) do
             f:ClearAllPoints()
             for _, pt in ipairs(pts) do pcall(f.SetPoint, f, unpack(pt)) end
+            if f.nzrCollapsed then f.nzrCollapsed = nil; f:SetAlpha(1); pcall(f.Show, f) end
         end
         shifted = nil
         return
@@ -1043,6 +1045,9 @@ local function ShiftBars(on)
     local hd = ShiftHolder()
     hd:SetSize(maxRight - minLeft, top - bottom)
     local tl, tt = hd:GetLeft(), hd:GetTop()
+    -- l'icône DPS a été glissée : les barres la suivent, juste en dessous
+    local bp = DB().meterBarsPos
+    if bp then tl, tt = bp[1], bp[2] end
     if not (tl and tt) then tl, tt = wl, wt end
     local dx, dy = minLeft - tl, top - tt
     -- une barre accrochée à une autre barre déplacée suit déjà toute seule :
@@ -1102,7 +1107,30 @@ local function ShowMini(show)
             s:StopMovingOrSizing()
             local a, _, r, x, y = s:GetPoint()
             DB().meterMiniPos = { a, r, x, y }
+            -- barres décalées : elles suivent l'icône (placées juste en dessous)
+            if shifted and s:GetLeft() then
+                DB().meterBarsPos = { s:GetLeft(), s:GetBottom() - 16 }
+                if NZR.MeterShiftRefresh then NZR.MeterShiftRefresh(true) end
+            end
         end)
+        -- petite flèche : replier / déplier les barres décalées (comme celle des buffs)
+        local ar = CreateFrame("Button", nil, mini)
+        ar:SetSize(18, 18)
+        ar:SetPoint("LEFT", mini, "RIGHT", 3, 0)
+        ar.tex = ar:CreateTexture(nil, "ARTWORK"); ar.tex:SetAllPoints()
+        ar:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight", "ADD")
+        ar:SetScript("OnClick", function()
+            DB().meterBarsCollapsed = not DB().meterBarsCollapsed
+            if NZR.MeterBarsCollapse then NZR.MeterBarsCollapse() end
+        end)
+        ar:SetScript("OnEnter", function(s)
+            GameTooltip:SetOwner(s, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(DB().meterBarsCollapsed and "Afficher les barres" or "Cacher les barres")
+            GameTooltip:AddLine("Barres, buffs et temps de recharge choisis dans les réglages du meter.", 1, 1, 1, true)
+            GameTooltip:Show()
+        end)
+        ar:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        mini.arrow = ar
         mini:SetScript("OnClick", function()
             DB().meterMin = false
             mini:Hide()
@@ -1131,6 +1159,27 @@ local function ShowMini(show)
             elseif win then mini:SetPoint("TOPLEFT", win, "TOPLEFT", 0, 0) end
         end
         mini:SetShown(show)
+        if NZR.MeterBarsCollapse then NZR.MeterBarsCollapse() end
+    end
+end
+
+-- replier : invisibles et (hors combat) cachées ; déplier : comme avant
+NZR.MeterBarsCollapse = function()
+    local hide = DB().meterBarsCollapsed and shifted ~= nil
+    if shifted then
+        for f in pairs(shifted) do
+            if hide then
+                f.nzrCollapsed = true; f:SetAlpha(0)
+                if not InCombatLockdown() then pcall(f.Hide, f) end
+            elseif f.nzrCollapsed then
+                f.nzrCollapsed = nil; f:SetAlpha(1)
+                if not InCombatLockdown() then pcall(f.Show, f) end
+            end
+        end
+    end
+    if mini and mini.arrow then
+        mini.arrow:SetShown(shifted ~= nil and next(shifted) ~= nil)
+        mini.arrow.tex:SetTexture(DB().meterBarsCollapsed and "Interface\\Buttons\\Arrow-Down-Up" or "Interface\\Buttons\\Arrow-Up-Up")
     end
 end
 
