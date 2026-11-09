@@ -1,0 +1,35 @@
+name: Release
+# Publie une release dès que la version du .toc change (ou à la main : Actions > Release > Run workflow).
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lire la version
+        id: v
+        run: |
+          VERSION=$(grep -m1 '^## Version:' NZRForever.toc | sed 's/.*: *//' | tr -d '\r ')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if gh release view "v$VERSION" >/dev/null 2>&1; then echo "existe=1" >> "$GITHUB_OUTPUT"; fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Préparer le zip
+        if: steps.v.outputs.existe != '1'
+        run: |
+          mkdir -p build/NZRForever
+          git archive HEAD | tar -x -C build/NZRForever
+          rm -rf build/NZRForever/.github build/NZRForever/.gitignore build/NZRForever/README.md
+          cd build && zip -qr ../NZRForever-v${{ steps.v.outputs.version }}.zip NZRForever
+      - name: Publier la release
+        if: steps.v.outputs.existe != '1'
+        run: |
+          gh release create "v${{ steps.v.outputs.version }}" NZRForever-v${{ steps.v.outputs.version }}.zip \
+            --title "NZRForever ${{ steps.v.outputs.version }}" --generate-notes --target main
+        env:
+          GH_TOKEN: ${{ github.token }}

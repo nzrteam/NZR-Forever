@@ -1,0 +1,523 @@
+-- NZR Forever - Réglages : /nzr, bouton "NZR Forever" du menu Échap, clic droit sur la minimap,
+-- Échap > Options > AddOns. Catégories à gauche, une ligne par réglage avec explication.
+local _, NZR = ...
+local M = NZR:Module("Options")
+local C = NZR.C
+
+local W, H = 680, 600
+local win
+local snapshot = {}
+local reloadKeys = {}
+
+---------------------------------------------------------------------------
+-- Contenu des pages
+-- t = type (switch, slider, choice, button), key = réglage, r = recharge nécessaire
+---------------------------------------------------------------------------
+local function accentChoices()
+    local list = {}
+    for _, a in ipairs(NZR.ACCENTS) do table.insert(list, { a.id, a.name, a.a }) end
+    return list
+end
+
+local PAGES = {
+    { id = "meter", name = "DPS meter", desc = "L'essentiel en haut. Le reste ne sert que si tu veux personnaliser. Clic droit sur le meter = cette page.",
+      items = {
+        { t = "switch", key = "meter", section = "L'essentiel", label = "Afficher le DPS meter", desc = "Pense à couper celui de Blizzard dans les options du jeu.", r = true },
+        { t = "choice", key = "meterView", section = "L'essentiel", label = "Présentation", desc = "Détaillé : une carte par joueur. Tableau : colonnes. Barres : un classement simple.",
+          choices = function() return { { "cards", "Détaillé" }, { "table", "Tableau" }, { "bars", "Barres" } } end, apply = function() if NZR.MeterApplySize then NZR.MeterApplySize() end end },
+        { t = "choice", key = "meterTheme", section = "L'essentiel", label = "Teinte", r = true, desc = "Jeu : se fond dans WoW. Noir : sobre. Violet : couleurs NZR.",
+          choices = function() return { { "jeu", "Jeu" }, { "noir", "Noir" }, { "violet", "Violet" } } end },
+        { t = "slider", key = "meterAlpha", section = "L'essentiel", label = "Opacité du fond", desc = "Plus bas = on voit le jeu à travers.", min = 0.3, max = 1, step = 0.05,
+          apply = function() if NZR.MeterRefresh then NZR.MeterRefresh(false) end end },
+        { t = "switch", key = "meterAuto", section = "Quand l'afficher", label = "Caché en solo hors combat", desc = "Apparaît en combat ou en groupe, disparaît 20 s après. Le bouton « réduire » du meter le range en petite icône quand tu veux.", meter = true },
+        { t = "switch", key = "meterLock", section = "Quand l'afficher", label = "Verrouiller", desc = "Empêche de le déplacer ou de le redimensionner par erreur.", meter = true },
+        { t = "multi", key = "meterInfo", section = "Présentation Détaillé", label = "Infos sous le nom", desc = "Clique pour afficher ou masquer.", meter = true,
+          choices = function() return { { "dmg", "Total" }, { "heal", "Soins" }, { "hps", "HPS" }, { "taken", "Subis" }, { "abs", "Absorptions" }, { "int", "Interruptions" }, { "disp", "Dissipations" }, { "death", "Morts" } } end },
+        { t = "switch", key = "meterTargetBar", section = "Présentation Détaillé", label = "Vie de ta cible en haut", desc = "Nom et vie de ce que tu combats.", meter = true },
+        { t = "switch", key = "meterCardFill", section = "Présentation Détaillé", label = "Fond à la couleur de la classe", desc = "Se remplit selon la part de chacun.", meter = true },
+        { t = "multi", key = "meterCols", section = "Présentations Tableau et Barres", label = "Colonnes", desc = "Ce que montre le tableau. La largeur s'adapte.", meter = true,
+          choices = function()
+              local list = {}
+              for _, c in ipairs(NZR.METER_COLUMNS or {}) do
+                  if c.available ~= false then table.insert(list, { c.id, c.long }) end
+              end
+              return list
+          end },
+        { t = "choice", key = "meterSort", section = "Présentations Tableau et Barres", label = "Trier par", desc = "Aussi en cliquant sur un titre de colonne.", meter = true,
+          choices = function() return { { "dps", "DPS" }, { "dmg", "Dégâts" }, { "heal", "Soins" }, { "taken", "Subis" } } end },
+        { t = "choice", key = "meterRowSize", section = "Présentations Tableau et Barres", label = "Taille des lignes", desc = "Compacte : une ligne fine.", meter = true, resize = false,
+          choices = function() return { { "compact", "Compacte" }, { "normal", "Normale" }, { "large", "Grande" } } end },
+        { t = "choice", key = "meterBarColor", section = "Présentations Tableau et Barres", label = "Couleur des barres", desc = "Couleur de la classe ou couleur d'accent.", meter = true,
+          choices = function() return { { "class", "Classe" }, { "accent", "Accent" } } end },
+        { t = "multi", key = "meterExtras", flat = true, section = "Présentations Tableau et Barres", label = "Petits plus", desc = "Clique pour afficher ou masquer.", meter = true,
+          choices = function() return { { "meterShare", "Part (%)" }, { "meterIcons", "Icônes de spé" }, { "meterRank", "Rang" }, { "meterCrown", "Couronne du 1er" }, { "meterFooter", "Totaux du groupe" } } end },
+        { t = "button", section = "Outils", label = "Vider le compteur", desc = "Remet tous les combats à zéro.", text = function() return "Vider" end,
+          click = function() if NZR.ResetMeterData then NZR.ResetMeterData() end end },
+        { t = "button", section = "Outils", label = "Ajuster la largeur", desc = "Recalcule la largeur selon les colonnes.", text = function() return "Ajuster" end,
+          click = function() if NZR.MeterRefresh then NZR.MeterRefresh(true) end end },
+      } },
+    { id = "look", name = "Sorts et buffs", desc = "Facultatif : le look NZR pour tes barres de sorts et tes buffs. Tout est désactivé de base, active ce que tu veux.",
+      items = {
+        { t = "switch", key = "theme", label = "Barres d'action (sorts)", desc = "Coins arrondis discrets, bord fin, raccourcis lisibles, survol coloré.", r = true },
+        { t = "switch", key = "auras", label = "Buffs et débuffs", desc = "Icônes arrondies, bord fin (rouge pour les débuffs), durée lisible.", r = true },
+        { t = "switch", key = "tooltips", label = "Infobulles", desc = "Fond sombre, bord à la couleur de la qualité.", r = true },
+        { t = "choice", key = "meterTheme", label = "Teinte", r = true, desc = "La même que le meter. Jeu : se fond dans WoW. Noir : sobre. Violet : couleurs NZR.",
+          choices = function() return { { "jeu", "Jeu" }, { "noir", "Noir" }, { "violet", "Violet" } } end },
+      } },
+    { id = "frames", name = "Cadres", desc = "Ton cadre et celui de ta cible, au style du jeu mais plus lisibles. Désactivé de base.",
+      items = {
+        { t = "switch", key = "unitFrames", section = "L'essentiel", label = "Cadres joueur et cible NZR", desc = "Remplace les cadres du jeu par des cadres dorés plus lisibles (portrait, niveau, nom, vie, mana).", r = true },
+        { t = "choice", key = "ufPortrait", section = "L'essentiel", label = "Portrait", desc = "Rond comme le jeu, ou carré.", r = true,
+          choices = function() return { { "round", "Rond" }, { "square", "Carré" } } end },
+        { t = "choice", key = "ufText", section = "Texte des barres", label = "Afficher", desc = "Valeurs + % : « 836 / 836 » au centre et le % à droite. % : seulement le pourcentage, gros et centré.",
+          choices = function() return { { "both", "Valeurs + %" }, { "values", "Valeurs" }, { "percent", "%" }, { "none", "Rien" } } end,
+          apply = function() if NZR.FramesRefresh then NZR.FramesRefresh() end end },
+        { t = "switch", key = "ufShort", section = "Texte des barres", label = "Grands nombres raccourcis", desc = "12,4k au lieu de 12 400.",
+          apply = function() if NZR.FramesRefresh then NZR.FramesRefresh() end end },
+        { t = "choice", key = "ufColor", section = "Couleurs", label = "Barre de vie", desc = "Verte comme le jeu, ou à la couleur de la classe (monstres : rouge, jaune ou vert selon leur attitude).",
+          choices = function() return { { "green", "Verte" }, { "class", "Couleur de classe" } } end,
+          apply = function() if NZR.FramesRefresh then NZR.FramesRefresh() end end },
+        { t = "slider", key = "ufScale", section = "Taille et place", label = "Taille", desc = "Taille des deux cadres.", min = 0.7, max = 1.5, step = 0.05,
+          apply = function() if NZR.FramesScale then NZR.FramesScale() end end },
+        { t = "button", section = "Taille et place", label = "Déplacer les cadres", desc = "Fait apparaître des blocs à glisser. Reclique pour finir.",
+          text = function() return NZR.unlocked and "Terminer" or "Déplacer" end,
+          click = function() NZR:SetUnlocked(not NZR.unlocked) end },
+      } },
+    { id = "paladin", name = "Paladin", desc = "Assistant de bénédictions (comme PallyPower) : répartition entre paladins du groupe et barre pour les lancer. Désactivé de base.",
+      items = {
+        { t = "switch", key = "paladin", label = "Assistant de bénédictions", desc = "Seulement si tu joues un paladin. Les autres paladins avec NZR Forever partagent la même répartition.", r = true },
+        { t = "button", label = "Répartition des bénédictions", desc = "Qui donne quoi à quelle classe (aussi /nzr bene, ou clic droit sur la barre).",
+          text = function() return "Ouvrir" end,
+          click = function() if NZR.BlessOpen then NZR:ToggleOptions(false); NZR.BlessOpen() else NZR:Print("active d'abord l'assistant, puis clique sur Recharger.") end end },
+        { t = "switch", key = "blessGreater", section = "Barre", label = "Bénédictions supérieures au clic gauche", desc = "Toute la classe d'un coup (demande un Symbole des rois). Clic droit = version simple." },
+        { t = "switch", key = "blessSolo", section = "Barre", label = "Afficher la barre même seul", desc = "Sinon, elle n'apparaît qu'en groupe ou en raid.", r = true },
+        { t = "switch", key = "blessLock", section = "Barre", label = "Verrouiller la barre", desc = "Sinon, glisse-la par son titre pour la déplacer." },
+        { t = "slider", key = "blessScale", section = "Barre", label = "Taille de la barre", desc = "Taille des boutons de bénédiction.", min = 0.6, max = 1.6, step = 0.05,
+          apply = function() local b = _G.NZRF_BlessBar; if b and not InCombatLockdown() then b:SetScale(NZR.db.blessScale) end end },
+      } },
+    { id = "move", name = "Pratique", desc = "Petits plus qui ne changent pas le look du jeu : ramasser tout le butin, minicarte carrée, déplacer les fenêtres.",
+      items = {
+        { t = "switch", key = "lootAll", section = "Butin", label = "Bouton « Tout ramasser »", desc = "Bouton du jeu sous la fenêtre de butin.", r = true },
+        { t = "switch", key = "lootAutoClose", section = "Butin", label = "Fermer le butin quand il est vide", desc = "La fenêtre se ferme toute seule dès qu'il n'y a plus rien à ramasser." },
+        { t = "choice", key = "lootKey", section = "Butin", label = "Touche pour tout ramasser", desc = "Active seulement quand la fenêtre de butin est ouverte. Hors combat.",
+          choices = function() return { { "E", "E" }, { "F", "F" }, { "R", "R" }, { "SPACE", "Espace" }, { "none", "Aucune" } } end },
+        { t = "switch", key = "questHL", section = "Surbrillance des quêtes", label = "Surbrillance des quêtes", desc = "Un court effet quand ta souris passe sur un objet, un PNJ ou un monstre utile à une de tes quêtes.", r = true },
+        { t = "choice", key = "hlStyle", section = "Surbrillance des quêtes", label = "Style", desc = "Ping : anneaux au sol. Éclat : étoile qui scintille. Halo : lueur douce.",
+          choices = function() return { { "ping", "Ping" }, { "eclat", "Éclat" }, { "halo", "Halo" } } end,
+          apply = function() if NZR.HighlightTest then NZR.HighlightTest() end end },
+        { t = "choice", key = "hlColor", section = "Surbrillance des quêtes", label = "Couleur", desc = "Doré comme les quêtes du jeu, ou une autre couleur.",
+          choices = function() return { { "gold", "Doré" }, { "white", "Blanc" }, { "green", "Vert" }, { "blue", "Bleu" } } end,
+          apply = function() if NZR.HighlightTest then NZR.HighlightTest() end end },
+        { t = "slider", key = "hlSize", section = "Surbrillance des quêtes", label = "Taille de l'effet", desc = "100 % = taille normale.", min = 0.5, max = 2, step = 0.1 },
+        { t = "switch", key = "hlObjects", section = "Surbrillance des quêtes", label = "Objets (caisses, plantes…)", desc = "Ce que tu ramasses ou utilises pour une quête." },
+        { t = "switch", key = "hlNPCs", section = "Surbrillance des quêtes", label = "PNJ", desc = "Les personnages à qui parler pour une quête." },
+        { t = "switch", key = "hlMobs", section = "Surbrillance des quêtes", label = "Monstres", desc = "Les monstres à tuer ou à fouiller pour une quête." },
+        { t = "switch", key = "hlCombat", section = "Surbrillance des quêtes", label = "Rien en combat", desc = "Pas d'effet pendant les combats." },
+        { t = "switch", key = "hlSound", section = "Surbrillance des quêtes", label = "Petit son", desc = "Le son du ping de la carte." },
+        { t = "button", section = "Surbrillance des quêtes", label = "Essayer", desc = "Joue l'effet au-dessus de ta souris (surbrillance activée et rechargée).",
+          text = function() return "Essayer" end,
+          click = function() if NZR.HighlightTest then NZR.HighlightTest() else NZR:Print("active la surbrillance, puis clique sur Recharger.") end end },
+        { t = "switch", key = "compass", section = "Flèche de quête", label = "Flèche vers ta quête (Forever Compass)", desc = "Flèche ou boussole à placer où tu veux, vers la quête suivie ; rouge vers ton cadavre quand tu es mort. Inutile si tu as déjà l'addon Forever Compass.", r = true },
+        { t = "button", section = "Flèche de quête", label = "Réglages de la flèche", desc = "Style, couleur, taille, infos affichées… (aussi /fc).",
+          text = function() return "Ouvrir" end,
+          click = function()
+              if NZR.CompassOpen then NZR:ToggleOptions(false); NZR.CompassOpen()
+              else NZR:Print("active d'abord la flèche, puis clique sur Recharger.") end
+          end },
+        { t = "switch", key = "squareMinimap", section = "Minicarte", label = "Minicarte carrée", desc = "Carte carrée avec le bord des infobulles du jeu ; boutons et nom de zone inchangés. Molette = zoom.", r = true },
+        { t = "switch", key = "tooltipOpaque", section = "Infobulles", label = "Infobulles opaques", desc = "Fond plein (plus de décor qui transparaît) et toujours au-dessus du reste.", r = true },
+        { t = "slider", key = "tooltipAlpha", section = "Infobulles", label = "Opacité des infobulles", desc = "100 % = complètement opaque.", min = 0.5, max = 1, step = 0.05 },
+        { t = "switch", key = "moveTooltip", section = "Déplacer", label = "Infobulle déplaçable", desc = "Puis « Placer l'infobulle et les sacs » pour choisir l'endroit.", r = true },
+        { t = "switch", key = "tooltipCursor", section = "Déplacer", label = "Infobulle à la souris", desc = "Elle s'affiche juste à côté du curseur, en haut à gauche.", r = true },
+        { t = "switch", key = "moveBags", section = "Déplacer", label = "Sacs déplaçables", desc = "Toute la pile de sacs suit l'endroit choisi.", r = true },
+        { t = "switch", key = "moveWindows", section = "Déplacer", label = "Toutes les fenêtres du jeu déplaçables", desc = "Personnage, carte, sorts, talents, collections, PNJ, quêtes… Glisse par la barre de titre ; clic droit dessus = place d'origine.", r = true },
+        { t = "button", section = "Déplacer", label = "Placer l'infobulle et les sacs", desc = "Fait apparaître des blocs à glisser. Reclique ou tape /nzr lock pour finir.",
+          text = function() return NZR.unlocked and "Terminer" or "Placer" end,
+          click = function() NZR:SetUnlocked(not NZR.unlocked) end },      } },
+}
+
+---------------------------------------------------------------------------
+-- Widgets au style du jeu (modèles Blizzard : cases, boutons rouges, onglets)
+---------------------------------------------------------------------------
+local function Make(kind, name, parent, template)
+    local ok, f = pcall(CreateFrame, kind, name, parent, template)
+    if ok and f then return f, true end
+    return CreateFrame(kind, name, parent), false
+end
+
+local function GameText(parent, font, r, g, b)
+    local fs = parent:CreateFontString(nil, "OVERLAY", font or "GameFontHighlight")
+    if r then fs:SetTextColor(r, g, b) end
+    fs:SetJustifyH("LEFT")
+    return fs
+end
+
+local function Switch(parent, get, set)
+    local b = Make("CheckButton", nil, parent, "UICheckButtonTemplate")
+    b:SetSize(26, 26)
+    function b:Refresh() self:SetChecked(get() and true or false) end
+    b:SetScript("OnClick", function(s)
+        set(s:GetChecked() and true or false)
+        PlaySound(s:GetChecked() and 856 or 857)
+    end)
+    b:Refresh()
+    return b
+end
+
+-- choix : boutons radio du jeu
+local function Choice(parent, list, get, set)
+    local f = CreateFrame("Frame", nil, parent)
+    f:SetHeight(22)
+    f.btns = {}
+    local x = 0
+    for i, ch in ipairs(list) do
+        local b = Make("CheckButton", nil, f, "UIRadioButtonTemplate")
+        b:SetSize(18, 18)
+        b:SetPoint("LEFT", x, 0)
+        b.value = ch[1]
+        local t = GameText(f, "GameFontHighlightSmall")
+        t:SetPoint("LEFT", b, "RIGHT", 2, 0)
+        t:SetText(ch[2])
+        b.label = t
+        x = x + 18 + 2 + math.ceil(t:GetStringWidth()) + 14
+        b:SetScript("OnClick", function() set(b.value); f:Refresh(); PlaySound(856) end)
+        f.btns[i] = b
+    end
+    f:SetWidth(math.max(1, x - 14))
+    function f:Refresh()
+        local v = get()
+        for _, b in ipairs(self.btns) do
+            b:SetChecked(b.value == v)
+            if b.value == v then b.label:SetTextColor(1, 0.82, 0) else b.label:SetTextColor(0.9, 0.9, 0.9) end
+        end
+    end
+    f:Refresh()
+    return f
+end
+
+-- plusieurs choix : cases à cocher du jeu
+local function Multi(parent, list, getTable, onChange, maxW)
+    local f = CreateFrame("Frame", nil, parent)
+    f.boxes = {}
+    local x, y = 0, 0
+    maxW = maxW or 480
+    for _, ch in ipairs(list) do
+        local b = Make("CheckButton", nil, f, "UICheckButtonTemplate")
+        b:SetSize(22, 22)
+        local t = GameText(f, "GameFontHighlightSmall")
+        t:SetText(ch[2])
+        local w = 22 + 2 + math.ceil(t:GetStringWidth()) + 14
+        if x + w > maxW then x = 0; y = y - 24 end
+        b:SetPoint("TOPLEFT", x, y)
+        t:SetPoint("LEFT", b, "RIGHT", 1, 0)
+        x = x + w
+        b.value = ch[1]
+        b:SetScript("OnClick", function(s)
+            local tb = getTable()
+            tb[s.value] = s:GetChecked() and true or false
+            onChange()
+        end)
+        table.insert(f.boxes, b)
+    end
+    f:SetSize(maxW, -y + 22)
+    function f:Refresh()
+        local tb = getTable()
+        for _, b in ipairs(self.boxes) do b:SetChecked(tb[b.value] and true or false) end
+    end
+    f:Refresh()
+    return f
+end
+
+-- curseur : rail et bouton du jeu, valeur en %
+local function Slider(parent, item)
+    local f = CreateFrame("Frame", nil, parent)
+    f:SetSize(230, 24)
+    local v = GameText(f, "GameFontHighlightSmall")
+    v:SetPoint("RIGHT", 0, 0); v:SetWidth(40); v:SetJustifyH("RIGHT")
+    local s = CreateFrame("Slider", nil, f)
+    s:SetOrientation("HORIZONTAL")
+    s:SetPoint("LEFT", 0, 0); s:SetPoint("RIGHT", v, "LEFT", -8, 0)
+    s:SetHeight(17)
+    local track = s:CreateTexture(nil, "BACKGROUND")
+    track:SetPoint("LEFT", 0, 0); track:SetPoint("RIGHT", 0, 0); track:SetHeight(8)
+    if not pcall(track.SetAtlas, track, "Minimal_SliderBar_Middle", false) or not track:GetAtlas() then
+        track:SetColorTexture(0.12, 0.12, 0.13, 1)
+    end
+    s:SetThumbTexture("Interface\\Buttons\\UI-SliderBar-Button-Horizontal")
+    local th = s:GetThumbTexture(); th:SetSize(32, 32)
+    s:SetMinMaxValues(item.min, item.max)
+    s:SetValueStep(item.step)
+    s:SetObeyStepOnDrag(true)
+    local function show(val) v:SetText(("%d %%"):format(math.floor(val * 100 + 0.5))) end
+    s:SetValue(NZR.db[item.key] or 1); show(NZR.db[item.key] or 1)
+    s:SetScript("OnValueChanged", function(_, val)
+        val = math.floor(val / item.step + 0.5) * item.step
+        NZR.db[item.key] = val
+        show(val)
+        if item.apply then item.apply() end
+    end)
+    f.Refresh = function() s:SetValue(NZR.db[item.key] or 1) end
+    return f
+end
+
+local function PushButton(parent, textFn, onClick)
+    local b = Make("Button", nil, parent, "UIPanelButtonTemplate")
+    b:SetHeight(22)
+    function b:Refresh()
+        self:SetText(textFn())
+        local fs = self:GetFontString()
+        self:SetWidth(math.max(110, (fs and fs:GetStringWidth() or 80) + 30))
+    end
+    b:SetScript("OnClick", function(s) onClick(); s:Refresh() end)
+    b:Refresh()
+    return b
+end
+
+---------------------------------------------------------------------------
+-- Fenêtre (cadre du jeu, onglets en bas comme Personnage ou Collections)
+---------------------------------------------------------------------------
+local function NeedsReload()
+    for key in pairs(reloadKeys) do
+        if NZR.db[key] ~= snapshot[key] then return true end
+    end
+    return false
+end
+
+local function MeterApply(item)
+    if item.meter and NZR.MeterRefresh then
+        NZR.MeterRefresh(item.resize ~= false and (item.key == "meterCols" or item.key == "meterIcons" or item.key == "meterShare"))
+    end
+end
+
+local function BuildPage(content, page, idx)
+    local scroll = Make("ScrollFrame", "NZRF_OptionsScroll" .. idx, content, "UIPanelScrollFrameTemplate")
+    scroll:SetPoint("TOPLEFT", 6, -6)
+    scroll:SetPoint("BOTTOMRIGHT", -28, 6)
+    scroll:Hide()
+    local p = CreateFrame("Frame", nil, scroll)
+    p:SetSize(W - 70, 100)
+    scroll:SetScrollChild(p)
+    scroll:SetScript("OnShow", function(s) s:SetVerticalScroll(0) end)
+
+    scroll.controls = {}
+    local y = -6
+    local lastSection
+    for _, item in ipairs(page.items) do
+        if item.section and item.section ~= lastSection then
+            lastSection = item.section
+            local st = GameText(p, "GameFontNormalLarge")
+            st:SetPoint("TOPLEFT", 8, y - 6)
+            st:SetText(item.section)
+            local ln = p:CreateTexture(nil, "ARTWORK")
+            ln:SetAtlas("Options_HorizontalDivider", true)
+            if not ln:GetAtlas() then ln:SetColorTexture(1, 1, 1, 0.12); ln:SetHeight(1) end
+            ln:SetPoint("TOPLEFT", st, "BOTTOMLEFT", -4, -4)
+            ln:SetPoint("RIGHT", p, "RIGHT", -8, 0)
+            y = y - 38
+        end
+        local row = CreateFrame("Frame", nil, p)
+        row:SetPoint("TOPLEFT", 0, y); row:SetPoint("TOPRIGHT", 0, y)
+        local hl = row:CreateTexture(nil, "BACKGROUND")
+        hl:SetAllPoints(); hl:SetColorTexture(1, 1, 1, 0.04); hl:Hide()
+        row:EnableMouse(true)
+        row:SetScript("OnEnter", function() hl:Show() end)
+        row:SetScript("OnLeave", function() hl:Hide() end)
+
+        local label = GameText(row, "GameFontHighlight")
+        label:SetPoint("TOPLEFT", 14, -8)
+        label:SetText(item.label .. (item.r and "  |cff808080(recharge)|r" or ""))
+        if item.r then reloadKeys[item.key] = true end
+        local desc = GameText(row, "GameFontDisableSmall")
+        desc:SetTextColor(0.62, 0.62, 0.62)
+        desc:SetPoint("TOPLEFT", label, "BOTTOMLEFT", 0, -4)
+        desc:SetWordWrap(true)
+        desc:SetText(item.desc)
+
+        local function changed()
+            if item.apply then item.apply() end
+            MeterApply(item)
+            win.Update()
+        end
+        local ctl, rowH = nil, 46
+        if item.t == "switch" then
+            ctl = Switch(row, function() return NZR.db[item.key] end, function(v) NZR.db[item.key] = v; changed() end)
+        elseif item.t == "choice" then
+            ctl = Choice(row, item.choices(), function() return NZR.db[item.key] end, function(v) NZR.db[item.key] = v; changed() end)
+        elseif item.t == "slider" then
+            ctl = Slider(row, item)
+        elseif item.t == "button" then
+            ctl = PushButton(row, item.text, item.click)
+        elseif item.t == "multi" then
+            ctl = Multi(row, item.choices(), function()
+                if item.flat then return NZR.db end         -- cases = réglages oui/non séparés
+                if type(NZR.db[item.key]) ~= "table" then NZR.db[item.key] = {} end
+                return NZR.db[item.key]
+            end, changed, W - 120)
+        end
+        if item.t == "multi" then
+            ctl:SetPoint("TOPLEFT", desc, "BOTTOMLEFT", -4, -6)
+            desc:SetPoint("RIGHT", row, "RIGHT", -14, 0)
+            rowH = 46 + ctl:GetHeight() + 6
+        else
+            ctl:SetPoint("RIGHT", row, "RIGHT", -14, 0)
+            desc:SetPoint("RIGHT", ctl, "LEFT", -16, 0)
+            label:SetPoint("RIGHT", ctl, "LEFT", -16, 0)
+        end
+        row:SetHeight(rowH)
+        table.insert(scroll.controls, ctl)
+        y = y - rowH - 2
+    end
+    p:SetHeight(-y + 10)
+    return scroll
+end
+
+local function Create()
+    win = Make("Frame", "NZRF_Options", UIParent, "ButtonFrameTemplate")
+    win:SetSize(W, H)
+    win:SetPoint("CENTER")
+    win:SetFrameStrata("HIGH")
+    win:SetToplevel(true)
+    win:SetMovable(true)
+    win:EnableMouse(true)
+    win:SetClampedToScreen(true)
+    tinsert(UISpecialFrames, "NZRF_Options")
+    if ButtonFrameTemplate_HidePortrait then pcall(ButtonFrameTemplate_HidePortrait, win) end
+    if ButtonFrameTemplate_HideButtonBar then pcall(ButtonFrameTemplate_HideButtonBar, win) end
+    local title = "NZR Forever"
+    if not (win.SetTitle and pcall(win.SetTitle, win, title)) then
+        local tt = win.TitleText or (win.TitleContainer and win.TitleContainer.TitleText)
+        if tt then tt:SetText(title) end
+    end
+    -- déplacer par la barre de titre
+    local drag = CreateFrame("Frame", nil, win)
+    drag:SetPoint("TOPLEFT", 0, 0); drag:SetPoint("TOPRIGHT", -28, 0); drag:SetHeight(22)
+    drag:EnableMouse(true); drag:RegisterForDrag("LeftButton")
+    drag:SetScript("OnDragStart", function() win:StartMoving() end)
+    drag:SetScript("OnDragStop", function() win:StopMovingOrSizing() end)
+
+    local inset = win.Inset or win
+    win.desc = GameText(win, "GameFontNormal")
+    win.desc:SetPoint("TOPLEFT", 16, -64)
+    win.desc:SetPoint("RIGHT", win, "RIGHT", -16, 0)
+    win.desc:SetWordWrap(true)
+    if win.Inset then
+        win.Inset:ClearAllPoints()
+        win.Inset:SetPoint("TOPLEFT", 8, -92)
+        win.Inset:SetPoint("BOTTOMRIGHT", -8, 40)
+    end
+
+    win.pages, win.tabs = {}, {}
+    local Show
+    Show = function(i)
+        for j, p in ipairs(win.pages) do p:SetShown(j == i) end
+        if PanelTemplates_SetTab then pcall(PanelTemplates_SetTab, win, i) end
+        win.current = i
+        win.desc:SetText(PAGES[i].desc)
+    end
+    for i, page in ipairs(PAGES) do
+        win.pages[i] = BuildPage(inset, page, i)
+        -- onglets en haut (modèle du jeu « onglet du dessus », sinon onglet classique)
+        local tab, top = Make("Button", "NZRF_OptionsTab" .. i, win, "PanelTopTabButtonTemplate")
+        if not top then tab = Make("Button", "NZRF_OptionsTab" .. i .. "b", win, "PanelTabButtonTemplate") end
+        tab:SetID(i)
+        tab:SetText(page.name)
+        if PanelTemplates_TabResize then pcall(PanelTemplates_TabResize, tab, 0) end
+        if i == 1 then tab:SetPoint("TOPLEFT", win, "TOPLEFT", 14, -26)
+        else tab:SetPoint("LEFT", win.tabs[i - 1], "RIGHT", top and 2 or -16, 0) end
+        tab:SetScript("OnClick", function() Show(i); PlaySound(841) end)
+        win.tabs[i] = tab
+    end
+    win.Tabs = win.tabs
+    if PanelTemplates_SetNumTabs then pcall(PanelTemplates_SetNumTabs, win, #PAGES) end
+
+    -- bas : tout réinitialiser, recharger, fermer (boutons du jeu)
+    local resetAll = PushButton(win, function() return "Tout réinitialiser" end, function()
+        StaticPopupDialogs["NZRF_RESET"] = {
+            text = "Remettre tous les réglages de NZR Forever à zéro ?\nL'interface sera rechargée.",
+            button1 = "Réinitialiser", button2 = "Annuler",
+            OnAccept = function() NZRF_DB = nil; ReloadUI() end,
+            timeout = 0, whileDead = true, hideOnEscape = true,
+        }
+        StaticPopup_Show("NZRF_RESET")
+    end)
+    resetAll:SetPoint("BOTTOMLEFT", 10, 12)
+    local reload = PushButton(win, function() return "Recharger" end, function() ReloadUI() end)
+    reload:SetPoint("LEFT", resetAll, "RIGHT", 6, 0)
+    local done = PushButton(win, function() return "Fermer" end, function() win:Hide() end)
+    done:SetPoint("BOTTOMRIGHT", -10, 12)
+    local hint = GameText(win, "GameFontDisableSmall")
+    hint:SetPoint("RIGHT", done, "LEFT", -12, 0)
+    hint:SetJustifyH("RIGHT")
+
+    function win.Update()
+        local need = NeedsReload()
+        if need then reload:LockHighlight() else reload:UnlockHighlight() end
+        hint:SetText(need and "|cffffd100Clique sur Recharger pour appliquer.|r" or "Réglages enregistrés automatiquement.")
+    end
+
+    win:SetScript("OnShow", function()
+        PlaySound(SOUNDKIT and SOUNDKIT.IG_CHARACTER_INFO_OPEN or 839)
+        for _, p in ipairs(win.pages) do
+            for _, c in ipairs(p.controls) do if c.Refresh then c:Refresh() end end
+        end
+        if win.wantPage then win.Show(win.wantPage); win.wantPage = nil end
+        win.Update()
+    end)
+    win:SetScript("OnHide", function() PlaySound(SOUNDKIT and SOUNDKIT.IG_CHARACTER_INFO_CLOSE or 840) end)
+    win.Show = Show
+    Show(1)
+    win:Hide()
+end
+
+function NZR:ToggleOptions(show, pageId)
+    if not win then Create() end
+    if show == nil then show = not win:IsShown() end
+    if pageId then
+        for i, page in ipairs(PAGES) do
+            if page.id == pageId then win.wantPage = i end
+        end
+        if win:IsShown() and win.wantPage then win.Show(win.wantPage); win.wantPage = nil end
+    end
+    win:SetShown(show)
+end
+
+local function OpenFromMenu()
+    if GameMenuFrame and GameMenuFrame:IsShown() then HideUIPanel(GameMenuFrame) end
+    if SettingsPanel and SettingsPanel:IsShown() then pcall(HideUIPanel, SettingsPanel) end
+    NZR:ToggleOptions(true)
+end
+
+function M:Init()
+    -- valeurs de départ pour savoir si un rechargement est nécessaire
+    for _, page in ipairs(PAGES) do
+        for _, item in ipairs(page.items) do
+            if item.key then snapshot[item.key] = NZR.db[item.key] end
+        end
+    end
+
+    -- bouton "NZR Forever" dans le menu Échap (le menu garde le look du jeu)
+    if GameMenuFrame and GameMenuFrame.InitButtons and GameMenuFrame.AddButton then
+        hooksecurefunc(GameMenuFrame, "InitButtons", function(self)
+            pcall(self.AddButton, self, "NZR Forever", OpenFromMenu)
+        end)
+        -- (NZR Forever ne touche pas au reste du menu Échap)
+    elseif GameMenuFrame then
+        local b = CreateFrame("Button", nil, GameMenuFrame, "UIPanelButtonTemplate")
+        b:SetSize(144, 21)
+        b:SetText("NZR Forever")
+        b:SetPoint("TOP", GameMenuFrame, "BOTTOM", 0, -4)
+        b:SetScript("OnClick", OpenFromMenu)
+    end
+
+    -- Échap > Options > AddOns > NZR Forever
+    if Settings and Settings.RegisterCanvasLayoutCategory then
+        local panel = CreateFrame("Frame")
+        local t = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+        t:SetPoint("TOPLEFT", 16, -16)
+        t:SetText("NZR Forever " .. NZR.version)
+        local b = PushButton(panel, function() return "Ouvrir les réglages" end, OpenFromMenu)
+        b:SetPoint("TOPLEFT", 16, -46)
+        local ok, cat = pcall(Settings.RegisterCanvasLayoutCategory, panel, "NZR Forever")
+        if ok and cat then pcall(Settings.RegisterAddOnCategory, cat) end
+    end
+end
