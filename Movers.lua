@@ -5,6 +5,16 @@ local M = NZR:Module("Movers")
 ---------------------------------------------------------------------------
 -- Infobulle par défaut (survol d'un monstre, d'un joueur, du monde)
 ---------------------------------------------------------------------------
+-- mode Édition du jeu (placement de l'interface) : on ne touche à rien pendant ce temps,
+-- sinon on se bat avec lui pour la place et la couleur de l'infobulle
+local function Editing()
+    local em = _G.EditModeManagerFrame
+    if not em then return false end
+    if em.IsEditModeActive then local ok, v = pcall(em.IsEditModeActive, em); if ok then return v end end
+    return em:IsShown()
+end
+NZR.EditModeActive = Editing
+
 local function SetupTooltip()
     local hd = NZR:Holder("tooltip", "Infobulles", 200, 60, { "BOTTOMRIGHT", "BOTTOMRIGHT", -60, 200 })
     hd.scaled = false
@@ -18,7 +28,7 @@ local function SetupTooltip()
     end
     local function Place()
         if InCombatLockdown() and cont:IsProtected() then return end
-        if NZR.db.tooltipCursor then return end
+        if NZR.db.tooltipCursor or Editing() then return end
         cont:ClearAllPoints()
         cont:SetPoint("BOTTOMRIGHT", hd, "BOTTOMRIGHT", 0, 0)
     end
@@ -28,11 +38,15 @@ local function SetupTooltip()
     ev:RegisterEvent("PLAYER_ENTERING_WORLD")
     ev:RegisterEvent("EDIT_MODE_LAYOUTS_UPDATED")
     ev:SetScript("OnEvent", function() C_Timer.After(0.2, Place) end)
+    -- en sortant du mode Édition, on remet l'infobulle à sa place
+    if _G.EditModeManagerFrame then
+        _G.EditModeManagerFrame:HookScript("OnHide", function() C_Timer.After(0.3, Place) end)
+    end
     -- à la souris : l'emplacement suit le curseur (l'infobulle reste celle du jeu)
     if NZR.db.tooltipCursor then
         local follow = CreateFrame("Frame")
         follow:SetScript("OnUpdate", function()
-            if not GameTooltip:IsShown() then return end
+            if not GameTooltip:IsShown() or Editing() then return end
             local x, y = GetCursorPosition()
             local s = UIParent:GetEffectiveScale()
             cont:ClearAllPoints()
@@ -266,6 +280,7 @@ end
 local function SetupOpaqueTooltips()
     local function Fix(tt)
         if not tt or (tt.IsForbidden and tt:IsForbidden()) then return end
+        if Editing() then return end
         local a = NZR.db.tooltipAlpha or 1
         if tt.NineSlice and tt.NineSlice.SetCenterColor then
             pcall(tt.NineSlice.SetCenterColor, tt.NineSlice, 0.03, 0.03, 0.05, a)
