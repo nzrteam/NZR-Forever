@@ -23,7 +23,9 @@ function NZR.FramesFont(fs)
     for s in pairs(fs and { [fs] = true } or fontStrings) do
         local size = math.floor((s.nzrSize or 10) * (NZR.db.ufFontSize or 1) + 0.5)
         local path = NZR.FontPath(NZR.db.ufFont, GameBarFont())
-        if not pcall(s.SetFont, s, path, size, "OUTLINE") then pcall(s.SetFont, s, STANDARD_TEXT_FONT, size, "OUTLINE") end
+        local flags, shadow = NZR.OutlineFlags(NZR.db.ufOutline or "shadow")
+        if not pcall(s.SetFont, s, path, size, flags) then pcall(s.SetFont, s, STANDARD_TEXT_FONT, size, flags) end
+        NZR.ApplyShadow(s, shadow)
     end
 end
 
@@ -120,7 +122,6 @@ local function Bar(parent, h)
         local fs = b:CreateFontString(nil, "OVERLAY")
         fs.nzrSize = size
         NZR.FramesFont(fs)
-        fs:SetShadowColor(0, 0, 0, 1); fs:SetShadowOffset(1, -1)
         fs:SetJustifyH(justify)
         return fs
     end
@@ -264,7 +265,7 @@ local function SetBarText(bar, unit, cur, max, isPower)
         -- tout au centre (« 766 / 766   100 % ») : aligné avec la mana en dessous
         local both = values
         if not isPower and values and pct then
-            local ok2, s2 = pcall(string.format, "%s   %s", values, pct)
+            local ok2, s2 = pcall(string.format, "%s  |cffa0a0a0·|r  %s", values, pct)
             if ok2 then both = s2 end
         end
         NZR.SafeText(bar.center, both or ""); bar.right:SetText("")

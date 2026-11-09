@@ -21,7 +21,7 @@ NZR.C = {
 }
 
 local defaults = {
-    theme = false, auras = false, tooltips = false, tooltipCursor = false, moveTooltip = false, moveBags = false, moveMap = false, moveWindows = true, squareMinimap = false, compass = false, paladin = false, questHL = false, unitFrames = false, plates = false, npText = "both", npColor = "game", ufPortrait = "round", ufText = "both", ufName = "full", ufColor = "green", ufShort = true, ufScale = 1, ufFont = "game", ufFontSize = 1, npFont = "game", npFontSize = 1, hlStyle = "ping", hlColor = "gold", hlSize = 1, hlObjects = true, hlNPCs = true, hlMobs = true, hlCombat = true, hlSound = false, blessGreater = true, blessSolo = true, blessLock = false, blessScale = 1, menuButton = true, tooltipOpaque = true, tooltipAlpha = 1, lootAll = true, lootAutoClose = true, lootKey = "E",
+    theme = false, auras = false, tooltips = false, tooltipCursor = false, moveTooltip = false, moveBags = false, moveMap = false, moveWindows = true, squareMinimap = false, compass = false, paladin = false, questHL = false, unitFrames = false, plates = false, npText = "both", npColor = "game", ufPortrait = "round", ufText = "both", ufName = "full", ufColor = "green", ufShort = true, ufScale = 1, ufFont = "game", ufFontSize = 1, ufOutline = "shadow", npFont = "game", npFontSize = 1, npOutline = "game", hlStyle = "ping", hlColor = "gold", hlSize = 1, hlObjects = true, hlNPCs = true, hlMobs = true, hlCombat = true, hlSound = false, blessGreater = true, blessSolo = true, blessLock = false, blessScale = 1, menuButton = true, tooltipOpaque = true, tooltipAlpha = 1, lootAll = true, lootAutoClose = true, lootKey = "E",
     accent = "violet", font = "inter", damageFont = false,
     meter = true, meterMode = 1, meterOverall = false, meterW = 300, meterH = 180,
     scale = 1, opacity = 1,
@@ -759,4 +759,24 @@ function NZR.FontPath(key, gameFont)
         if f[1] == key and f[3] then return f[3] end
     end
     return gameFont or STANDARD_TEXT_FONT
+end
+
+-- contour du texte : ombre seule (propre), contour fin, épais, ou rien
+NZR.OUTLINES = {
+    { "shadow", "Ombre seule" },
+    { "outline", "Contour fin" },
+    { "thick", "Contour épais" },
+    { "none", "Aucun" },
+}
+-- renvoie les « flags » de police et si on met l'ombre portée
+function NZR.OutlineFlags(key, gameFlags)
+    if key == "outline" then return "OUTLINE", false
+    elseif key == "thick" then return "THICKOUTLINE", false
+    elseif key == "none" then return "", false
+    elseif key == "shadow" then return "", true end
+    return gameFlags or "OUTLINE", false            -- « du jeu »
+end
+function NZR.ApplyShadow(fs, on)
+    if on then fs:SetShadowColor(0, 0, 0, 1); fs:SetShadowOffset(1, -1)
+    else fs:SetShadowOffset(0, 0) end
 end

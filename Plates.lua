@@ -155,7 +155,9 @@ local function UpdateText(plate)
         local path = NZR.FontPath(DB().npFont, gf[1])
         local sz = math.floor((gf[2] or 10) * (DB().npFontSize or 1) + 0.5)
         for _, fs in ipairs({ bar.nzrC, bar.nzrR }) do
-            if not pcall(fs.SetFont, fs, path, sz, gf[3] or "OUTLINE") then pcall(fs.SetFont, fs, gf[1], sz, gf[3]) end
+            local flags, shadow = NZR.OutlineFlags(DB().npOutline or "game", gf[3])
+            if not pcall(fs.SetFont, fs, path, sz, flags) then pcall(fs.SetFont, fs, gf[1], sz, flags) end
+            if DB().npOutline and DB().npOutline ~= "game" then NZR.ApplyShadow(fs, shadow) end
         end
     end
     if not bar or not unit or not UnitExists(unit) then return end
