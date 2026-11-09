@@ -1042,6 +1042,19 @@ local function ShiftBars(on)
     local tl, tt = hd:GetLeft(), hd:GetTop()
     if not (tl and tt) then tl, tt = wl, wt end
     local dx, dy = minLeft - tl, top - tt
+    -- une barre accrochée à une autre barre déplacée suit déjà toute seule :
+    -- on ne décale que les points accrochés à autre chose (sinon elle bouge deux fois)
+    local set = {}
+    for _, f in ipairs(list) do set[f] = true end
+    local function follows(rel)
+        local r, guard = rel, 0
+        while r and r ~= UIParent and guard < 20 do
+            if set[r] then return true end
+            r = r.GetParent and r:GetParent() or nil
+            guard = guard + 1
+        end
+        return false
+    end
     for _, f in ipairs(list) do
         local pts = {}
         for i = 1, f:GetNumPoints() do
@@ -1050,7 +1063,10 @@ local function ShiftBars(on)
         end
         shifted[f] = pts
         f:ClearAllPoints()
-        for _, pt in ipairs(pts) do pcall(f.SetPoint, f, pt[1], pt[2], pt[3], (pt[4] or 0) - dx, (pt[5] or 0) - dy) end
+        for _, pt in ipairs(pts) do
+            if follows(pt[2]) then pcall(f.SetPoint, f, pt[1], pt[2], pt[3], pt[4] or 0, pt[5] or 0)
+            else pcall(f.SetPoint, f, pt[1], pt[2], pt[3], (pt[4] or 0) - dx, (pt[5] or 0) - dy) end
+        end
     end
     shiftTop, shiftLeft = tt, tl
 end
