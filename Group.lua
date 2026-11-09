@@ -78,14 +78,14 @@ local function Style(b, kind)
             ring:SetAllPoints(); ring:SetTexture(MEDIA .. "ring_round")
         end
         b.port = port
-        -- niveau dans un petit cadre doré, en bas à gauche du portrait
+        -- niveau dans un petit cadre doré, centré sous le portrait
         local lv = CreateFrame("Frame", nil, pf)
-        lv:SetSize(26, 18); lv:SetPoint("CENTER", pf, "BOTTOMLEFT", 6, 5)
+        lv:SetSize(28, 18); lv:SetPoint("CENTER", pf, "BOTTOM", 0, 3)   -- sous le portrait, bien dans la case
         lv:SetFrameLevel(pf:GetFrameLevel() + 4)
         local lbg = lv:CreateTexture(nil, "BACKGROUND"); lbg:SetPoint("TOPLEFT", 2, -2); lbg:SetPoint("BOTTOMRIGHT", -2, 2)
         lbg:SetColorTexture(0.05, 0.04, 0.03, 0.95)
         local lhost = CreateFrame("Frame", nil, lv)
-        lhost:SetScale(0.5); lhost:SetPoint("TOPLEFT"); lhost:SetSize(26 / 0.5, 18 / 0.5)
+        lhost:SetScale(0.5); lhost:SetPoint("TOPLEFT"); lhost:SetSize(28 / 0.5, 18 / 0.5)
         local lns = CreateFrame("Frame", nil, lhost, "NineSlicePanelTemplate")
         lns:SetAllPoints()
         if not (NineSliceUtil and pcall(NineSliceUtil.ApplyLayoutByName, lns, "Dialog")) then lns:Hide() end
