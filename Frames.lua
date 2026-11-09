@@ -180,6 +180,28 @@ local function Create(unit, holderKey, default, mirror)
     local l, r = mirror and 9 or 16, mirror and -16 or -9
     f.health = Bar(barBox, 16)
     f.health:SetPoint("TOPLEFT", l, -20); f.health:SetPoint("TOPRIGHT", r, -20)
+    -- soins en approche (les tiens et ceux des autres), comme le cadre du jeu :
+    -- une barre verte claire qui part du bout de la vie ; coupée au bord de la barre
+    do
+        local hb = f.health
+        local clip = CreateFrame("Frame", nil, hb)
+        clip:SetAllPoints(); clip:SetClipsChildren(true)
+        clip:SetFrameLevel(hb:GetFrameLevel() + 1)
+        local pred = CreateFrame("StatusBar", nil, clip)
+        local fill = hb:GetStatusBarTexture()
+        pred:SetPoint("TOPLEFT", fill, "TOPRIGHT", 0, 0)
+        pred:SetPoint("BOTTOMLEFT", fill, "BOTTOMRIGHT", 0, 0)
+        pred:SetStatusBarTexture(BAR)
+        pred:SetStatusBarColor(0, 0.83, 0, 0.55)
+        pred:SetMinMaxValues(0, 1); pred:SetValue(0)
+        local function size() local w = hb:GetWidth(); if w and w > 0 then pred:SetWidth(w) end end
+        size(); hb:HookScript("OnSizeChanged", size)
+        hb.pred = pred
+        -- le texte reste au-dessus de la prévision
+        local txt = CreateFrame("Frame", nil, hb)
+        txt:SetAllPoints(); txt:SetFrameLevel(hb:GetFrameLevel() + 3)
+        hb.center:SetParent(txt); hb.right:SetParent(txt)
+    end
     f.power = Bar(barBox, 10)
     f.power:SetPoint("TOPLEFT", f.health, "BOTTOMLEFT", 0, -2); f.power:SetPoint("TOPRIGHT", f.health, "BOTTOMRIGHT", 0, -2)
 
@@ -292,6 +314,23 @@ local function UpdateHealth(f)
     f.health:SetMinMaxValues(0, max)
     f.health:SetValue(cur)
     f.health:SetStatusBarColor(HealthRGB(u))
+    if f.health.pred then
+        local p = f.health.pred
+        p:SetMinMaxValues(0, max)
+        local inc
+        if UnitGetIncomingHeals then
+            local ok, v = pcall(UnitGetIncomingHeals, u); if ok then inc = v end
+        end
+        if inc == nil and CreateUnitHealPredictionCalculator and UnitGetDetailedHealPrediction then
+            -- API récente : calculateur de prévision (valeurs possiblement secrètes, passées telles quelles)
+            f.healCalc = f.healCalc or select(2, pcall(CreateUnitHealPredictionCalculator))
+            local calc = f.healCalc
+            if calc and pcall(UnitGetDetailedHealPrediction, u, "player", calc) and calc.GetIncomingHeals then
+                local ok, v = pcall(calc.GetIncomingHeals, calc); if ok then inc = v end
+            end
+        end
+        if inc == nil or not pcall(p.SetValue, p, inc) then p:SetValue(0) end
+    end
     local okd, dead = pcall(UnitIsDeadOrGhost, u)
     if okd and plain(dead) and dead then
         f.health.center:SetText(UnitIsGhost(u) and "Fantôme" or "Mort"); f.health.right:SetText("")
@@ -372,14 +411,14 @@ NZR.FramesRefresh = function() NZR.FramesFont(); for _, f in pairs(frames) do Up
 
 local function Events(f)
     local u = f.unit
-    for _, ev in ipairs({ "UNIT_HEALTH", "UNIT_MAXHEALTH", "UNIT_POWER_UPDATE", "UNIT_MAXPOWER", "UNIT_DISPLAYPOWER",
+    for _, ev in ipairs({ "UNIT_HEALTH", "UNIT_MAXHEALTH", "UNIT_POWER_UPDATE", "UNIT_MAXPOWER", "UNIT_DISPLAYPOWER", "UNIT_HEAL_PREDICTION",
                           "UNIT_NAME_UPDATE", "UNIT_LEVEL", "UNIT_PORTRAIT_UPDATE", "UNIT_MODEL_CHANGED", "UNIT_FACTION" }) do
         pcall(f.RegisterUnitEvent, f, ev, u)
     end
     f:RegisterEvent("PLAYER_ENTERING_WORLD")
     if u == "target" then f:RegisterEvent("PLAYER_TARGET_CHANGED") end
     f:SetScript("OnEvent", function(self, ev)
-        if ev == "UNIT_HEALTH" or ev == "UNIT_MAXHEALTH" then pcall(UpdateHealth, self)
+        if ev == "UNIT_HEALTH" or ev == "UNIT_MAXHEALTH" or ev == "UNIT_HEAL_PREDICTION" then pcall(UpdateHealth, self)
         elseif ev == "UNIT_POWER_UPDATE" or ev == "UNIT_MAXPOWER" or ev == "UNIT_DISPLAYPOWER" then pcall(UpdatePower, self)
         else UpdateAll(self) end
     end)
