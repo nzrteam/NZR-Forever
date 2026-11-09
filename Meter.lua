@@ -983,7 +983,10 @@ local mini
 local BAR_NAMES = { "MainMenuBar", "MainActionBar", "MultiBarBottomLeft", "MultiBarBottomRight",
     "MultiBarRight", "MultiBarLeft", "MultiBar5", "MultiBar6", "MultiBar7", "StanceBar", "StanceBarFrame",
     "PetActionBar", "PetActionBarFrame", "PossessActionBar", "PossessBarFrame", "MultiCastActionBarFrame",
-    "BuffFrame", "DebuffFrame" }
+}
+-- à suivre aussi, au choix (réglages du meter)
+local BUFF_NAMES = { "BuffFrame", "DebuffFrame", "BuffIconCooldownViewer", "BuffBarCooldownViewer" }
+local CD_NAMES = { "EssentialCooldownViewer", "UtilityCooldownViewer" }
 local shifted = nil          -- { [frame] = points d'origine }, nil = rien de décalé
 local shiftTop, shiftLeft
 local shiftHolder
@@ -1014,7 +1017,11 @@ local function ShiftBars(on)
     if not (wl and wr) then return end
     local list, minLeft, top, maxRight, bottom = {}, nil, nil, nil, nil
     local seen = {}
-    for _, n in ipairs(BAR_NAMES) do
+    local names = {}
+    for _, n in ipairs(BAR_NAMES) do names[#names + 1] = n end
+    if DB().meterShiftBuffs ~= false then for _, n in ipairs(BUFF_NAMES) do names[#names + 1] = n end end
+    if DB().meterShiftCD ~= false then for _, n in ipairs(CD_NAMES) do names[#names + 1] = n end end
+    for _, n in ipairs(names) do
         local f = _G[n]
         if f and not seen[f] and f.IsShown and f:IsShown() and f.GetLeft then
             seen[f] = true
