@@ -892,4 +892,10 @@ function MOD:Init()
     FC:RegisterEvent("PLAYER_UNGHOST")
     FC:SetScript("OnEvent", OnEvent)
     NZR.CompassOpen = OpenOptions
+    -- cible posée par un autre module (ex. guide de leveling : centre d'une zone)
+    NZR.CompassPointTo = function(map, x, y, name, desc)
+        SetManual(map, x, y, name, desc)
+        FC:Show()
+        return true
+    end
 end

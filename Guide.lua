@@ -7,7 +7,7 @@ local plain = NZR.plain
 
 local function DB() return NZR.db end
 local ROWS, COLS, CELL, ICON = 7, 4, 44, 34
-local W, H = 660, 610
+local W, H = 660, 640
 
 local data            -- NZR.GuideData[classe]
 local win, btn
@@ -71,10 +71,11 @@ local function AtLevel(full, level)
                 if r[ti][i] > 0 then order[#order + 1] = { ti = ti, i = i, row = t.r } end
             end
         end
+        -- même ordre que le calculateur : ligne la plus basse d'abord, puis l'ordre des arbres et des talents
         table.sort(order, function(a, b)
             if a.row ~= b.row then return a.row > b.row end
-            if a.ti ~= b.ti then return a.ti > b.ti end
-            return a.i > b.i
+            if a.ti ~= b.ti then return a.ti < b.ti end
+            return a.i < b.i
         end)
         local hit
         for _, o in ipairs(order) do
@@ -226,7 +227,7 @@ end
 local function BuildTree(parent, ti, tree, x)
     local f = CreateFrame("Frame", nil, parent)
     f:SetSize(COLS * CELL + 20, 34 + ROWS * CELL + 4)
-    f:SetPoint("TOPLEFT", parent, "TOPLEFT", x, -112)
+    f:SetPoint("TOPLEFT", parent, "TOPLEFT", x, -140)
     local bg = f:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints(); bg:SetColorTexture(0, 0, 0, 0.35)
     local edge = f:CreateTexture(nil, "BACKGROUND", nil, -1)
@@ -263,6 +264,120 @@ local function BuildTree(parent, ti, tree, x)
     return f
 end
 
+---------------------------------------------------------------------------
+-- Onglet Leveling : feuille de route par niveau, zone mise en avant, flèche vers la zone
+---------------------------------------------------------------------------
+local ROW_H = 24
+local mapCache
+
+local function Norm(s)
+    s = (s or ""):lower()
+    local map = { ["é"] = "e", ["è"] = "e", ["ê"] = "e", ["ë"] = "e", ["à"] = "a", ["â"] = "a", ["î"] = "i", ["ï"] = "i",
+                  ["ô"] = "o", ["û"] = "u", ["ù"] = "u", ["ç"] = "c", ["É"] = "e", ["Â"] = "a" }
+    for k, v in pairs(map) do s = s:gsub(k, v) end
+    return (s:gsub("[^%w]", ""))
+end
+
+local function FindMap(name)
+    if not (C_Map and C_Map.GetMapChildrenInfo) then return nil end
+    if not mapCache then
+        mapCache = {}
+        for _, root in ipairs({ 947, 946, 1414, 1415, 12, 13 }) do
+            local ok, list = pcall(C_Map.GetMapChildrenInfo, root, nil, true)
+            if ok and type(list) == "table" then
+                for _, m in ipairs(list) do
+                    local key = Norm(m.name)
+                    -- on garde la vraie zone (type 3) plutôt qu'un sous-lieu du même nom
+                    if key ~= "" and (not mapCache[key] or m.mapType == 3) then mapCache[key] = m.mapID end
+                end
+            end
+        end
+    end
+    local key = Norm(name)
+    if mapCache[key] then return mapCache[key] end
+    for k, id in pairs(mapCache) do
+        if k:find(key, 1, true) or key:find(k, 1, true) and #k > 5 then return id end
+    end
+end
+
+local function PointTo(name)
+    local id = FindMap(name)
+    if not id then NZR:Print(("« %s » introuvable sur la carte de ce client."):format(name)); return end
+    if NZR.CompassPointTo then
+        NZR.CompassPointTo(id, 0.5, 0.5, name, "Guide de leveling")
+        NZR:Print(("flèche vers %s."):format(name))
+    elseif TomTom and TomTom.AddWaypoint then
+        pcall(TomTom.AddWaypoint, TomTom, id, 0.5, 0.5, { title = name })
+        NZR:Print(("flèche vers %s."):format(name))
+    elseif C_Map.SetUserWaypoint and UiMapPoint and UiMapPoint.CreateFromCoordinates then
+        pcall(C_Map.SetUserWaypoint, UiMapPoint.CreateFromCoordinates(id, 0.5, 0.5))
+        if C_SuperTrack and C_SuperTrack.SetSuperTrackedUserWaypoint then pcall(C_SuperTrack.SetSuperTrackedUserWaypoint, true) end
+        NZR:Print(("repère posé sur %s (carte du monde)."):format(name))
+    end
+end
+
+local function RouteFor()
+    local faction = UnitFactionGroup("player")
+    local f = faction == "Horde" and "H" or "A"
+    local _, race = UnitRace("player")
+    local out = {}
+    for _, e in ipairs(NZR.GuideData.ROUTE or {}) do
+        if not e.f or e.f == f then
+            local name = e[3]
+            if e.start then name = (NZR.GuideData.START or {})[race] or name end
+            out[#out + 1] = { min = e[1], max = e[2], name = name, d = e.d, zone = e.zone, start = e.start }
+        end
+    end
+    return out
+end
+
+local function BuildLeveling(pg)
+    local lv = {}
+    win.lv = lv
+    lv.head = pg:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    lv.head:SetPoint("TOPLEFT", 18, -62)
+    lv.sub = pg:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    lv.sub:SetPoint("TOPLEFT", lv.head, "BOTTOMLEFT", 0, -4)
+    lv.sub:SetPoint("RIGHT", pg, "RIGHT", -18, 0); lv.sub:SetJustifyH("LEFT")
+
+    local box = CreateFrame("Frame", nil, pg)
+    box:SetPoint("TOPLEFT", 14, -100); box:SetPoint("BOTTOMRIGHT", -14, 34)
+    local bg = box:CreateTexture(nil, "BACKGROUND"); bg:SetAllPoints(); bg:SetColorTexture(0, 0, 0, 0.35)
+    local edge = box:CreateTexture(nil, "BACKGROUND", nil, -1)
+    edge:SetPoint("TOPLEFT", -1, 1); edge:SetPoint("BOTTOMRIGHT", 1, -1); edge:SetColorTexture(0.45, 0.36, 0.18, 0.7)
+    local scroll = CreateFrame("ScrollFrame", "NZRF_GuideRoute", box, "UIPanelScrollFrameTemplate")
+    scroll:SetPoint("TOPLEFT", 4, -4); scroll:SetPoint("BOTTOMRIGHT", -26, 4)
+    local list = CreateFrame("Frame", nil, scroll)
+    list:SetSize(W - 70, 10)
+    scroll:SetScrollChild(list)
+    lv.scroll, lv.list, lv.rows = scroll, list, {}
+
+    local note = pg:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    note:SetPoint("BOTTOMLEFT", 16, 12); note:SetPoint("RIGHT", pg, "RIGHT", -16, 0); note:SetJustifyH("LEFT")
+    note:SetText("Repères de niveau généraux ; le pas à pas quête par quête reste le travail de RestedXP et Questie.")
+end
+
+local function LevelRow(i)
+    local lv = win.lv
+    if lv.rows[i] then return lv.rows[i] end
+    local r = CreateFrame("Frame", nil, lv.list)
+    r:SetHeight(ROW_H)
+    r:SetPoint("TOPLEFT", 0, -(i - 1) * ROW_H); r:SetPoint("RIGHT", lv.list, "RIGHT", 0, 0)
+    r.bg = r:CreateTexture(nil, "BACKGROUND"); r.bg:SetAllPoints()
+    r.range = r:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    r.range:SetPoint("LEFT", 8, 0); r.range:SetWidth(54); r.range:SetJustifyH("LEFT")
+    r.icon = r:CreateTexture(nil, "ARTWORK"); r.icon:SetSize(16, 16); r.icon:SetPoint("LEFT", 62, 0)
+    r.name = r:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    r.name:SetPoint("LEFT", r.icon, "RIGHT", 6, 0); r.name:SetJustifyH("LEFT")
+    r.where = r:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    r.where:SetPoint("LEFT", r.name, "RIGHT", 8, 0)
+    r.go = CreateFrame("Button", nil, r, "UIPanelButtonTemplate")
+    r.go:SetSize(70, 20); r.go:SetPoint("RIGHT", -6, 0); r.go:SetText("Flèche")
+    r.go:SetScript("OnClick", function(s) PointTo(s.target) end)
+    lv.rows[i] = r
+    return r
+end
+
 local function CreateWindow()
     win = CreateFrame("Frame", "NZRF_Guide", UIParent)
     win:SetSize(W, H)
@@ -273,37 +388,54 @@ local function CreateWindow()
     win:RegisterForDrag("LeftButton")
     win:SetScript("OnDragStart", win.StartMoving)
     win:SetScript("OnDragStop", win.StopMovingOrSizing)
-    local over = NZR:WowFrame(win, "Guide de progression", 0.97)
-    win.over = over
-    local close = CreateFrame("Button", nil, over, "UIPanelCloseButton")
+    local root = NZR:WowFrame(win, "Guide de progression", 0.97)
+    win.over = root
+    local close = CreateFrame("Button", nil, root, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", 2, 1)
     close:SetScript("OnClick", function() win:Hide() end)
     tinsert(UISpecialFrames, "NZRF_Guide")
 
+    -- deux onglets : Talents / Leveling
+    win.pages, win.pageTabs = {}, {}
+    local x = 12
+    for i, name in ipairs({ "Talents", "Leveling" }) do
+        local pg = CreateFrame("Frame", nil, root)
+        pg:SetAllPoints(); pg:Hide()
+        win.pages[i] = pg
+        local t = Tab(root, name, x)
+        t:SetScript("OnClick", function() DB().guidePage = i; PlaySound(841); Refresh() end)
+        win.pageTabs[i] = t
+        x = x + (t:GetWidth() or 120) + 4
+    end
+    BuildLeveling(win.pages[2])
+    local over = win.pages[1]
+
     if not data then
         local msg = over:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
         msg:SetPoint("CENTER")
-        msg:SetText("Pas encore de guide pour ta classe.\nPour l'instant : Paladin.")
-        win:SetSize(360, 140)
+        msg:SetText("Pas encore de build pour ta classe (Paladin pour l'instant).\nL'onglet Leveling marche pour toutes les classes.")
         return
     end
 
-    -- onglets des builds
+    -- choix du build
     win.tabs = {}
-    local x = 12
+    local bx = 14
     for i, b in ipairs(data.builds) do
-        local t = Tab(over, b.name, x)
+        local t = CreateFrame("Button", nil, over, "UIPanelButtonTemplate")
+        t:SetSize(140, 22)
+        t:SetPoint("TOPLEFT", bx, -60)
+        t:SetText(b.name)
         t:SetScript("OnClick", function()
             DB().guideBuild = b.id
             PlaySound(841); Refresh()
         end)
         win.tabs[i] = t
-        x = x + (t:GetWidth() or 150) + 4
+        bx = bx + 144
     end
 
     -- ligne d'info
     win.role = over:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    win.role:SetPoint("TOPLEFT", 18, -62)
+    win.role:SetPoint("TOPLEFT", 18, -90)
     win.info = over:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     win.info:SetPoint("TOPLEFT", win.role, "BOTTOMLEFT", 0, -4)
     win.next = over:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -313,7 +445,7 @@ local function CreateWindow()
     -- niveau : auto (le tien) ou choisi
     local auto = CreateFrame("CheckButton", nil, over, "UICheckButtonTemplate")
     auto:SetSize(24, 24)
-    auto:SetPoint("TOPRIGHT", -150, -58)
+    auto:SetPoint("TOPRIGHT", -150, -86)
     auto.label = over:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     auto.label:SetPoint("LEFT", auto, "RIGHT", 2, 0)
     auto.label:SetText("Mon niveau")
@@ -336,7 +468,7 @@ local function CreateWindow()
         return b
     end
     local prev, nextB = arrow(-1), arrow(1)
-    prev:SetPoint("TOPRIGHT", -96, -82)
+    prev:SetPoint("TOPRIGHT", -96, -108)
     win.lvl = over:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     win.lvl:SetPoint("LEFT", prev, "RIGHT", 2, 0); win.lvl:SetWidth(40)
     nextB:SetPoint("LEFT", win.lvl, "RIGHT", 2, 0)
@@ -353,7 +485,7 @@ local function CreateWindow()
 
     -- conseil du build, caractéristiques, source
     win.tip = over:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    win.tip:SetPoint("TOPLEFT", 18, -112 - (34 + ROWS * CELL + 4) - 12)
+    win.tip:SetPoint("TOPLEFT", 18, -140 - (34 + ROWS * CELL + 4) - 12)
     win.tip:SetPoint("RIGHT", over, "RIGHT", -18, 0)
     win.tip:SetJustifyH("LEFT"); win.tip:SetSpacing(2)
     win.stats = over:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -366,13 +498,17 @@ local function CreateWindow()
     src:SetText("Builds : conquestcapped.com · arbres : wowforevertools")
 end
 
+local RefreshLeveling
 Refresh = function()
-    if not win or not data or not win:IsShown() then return end
+    if not win or not win:IsShown() then return end
+    local page = DB().guidePage or 1
+    for i, pg in ipairs(win.pages) do pg:SetShown(i == page); SelectTab(win.pageTabs[i], i == page) end
+    if page == 2 then RefreshLeveling(); return end
+    if not data then return end
     local bi = BuildIndex()
     local build = data.builds[bi]
     for i, t in ipairs(win.tabs) do
-        local on = (i == bi)
-        SelectTab(t, on)
+        if i == bi then t:LockHighlight(); t:SetAlpha(1) else t:UnlockHighlight(); t:SetAlpha(0.75) end
     end
     local level = ShownLevel()
     win.auto:SetChecked(DB().guideAuto ~= false)
@@ -445,6 +581,57 @@ Refresh = function()
     win.tip:SetText("|cffffd100Conseil :|r " .. (build.tip or ""))
 end
 
+RefreshLeveling = function()
+    local lv = win.lv
+    local level = PlayerLevel()
+    local route = RouteFor()
+    local here = GetZoneText and GetZoneText() or ""
+    local firstCur, hereInfo
+    for i, e in ipairs(route) do
+        local r = LevelRow(i)
+        r:Show()
+        r.range:SetText(e.min == e.max and tostring(e.min) or (e.min .. "-" .. e.max))
+        r.name:SetText(e.name)
+        r.icon:SetTexture(e.d and "Interface\\Minimap\\Dungeon" or "Interface\\Icons\\INV_Misc_Map_01")
+        if not e.d then r.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92) else r.icon:SetTexCoord(0, 1, 0, 1) end
+        r.where:SetText(e.d and ("Donjon · " .. (e.zone or "")) or "")
+        r.go.target = e.d and e.zone or e.name
+        r.go:SetShown(not e.start or (NZR.GuideData.START and e.name ~= "Zone de départ de ta race"))
+        local cur = level >= e.min and level <= e.max
+        local past = level > e.max
+        if cur then
+            r.bg:SetColorTexture(1, 0.82, 0, 0.16)
+            r.name:SetTextColor(1, 0.82, 0); r.range:SetTextColor(1, 1, 1)
+            firstCur = firstCur or i
+        elseif past then
+            r.bg:SetColorTexture(0, 0, 0, 0)
+            r.name:SetTextColor(0.5, 0.5, 0.5); r.range:SetTextColor(0.5, 0.5, 0.5)
+        else
+            r.bg:SetColorTexture(1, 1, 1, (i % 2 == 0) and 0.03 or 0)
+            r.name:SetTextColor(0.9, 0.9, 0.9); r.range:SetTextColor(0.8, 0.8, 0.8)
+        end
+        if Norm(e.name) == Norm(here) and not e.d then hereInfo = e end
+    end
+    for i = #route + 1, #lv.rows do lv.rows[i]:Hide() end
+    lv.list:SetHeight(#route * ROW_H + 4)
+
+    lv.head:SetText(("Niveau %d · %s"):format(level, UnitFactionGroup("player") == "Horde" and "Horde" or "Alliance"))
+    local sub
+    if hereInfo then
+        if level < hereInfo.min then sub = ("Tu es en %s (%d-%d) : un peu tôt, attention."):format(here, hereInfo.min, hereInfo.max)
+        elseif level > hereInfo.max then sub = ("Tu es en %s (%d-%d) : tu peux passer à la suite, en doré."):format(here, hereInfo.min, hereInfo.max)
+        else sub = ("Tu es en %s (%d-%d) : bonne zone pour ton niveau."):format(here, hereInfo.min, hereInfo.max) end
+    else
+        sub = "En doré : les zones et donjons faits pour ton niveau. « Flèche » pointe vers la zone."
+    end
+    lv.sub:SetText(sub)
+    if firstCur and not lv.scrolled then
+        lv.scrolled = true
+        local y = math.max(0, (firstCur - 3) * ROW_H)
+        C_Timer.After(0, function() pcall(lv.scroll.SetVerticalScroll, lv.scroll, y) end)
+    end
+end
+
 function NZR.GuideToggle()
     if not win then CreateWindow() end
     if win:IsShown() then win:Hide() else win:Show(); Refresh() end
@@ -481,7 +668,7 @@ local function CreateButton()
     btn:SetScript("OnEnter", function(s)
         GameTooltip:SetOwner(s, "ANCHOR_LEFT")
         GameTooltip:AddLine("Guide de progression")
-        GameTooltip:AddLine("Le build à suivre selon ton niveau. Glisser : déplacer.", 1, 1, 1, true)
+        GameTooltip:AddLine("Talents à suivre et zones de leveling selon ton niveau. Glisser : déplacer.", 1, 1, 1, true)
         GameTooltip:Show()
     end)
     btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -494,7 +681,7 @@ function M:Init()
     CreateButton()
     local ev = CreateFrame("Frame")
     for _, e in ipairs({ "PLAYER_LEVEL_UP", "CHARACTER_POINTS_CHANGED", "PLAYER_TALENT_UPDATE",
-                         "SPELLS_CHANGED", "PLAYER_ENTERING_WORLD" }) do pcall(ev.RegisterEvent, ev, e) end
+                         "SPELLS_CHANGED", "PLAYER_ENTERING_WORLD", "ZONE_CHANGED_NEW_AREA" }) do pcall(ev.RegisterEvent, ev, e) end
     ev:SetScript("OnEvent", function() C_Timer.After(0.2, function() pcall(Refresh) end) end)
 end
 
