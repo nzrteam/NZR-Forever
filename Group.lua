@@ -113,20 +113,28 @@ local function Style(b, kind)
     b.mark:SetSize(14, 14); b.mark:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcons")
     b.mark:SetPoint("CENTER", b, "TOP", 0, -2)
 
-    -- débuffs que je peux dissiper (ou tous les débuffs gênants en raid)
-    b.debuffs = {}
-    for i = 1, 3 do
+    -- petites icônes : buffs en bas à gauche, débuffs en bas à droite (comme le jeu)
+    local isz = big and 16 or 13
+    local function Icon(list, i, corner, dir)
         local d = CreateFrame("Frame", nil, top)
-        d:SetSize(big and 16 or 13, big and 16 or 13)
-        if i == 1 then d:SetPoint("BOTTOMRIGHT", hp, "BOTTOMRIGHT", -1, 1)
-        else d:SetPoint("RIGHT", b.debuffs[i - 1], "LEFT", -1, 0) end
+        d:SetSize(isz, isz)
+        if i == 1 then d:SetPoint(corner, hp, corner, corner:find("LEFT") and 1 or -1, 1)
+        else d:SetPoint(dir == 1 and "LEFT" or "RIGHT", list[i - 1], dir == 1 and "RIGHT" or "LEFT", dir, 0) end
         d.edge = d:CreateTexture(nil, "BACKGROUND"); d.edge:SetAllPoints()
         d.icon = d:CreateTexture(nil, "ARTWORK")
         d.icon:SetPoint("TOPLEFT", 1, -1); d.icon:SetPoint("BOTTOMRIGHT", -1, 1)
         d.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        d.cd = CreateFrame("Cooldown", nil, d, "CooldownFrameTemplate")
+        d.cd:SetAllPoints(d.icon); d.cd:SetReverse(true); d.cd:SetDrawEdge(false)
+        if d.cd.SetHideCountdownNumbers then d.cd:SetHideCountdownNumbers(true) end
+        d.count = d:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
+        d.count:SetPoint("BOTTOMRIGHT", 2, -1)
         d:Hide()
-        b.debuffs[i] = d
+        list[i] = d
     end
+    b.debuffs, b.buffs = {}, {}
+    for i = 1, 3 do Icon(b.debuffs, i, "BOTTOMRIGHT", -1) end
+    for i = 1, (big and 6 or 3) do Icon(b.buffs, i, "BOTTOMLEFT", 1) end
 
     -- liseré : cible (blanc) ou menace (rouge)
     b.hl = top:CreateTexture(nil, "OVERLAY", nil, 2)
@@ -239,31 +247,66 @@ local function UpdateIcons(b)
 end
 
 local DEBUFF_RGB = { Magic = { 0.2, 0.6, 1 }, Curse = { 0.6, 0, 1 }, Disease = { 0.6, 0.4, 0 }, Poison = { 0, 0.6, 0 } }
+
+local function SetIcon(d, u, a)
+    d.id = a.auraInstanceID
+    pcall(d.icon.SetTexture, d.icon, a.icon)
+    d.count:SetText("")
+    if a.applications ~= nil and not (plain(a.applications) and a.applications <= 1) then
+        local ok, s = pcall(string.format, "%d", a.applications)
+        if ok then NZR.SafeText(d.count, s) end
+    end
+    d.cd:Hide()
+    local done = false
+    if C_UnitAuras.GetAuraDuration and d.cd.SetCooldownFromDurationObject and a.auraInstanceID then
+        local ok, dur = pcall(C_UnitAuras.GetAuraDuration, u, a.auraInstanceID)
+        if ok and dur and pcall(d.cd.SetCooldownFromDurationObject, d.cd, dur) then d.cd:Show(); done = true end
+    end
+    if not done and plain(a.duration) and plain(a.expirationTime) and a.duration > 0 then
+        d.cd:SetCooldown(a.expirationTime - a.duration, a.duration); d.cd:Show()
+    end
+    d:Show()
+end
+
+local function Fill(list, u, filters, stopAfterFirst)
+    local n = 0
+    for fi, filter in ipairs(filters) do
+        for i = 1, 40 do
+            if n >= #list then break end
+            local ok, a = pcall(C_UnitAuras.GetAuraDataByIndex, u, i, filter)
+            if not ok or not a then break end
+            local dup = false
+            for j = 1, n do if list[j].id == a.auraInstanceID then dup = true end end
+            if not dup then
+                n = n + 1
+                SetIcon(list[n], u, a)
+                list[n].aura = a
+            end
+        end
+        if stopAfterFirst and fi == 1 then break end
+    end
+    for i = n + 1, #list do list[i]:Hide(); list[i].id = nil end
+    return n
+end
+
 local function UpdateAuras(b)
     local u = b.unit
-    local n = 0
-    if u and UnitExists(u) and DB().grpDebuffs ~= false and C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
-        for _, filter in ipairs({ "HARMFUL|RAID", "HARMFUL" }) do
-            for i = 1, 20 do
-                if n >= 3 then break end
-                local ok, a = pcall(C_UnitAuras.GetAuraDataByIndex, u, i, filter)
-                if not ok or not a then break end
-                local dup = false
-                for j = 1, n do if b.debuffs[j].id == a.auraInstanceID then dup = true end end
-                if not dup then
-                    n = n + 1
-                    local d = b.debuffs[n]
-                    d.id = a.auraInstanceID
-                    pcall(d.icon.SetTexture, d.icon, a.icon)
-                    local t = plain(a.dispelName) and DEBUFF_RGB[a.dispelName]
-                    if t then d.edge:SetColorTexture(t[1], t[2], t[3], 1) else d.edge:SetColorTexture(0.8, 0.1, 0.1, 1) end
-                    d:Show()
-                end
+    local ok = u and UnitExists(u) and C_UnitAuras and C_UnitAuras.GetAuraDataByIndex
+    -- débuffs : ceux que je peux dissiper d'abord (ou tous si réglé)
+    if ok and DB().grpDebuffs ~= false then
+        Fill(b.debuffs, u, { "HARMFUL|RAID", "HARMFUL" }, DB().grpDebuffAll ~= true)
+        for _, d in ipairs(b.debuffs) do
+            if d:IsShown() and d.aura then
+                local t = plain(d.aura.dispelName) and DEBUFF_RGB[d.aura.dispelName]
+                if t then d.edge:SetColorTexture(t[1], t[2], t[3], 1) else d.edge:SetColorTexture(0.8, 0.1, 0.1, 1) end
             end
-            if filter == "HARMFUL|RAID" and DB().grpDebuffAll ~= true then break end
         end
-    end
-    for i = n + 1, 3 do b.debuffs[i]:Hide(); b.debuffs[i].id = nil end
+    else for _, d in ipairs(b.debuffs) do d:Hide() end end
+    -- buffs : les miens (bénédictions, soins sur la durée…), ou tous si réglé
+    if ok and DB().grpBuffs ~= "none" then
+        Fill(b.buffs, u, { DB().grpBuffs == "all" and "HELPFUL" or "HELPFUL|PLAYER" })
+        for _, d in ipairs(b.buffs) do d.edge:SetColorTexture(0, 0, 0, 1) end
+    else for _, d in ipairs(b.buffs) do d:Hide() end end
 end
 
 local function UpdateBorder(b)

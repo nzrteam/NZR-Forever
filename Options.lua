@@ -131,6 +131,8 @@ local PAGES = {
           choices = function() return { { "auto", "Auto" }, { "percent", "%" }, { "values", "Valeurs" }, { "none", "Rien" } } end, apply = function() if NZR.GroupRefresh then NZR.GroupRefresh() end end },
         { t = "switch", key = "grpPower", section = "Groupe et raid", label = "Barre de mana", desc = "Fine barre de mana / énergie sous la vie.", r = true },
         { t = "switch", key = "grpRole", section = "Groupe et raid", label = "Icône de rôle", desc = "Tank, soigneur, dégâts (si le rôle est choisi).", apply = function() if NZR.GroupRefresh then NZR.GroupRefresh() end end },
+        { t = "choice", key = "grpBuffs", section = "Groupe et raid", label = "Buffs", desc = "En bas à gauche de chaque case, avec le temps restant.",
+          choices = function() return { { "mine", "Les miens" }, { "all", "Tous" }, { "none", "Aucun" } } end, apply = function() if NZR.GroupRefresh then NZR.GroupRefresh() end end },
         { t = "switch", key = "grpDebuffs", section = "Groupe et raid", label = "Débuffs à dissiper", desc = "Jusqu'à 3 icônes en bas à droite, bord à la couleur du type (magie, malédiction…).", apply = function() if NZR.GroupRefresh then NZR.GroupRefresh() end end },
         { t = "switch", key = "grpDebuffAll", section = "Groupe et raid", label = "Tous les débuffs", desc = "Montre aussi ceux que tu ne peux pas dissiper.", apply = function() if NZR.GroupRefresh then NZR.GroupRefresh() end end },
         { t = "slider", key = "grpCellScale", section = "Groupe et raid", label = "Taille des cases", desc = "Largeur et hauteur de chaque case.", min = 0.7, max = 1.5, step = 0.05, r = true },
