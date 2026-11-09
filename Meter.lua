@@ -934,7 +934,12 @@ local function ApplySettings(resize)
         DB().meterTW = math.max(TableWidth(), 260)
         win:SetWidth(DB().meterTW)
     end
-    win.nzrAlpha = DB().meterAlpha or 0.88
+    if win.nzrRock then
+        win.nzrAlpha = 0
+        NZR:WowFrameAlpha(win, DB().meterAlpha or 0.85)
+    else
+        win.nzrAlpha = DB().meterAlpha or 0.88
+    end
     NZR:ApplyOpacity()
     win.foot:SetShown(DB().meterFooter)
     win.body:ClearAllPoints()
@@ -1116,26 +1121,23 @@ local function CreateWindow()
     win:SetBackdropColor(P.win[1], P.win[2], P.win[3], DB().meterAlpha or 0.92)
     win:SetBackdropBorderColor(unpack(P.winEdge))
     if P.jeu then
-        local ns = CreateFrame("Frame", nil, win, "NineSlicePanelTemplate")
-        ns:SetAllPoints()
-        ns:SetFrameLevel(win:GetFrameLevel() + 6)
-        local ok = NineSliceUtil and pcall(NineSliceUtil.ApplyLayoutByName, ns, "TooltipDefaultLayout")
-        if ok then
-            if ns.Center then ns.Center:Hide() end
-            if ns.SetBorderColor then pcall(ns.SetBorderColor, ns, 0.62, 0.62, 0.66, 1) end
-            -- le fond reste le nôtre (opacité réglable), arrondi léger comme les infobulles
-        else
-            ns:Hide()
-            win:SetBackdropBorderColor(0.42, 0.42, 0.46, 1)
-        end
-        win.nzrGameBorder = ns
+        -- même cadre que les fenêtres du jeu et les réglages NZR Forever
+        NZR:WowFrame(win, nil, DB().meterAlpha or 0.85)
+        win:SetBackdropColor(0, 0, 0, 0)
+        win:SetBackdropBorderColor(0, 0, 0, 0)
+        win.nzrAlpha = 0
     end
     PlaceWin()
 
     -- en-tête
     local head = CreateFrame("Frame", nil, win, "BackdropTemplate")
-    head:SetPoint("TOPLEFT", 1, -1); head:SetPoint("TOPRIGHT", -1, -1)
-    head:SetHeight(HEADER_H)
+    if P.jeu then
+        head:SetPoint("TOPLEFT", 4, 0); head:SetPoint("TOPRIGHT", -4, 0)
+        head:SetHeight(22)
+    else
+        head:SetPoint("TOPLEFT", 1, -1); head:SetPoint("TOPRIGHT", -1, -1)
+        head:SetHeight(HEADER_H)
+    end
     NZR:FlatBackdrop(head, false, 1)
     head:SetBackdropBorderColor(0, 0, 0, 0)
     head:EnableMouse(true)

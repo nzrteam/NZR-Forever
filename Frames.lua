@@ -8,7 +8,7 @@ local plain = NZR.plain
 local MEDIA = "Interface\\AddOns\\NZRForever\\Media\\uf\\"
 local BAR = "Interface\\TargetingFrame\\UI-StatusBar"
 
-local PANEL_W, PORT, PANEL_H = 214, 62, 52
+local PANEL_W, PORT, PANEL_H = 214, 62, 56
 local frames = {}
 
 local function DB() return NZR.db end
@@ -133,24 +133,21 @@ local function Create(unit, holderKey, default, mirror)
     if mirror then p:SetPoint("RIGHT", f, "RIGHT", -(PORT - 12), 0) else p:SetPoint("LEFT", f, "LEFT", PORT - 12, 0) end
     f.panel = p
 
-    local nameBox = CreateFrame("Frame", nil, p)
-    nameBox:SetPoint("TOPLEFT"); nameBox:SetPoint("TOPRIGHT"); nameBox:SetHeight(20)
-    ForeverBox(nameBox, { 0.30, 0.22, 0.12, 0.95 }, { 0.16, 0.11, 0.06, 0.95 })
-    f.name = nameBox:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    f.name:SetPoint("LEFT", mirror and 8 or 16, 0)
-    f.name:SetPoint("RIGHT", mirror and -16 or -8, 0)
+    -- même cadre que les fenêtres du jeu : le nom dans la barre de titre en métal
+    NZR:WowFrame(p, nil, 0.9)
+    f.name = p:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    f.name:SetPoint("TOPLEFT", mirror and 10 or 18, -5)
+    f.name:SetPoint("TOPRIGHT", mirror and -18 or -10, -5)
     f.name:SetJustifyH("CENTER")
     f.name:SetWordWrap(false)
-
     local barBox = CreateFrame("Frame", nil, p)
-    barBox:SetPoint("TOPLEFT", nameBox, "BOTTOMLEFT", 0, -1); barBox:SetPoint("TOPRIGHT", nameBox, "BOTTOMRIGHT", 0, -1)
-    barBox:SetHeight(PANEL_H - 21)
-    ForeverBox(barBox, { 0.05, 0.05, 0.05, 0.85 }, { 0.02, 0.02, 0.02, 0.85 })
+    barBox:SetPoint("TOPLEFT", 0, -22); barBox:SetPoint("BOTTOMRIGHT", 0, 0)
+    barBox:SetFrameLevel(p:GetFrameLevel() + 3)
     f.barBox = barBox
 
-    local l, r = mirror and 4 or 12, mirror and -12 or -4
+    local l, r = mirror and 8 or 14, mirror and -14 or -8
     f.health = Bar(barBox, 15)
-    f.health:SetPoint("TOPLEFT", l, -4); f.health:SetPoint("TOPRIGHT", r, -4)
+    f.health:SetPoint("TOPLEFT", l, -3); f.health:SetPoint("TOPRIGHT", r, -3)
     f.power = Bar(barBox, 9)
     f.power:SetPoint("TOPLEFT", f.health, "BOTTOMLEFT", 0, -2); f.power:SetPoint("TOPRIGHT", f.health, "BOTTOMRIGHT", 0, -2)
 
@@ -250,7 +247,7 @@ local function UpdatePower(f)
     if plain(max) then hasPower = max > 0; f.lastHasPower = hasPower
     else hasPower = f.lastHasPower ~= false end
     f.power:SetShown(hasPower)
-    f.barBox:SetHeight(hasPower and PANEL_H - 21 or PANEL_H - 32)
+    f.panel:SetHeight(hasPower and PANEL_H or PANEL_H - 11)
     if not hasPower then return end
     local cur = UnitPower(u)
     f.power:SetMinMaxValues(0, max)

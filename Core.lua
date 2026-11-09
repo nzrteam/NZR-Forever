@@ -213,6 +213,40 @@ function NZR:RoundButton(b, outer, inner)
     return mo, mi
 end
 
+-- cadre comme les fenêtres du jeu (et la fenêtre des réglages NZR Forever) :
+-- fond de pierre sombre, bord en métal avec barre de titre, titre doré
+function NZR:WowFrame(f, title, alpha)
+    local bg = f:CreateTexture(nil, "BACKGROUND", nil, -7)
+    bg:SetTexture("Interface\\FrameGeneral\\UI-Background-Rock", "REPEAT", "REPEAT")
+    bg:SetHorizTile(true); bg:SetVertTile(true)
+    bg:SetPoint("TOPLEFT", 2, -21); bg:SetPoint("BOTTOMRIGHT", -2, 2)
+    bg:SetAlpha(alpha or 1)
+    local dark = f:CreateTexture(nil, "BACKGROUND", nil, -8)
+    dark:SetPoint("TOPLEFT", 2, -2); dark:SetPoint("BOTTOMRIGHT", -2, 2)
+    dark:SetColorTexture(0, 0, 0, (alpha or 1) * 0.6)
+    local ns = CreateFrame("Frame", nil, f, "NineSlicePanelTemplate")
+    ns:SetAllPoints()
+    ns:SetFrameLevel(f:GetFrameLevel() + 1)
+    local ok = NineSliceUtil and pcall(NineSliceUtil.ApplyLayoutByName, ns, "ButtonFrameTemplateNoPortrait")
+    if not ok then
+        ok = NineSliceUtil and pcall(NineSliceUtil.ApplyLayoutByName, ns, "TooltipDefaultLayout")
+        if ns.Center then ns.Center:Hide() end
+    end
+    local t
+    if title then
+        t = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        t:SetPoint("TOP", 0, -5)
+        t:SetText(title)
+    end
+    f.nzrRock, f.nzrDark, f.nzrMetal, f.nzrTitle = bg, dark, ns, t
+    return ns, bg, t
+end
+
+function NZR:WowFrameAlpha(f, a)
+    if f.nzrRock then f.nzrRock:SetAlpha(a) end
+    if f.nzrDark then f.nzrDark:SetAlpha(1); f.nzrDark:SetColorTexture(0, 0, 0, a * 0.6) end
+end
+
 function NZR:Skin(f, alpha, noBorder, rounded)
     self:FlatBackdrop(f, true, 1, rounded)
     local c = self.C

@@ -372,7 +372,7 @@ local function LayoutBar()
     end
     for i = shown + 1, #buttons do buttons[i]:Hide(); buttons[i].class = nil end
     bar.count = shown
-    bar:SetHeight(32 + math.max(1, shown) * 36)
+    bar:SetHeight(48 + math.max(1, shown) * 36)
     bar.empty:SetShown(shown == 0)
 end
 
@@ -411,17 +411,15 @@ end
 
 local function CreateBar()
     bar = CreateFrame("Frame", "NZRF_BlessBar", UIParent)
-    bar:SetSize(196, 70)
+    bar:SetSize(200, 84)
     bar:SetFrameStrata("MEDIUM")
     bar:SetClampedToScreen(true)
     bar:SetMovable(true)
     bar:EnableMouse(true)
     bar:RegisterForDrag("LeftButton")
-    GameFrame(bar, 0.8)
-    local title = bar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    title:SetPoint("TOPLEFT", 10, -8); title:SetText("Bénédictions")
+    NZR:WowFrame(bar, "Bénédictions", 0.9)
     bar.info = bar:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    bar.info:SetPoint("TOPRIGHT", -10, -9); bar.info:SetJustifyH("RIGHT")
+    bar.info:SetPoint("BOTTOM", 0, 7); bar.info:SetJustifyH("CENTER")
     bar.empty = bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     bar.empty:SetPoint("TOPLEFT", 10, -30); bar.empty:SetWidth(176); bar.empty:SetJustifyH("LEFT")
     bar.empty:SetText("Rien d'attribué. Clic droit ici ou /nzr bene pour répartir.")
