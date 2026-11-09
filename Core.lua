@@ -235,6 +235,12 @@ function NZR:WowFrame(f, title, alpha, small)
         if ns.Center then ns.Center:Hide() end
     end
     if ns.Center then ns.Center:Hide() end            -- notre fond de pierre reste visible
+    -- petit bord : teinté du même doré que le bord des fenêtres (meter, réglages)
+    if small then
+        for _, r in ipairs({ ns:GetRegions() }) do
+            if r.SetVertexColor and r ~= ns.Center then r:SetVertexColor(1, 0.80, 0.48) end
+        end
+    end
     local t
     if title then
         -- le titre passe au-dessus du bord (sinon le cadre en métal le cache)
