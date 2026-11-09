@@ -150,6 +150,14 @@ local function UpdateText(plate)
         local _, _, _, found = MuteGameText(plate, bar)
         plate.nzrFound = found
     end
+    if bar.nzrGF then
+        local gf = bar.nzrGF
+        local path = NZR.FontPath(DB().npFont, gf[1])
+        local sz = math.floor((gf[2] or 10) * (DB().npFontSize or 1) + 0.5)
+        for _, fs in ipairs({ bar.nzrC, bar.nzrR }) do
+            if not pcall(fs.SetFont, fs, path, sz, gf[3] or "OUTLINE") then pcall(fs.SetFont, fs, gf[1], sz, gf[3]) end
+        end
+    end
     if not bar or not unit or not UnitExists(unit) then return end
     local mode = DB().npText or "both"
     local cur, max = UnitHealth(unit), UnitHealthMax(unit)
@@ -173,6 +181,7 @@ local function Style(plate, unit)
         font = font or STANDARD_TEXT_FONT
         size = size or 10
         flags = flags or "OUTLINE"
+        bar.nzrGF = { font, size, flags }        -- police d'origine du jeu
         bar.nzrC = bar:CreateFontString(nil, "OVERLAY"); bar.nzrC.nzrOwn = true
         bar.nzrC:SetFont(font, size, flags); bar.nzrC:SetPoint("CENTER", 0, 0)
         bar.nzrR = bar:CreateFontString(nil, "OVERLAY"); bar.nzrR.nzrOwn = true

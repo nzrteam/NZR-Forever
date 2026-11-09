@@ -11,6 +11,22 @@ local BAR = "Interface\\TargetingFrame\\UI-StatusBar"
 local PANEL_W, PORT, PANEL_H = 214, 60, 58
 local frames = {}
 
+-- police des chiffres (réglage « Police » et « Taille du texte »)
+local fontStrings = {}
+local function GameBarFont()
+    local obj = _G.TextStatusBarText
+    local f = obj and obj.GetFont and obj:GetFont()
+    return f or STANDARD_TEXT_FONT
+end
+function NZR.FramesFont(fs)
+    if fs then fontStrings[fs] = true end
+    for s in pairs(fs and { [fs] = true } or fontStrings) do
+        local size = math.floor((s.nzrSize or 10) * (NZR.db.ufFontSize or 1) + 0.5)
+        local path = NZR.FontPath(NZR.db.ufFont, GameBarFont())
+        if not pcall(s.SetFont, s, path, size, "OUTLINE") then pcall(s.SetFont, s, STANDARD_TEXT_FONT, size, "OUTLINE") end
+    end
+end
+
 local function DB() return NZR.db end
 
 local hider = CreateFrame("Frame")
@@ -102,7 +118,8 @@ local function Bar(parent, h)
     shine:SetColorTexture(1, 1, 1, 0.10)
     local function Text(size, justify)
         local fs = b:CreateFontString(nil, "OVERLAY")
-        fs:SetFont(STANDARD_TEXT_FONT, size, "OUTLINE")
+        fs.nzrSize = size
+        NZR.FramesFont(fs)
         fs:SetShadowColor(0, 0, 0, 1); fs:SetShadowOffset(1, -1)
         fs:SetJustifyH(justify)
         return fs
@@ -244,8 +261,13 @@ local function SetBarText(bar, unit, cur, max, isPower)
     elseif mode == "values" then
         NZR.SafeText(bar.center, values or ""); bar.right:SetText("")
     else
-        NZR.SafeText(bar.center, values or "")
-        NZR.SafeText(bar.right, isPower and "" or (pct or ""))
+        -- tout au centre (« 766 / 766   100 % ») : aligné avec la mana en dessous
+        local both = values
+        if not isPower and values and pct then
+            local ok2, s2 = pcall(string.format, "%s   %s", values, pct)
+            if ok2 then both = s2 end
+        end
+        NZR.SafeText(bar.center, both or ""); bar.right:SetText("")
     end
 end
 
@@ -326,7 +348,7 @@ end
 local function UpdateAll(f)
     pcall(UpdateInfo, f); pcall(UpdateHealth, f); pcall(UpdatePower, f)
 end
-NZR.FramesRefresh = function() for _, f in pairs(frames) do UpdateAll(f) end end
+NZR.FramesRefresh = function() NZR.FramesFont(); for _, f in pairs(frames) do UpdateAll(f) end end
 
 local function Events(f)
     local u = f.unit

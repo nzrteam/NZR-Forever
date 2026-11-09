@@ -21,7 +21,7 @@ NZR.C = {
 }
 
 local defaults = {
-    theme = false, auras = false, tooltips = false, tooltipCursor = false, moveTooltip = false, moveBags = false, moveMap = false, moveWindows = true, squareMinimap = false, compass = false, paladin = false, questHL = false, unitFrames = false, plates = false, npText = "both", npColor = "game", ufPortrait = "round", ufText = "both", ufName = "full", ufColor = "green", ufShort = true, ufScale = 1, hlStyle = "ping", hlColor = "gold", hlSize = 1, hlObjects = true, hlNPCs = true, hlMobs = true, hlCombat = true, hlSound = false, blessGreater = true, blessSolo = true, blessLock = false, blessScale = 1, menuButton = true, tooltipOpaque = true, tooltipAlpha = 1, lootAll = true, lootAutoClose = true, lootKey = "E",
+    theme = false, auras = false, tooltips = false, tooltipCursor = false, moveTooltip = false, moveBags = false, moveMap = false, moveWindows = true, squareMinimap = false, compass = false, paladin = false, questHL = false, unitFrames = false, plates = false, npText = "both", npColor = "game", ufPortrait = "round", ufText = "both", ufName = "full", ufColor = "green", ufShort = true, ufScale = 1, ufFont = "game", ufFontSize = 1, npFont = "game", npFontSize = 1, hlStyle = "ping", hlColor = "gold", hlSize = 1, hlObjects = true, hlNPCs = true, hlMobs = true, hlCombat = true, hlSound = false, blessGreater = true, blessSolo = true, blessLock = false, blessScale = 1, menuButton = true, tooltipOpaque = true, tooltipAlpha = 1, lootAll = true, lootAutoClose = true, lootKey = "E",
     accent = "violet", font = "inter", damageFont = false,
     meter = true, meterMode = 1, meterOverall = false, meterW = 300, meterH = 180,
     scale = 1, opacity = 1,
@@ -744,4 +744,19 @@ SlashCmdList.NZRF = function(msg)
             print(("  |cffc8a8ff/nzr %s|r — %s : %s"):format(k, t[2], onoff(NZRF_DB[t[1]])))
         end
     end
+end
+
+-- polices au choix pour les textes des barres (cadres et barres au-dessus des monstres)
+NZR.FONTS = {
+    { "game", "Du jeu" },
+    { "friz", "Friz Quadrata", "Fonts\\FRIZQT__.TTF" },
+    { "arial", "Arial Narrow", "Fonts\\ARIALN.TTF" },
+    { "skurri", "Skurri", "Fonts\\SKURRI.TTF" },
+    { "morpheus", "Morpheus", "Fonts\\MORPHEUS.TTF" },
+}
+function NZR.FontPath(key, gameFont)
+    for _, f in ipairs(NZR.FONTS) do
+        if f[1] == key and f[3] then return f[3] end
+    end
+    return gameFont or STANDARD_TEXT_FONT
 end

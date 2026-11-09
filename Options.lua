@@ -4,7 +4,8 @@ local _, NZR = ...
 local M = NZR:Module("Options")
 local C = NZR.C
 
-local W, H = 680, 600
+local W, H = 820, 600
+local LIST_W = 170          -- colonne de gauche (catégories), comme les Options du jeu
 local win
 local snapshot = {}
 local reloadKeys = {}
@@ -72,8 +73,13 @@ local PAGES = {
         { t = "choice", key = "ufName", section = "L'essentiel", label = "Nom affiché", desc = "Nom complet (avec le titre, comme dans le jeu) ou seulement le premier mot.",
           choices = function() return { { "full", "Nom complet" }, { "first", "Prénom seul" } } end,
           apply = function() if NZR.FramesRefresh then NZR.FramesRefresh() end end },
-        { t = "choice", key = "ufText", section = "Texte des barres", label = "Afficher", desc = "Valeurs + % : « 836 / 836 » au centre et le % à droite. % : seulement le pourcentage, gros et centré.",
+        { t = "choice", key = "ufText", section = "Texte des barres", label = "Afficher", desc = "Valeurs + % : « 836 / 836  100 % » centré. % : seulement le pourcentage, gros et centré.",
           choices = function() return { { "both", "Valeurs + %" }, { "values", "Valeurs" }, { "percent", "%" }, { "none", "Rien" } } end,
+          apply = function() if NZR.FramesRefresh then NZR.FramesRefresh() end end },
+        { t = "cycle", key = "ufFont", section = "Texte des barres", label = "Police", desc = "Police des chiffres de vie et de mana. Le nom garde la police dorée du jeu.",
+          choices = function() return NZR.FONTS end, preview = function(k) return NZR.FontPath(k) end,
+          apply = function() if NZR.FramesRefresh then NZR.FramesRefresh() end end },
+        { t = "slider", key = "ufFontSize", section = "Texte des barres", label = "Taille du texte", desc = "100 % = taille normale.", min = 0.7, max = 1.5, step = 0.05,
           apply = function() if NZR.FramesRefresh then NZR.FramesRefresh() end end },
         { t = "switch", key = "ufShort", section = "Texte des barres", label = "Grands nombres raccourcis", desc = "12,4k au lieu de 12 400.",
           apply = function() if NZR.FramesRefresh then NZR.FramesRefresh() end end },
@@ -83,6 +89,11 @@ local PAGES = {
         { t = "switch", key = "plates", section = "Barres au-dessus des monstres", label = "Personnaliser ces barres", desc = "Coche pour appliquer les deux choix ci-dessous. Décoché : les barres restent exactement comme dans le jeu.", r = true },
         { t = "choice", key = "npText", section = "Barres au-dessus des monstres", label = "Afficher", desc = "Comme pour tes cadres.",
           choices = function() return { { "both", "Vie + %" }, { "values", "Vie" }, { "percent", "%" }, { "none", "Rien" } } end,
+          apply = function() if NZR.PlatesRefresh then NZR.PlatesRefresh() end end },
+        { t = "cycle", key = "npFont", section = "Barres au-dessus des monstres", label = "Police", desc = "Du jeu = exactement celle d'origine.",
+          choices = function() return NZR.FONTS end, preview = function(k) return NZR.FontPath(k) end,
+          apply = function() if NZR.PlatesRefresh then NZR.PlatesRefresh() end end },
+        { t = "slider", key = "npFontSize", section = "Barres au-dessus des monstres", label = "Taille du texte", desc = "100 % = taille d'origine.", min = 0.7, max = 1.6, step = 0.05,
           apply = function() if NZR.PlatesRefresh then NZR.PlatesRefresh() end end },
         { t = "choice", key = "npColor", section = "Barres au-dessus des monstres", label = "Couleur", desc = "Celle du jeu, ou rouge pour tout ce que tu peux attaquer (gris si un autre joueur l'a déjà touché).",
           choices = function() return { { "game", "Du jeu" }, { "red", "Rouge si attaquable" } } end,
@@ -284,6 +295,57 @@ local function PushButton(parent, textFn, onClick)
     return b
 end
 
+-- liste déroulante façon Options du jeu : ◀ valeur ▶ (la valeur s'écrit dans sa propre police)
+local function Cycle(parent, list, get, set, preview)
+    local f = CreateFrame("Frame", nil, parent)
+    f:SetSize(230, 26)
+    local function arrow(dir)
+        local b = CreateFrame("Button", nil, f)
+        b:SetSize(24, 24)
+        local base = dir < 0 and "Interface\\Buttons\\UI-SpellbookIcon-PrevPage-" or "Interface\\Buttons\\UI-SpellbookIcon-NextPage-"
+        b:SetNormalTexture(base .. "Up"); b:SetPushedTexture(base .. "Down"); b:SetDisabledTexture(base .. "Disabled")
+        b:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight", "ADD")
+        return b
+    end
+    local prev, nextB = arrow(-1), arrow(1)
+    prev:SetPoint("LEFT", 0, 0); nextB:SetPoint("RIGHT", 0, 0)
+    local box = CreateFrame("Button", nil, f)
+    box:SetPoint("LEFT", prev, "RIGHT", 2, 0); box:SetPoint("RIGHT", nextB, "LEFT", -2, 0); box:SetHeight(22)
+    local edge = box:CreateTexture(nil, "BACKGROUND", nil, -1)
+    edge:SetAllPoints(); edge:SetColorTexture(0.45, 0.36, 0.18, 0.9)
+    local bg = box:CreateTexture(nil, "BACKGROUND")
+    bg:SetPoint("TOPLEFT", 1, -1); bg:SetPoint("BOTTOMRIGHT", -1, 1); bg:SetColorTexture(0.06, 0.05, 0.04, 0.95)
+    local hl = box:CreateTexture(nil, "HIGHLIGHT"); hl:SetPoint("TOPLEFT", 1, -1); hl:SetPoint("BOTTOMRIGHT", -1, 1)
+    hl:SetColorTexture(1, 0.82, 0, 0.08)
+    local t = box:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    t:SetPoint("LEFT", 6, 0); t:SetPoint("RIGHT", -6, 0); t:SetJustifyH("CENTER")
+    local function index()
+        local v = get()
+        for i, ch in ipairs(list) do if ch[1] == v then return i end end
+        return 1
+    end
+    local function go(d)
+        local i = (index() - 1 + d) % #list + 1
+        set(list[i][1]); f:Refresh(); PlaySound(856)
+    end
+    prev:SetScript("OnClick", function() go(-1) end)
+    nextB:SetScript("OnClick", function() go(1) end)
+    box:SetScript("OnClick", function(_, btn) go(btn == "RightButton" and -1 or 1) end)
+    box:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    function f:Refresh()
+        local ch = list[index()]
+        t:SetFontObject("GameFontHighlight")
+        if preview then
+            local path = preview(ch[1])
+            local _, size = t:GetFont()
+            if path then pcall(t.SetFont, t, path, size or 12, "") end
+        end
+        t:SetText(ch[2])
+    end
+    f:Refresh()
+    return f
+end
+
 ---------------------------------------------------------------------------
 -- Fenêtre (cadre du jeu, onglets en bas comme Personnage ou Collections)
 ---------------------------------------------------------------------------
@@ -300,32 +362,29 @@ local function MeterApply(item)
     end
 end
 
-local function BuildPage(content, page, idx)
-    local scroll = Make("ScrollFrame", "NZRF_OptionsScroll" .. idx, content, "UIPanelScrollFrameTemplate")
-    scroll:SetPoint("TOPLEFT", 6, -6)
+-- une catégorie = une page défilante à droite
+local function BuildSection(content, title, items, name)
+    local scroll = Make("ScrollFrame", name, content, "UIPanelScrollFrameTemplate")
+    scroll:SetPoint("TOPLEFT", LIST_W + 10, -6)
     scroll:SetPoint("BOTTOMRIGHT", -28, 6)
     scroll:Hide()
+    local PW = (W - 16) - (LIST_W + 10) - 34
     local p = CreateFrame("Frame", nil, scroll)
-    p:SetSize(W - 70, 100)
+    p:SetSize(PW, 100)
     scroll:SetScrollChild(p)
     scroll:SetScript("OnShow", function(s) s:SetVerticalScroll(0) end)
 
     scroll.controls = {}
-    local y = -6
-    local lastSection
-    for _, item in ipairs(page.items) do
-        if item.section and item.section ~= lastSection then
-            lastSection = item.section
-            local st = GameText(p, "GameFontNormalLarge")
-            st:SetPoint("TOPLEFT", 8, y - 6)
-            st:SetText(item.section)
-            local ln = p:CreateTexture(nil, "ARTWORK")
-            ln:SetAtlas("Options_HorizontalDivider", true)
-            if not ln:GetAtlas() then ln:SetColorTexture(1, 1, 1, 0.12); ln:SetHeight(1) end
-            ln:SetPoint("TOPLEFT", st, "BOTTOMLEFT", -4, -4)
-            ln:SetPoint("RIGHT", p, "RIGHT", -8, 0)
-            y = y - 38
-        end
+    local st = GameText(p, "GameFontNormalLarge")
+    st:SetPoint("TOPLEFT", 8, -10)
+    st:SetText(title)
+    local ln = p:CreateTexture(nil, "ARTWORK")
+    ln:SetAtlas("Options_HorizontalDivider", true)
+    if not ln:GetAtlas() then ln:SetColorTexture(1, 1, 1, 0.12); ln:SetHeight(1) end
+    ln:SetPoint("TOPLEFT", st, "BOTTOMLEFT", -4, -4)
+    ln:SetPoint("RIGHT", p, "RIGHT", -8, 0)
+    local y = -44
+    for _, item in ipairs(items) do
         local row = CreateFrame("Frame", nil, p)
         row:SetPoint("TOPLEFT", 0, y); row:SetPoint("TOPRIGHT", 0, y)
         local hl = row:CreateTexture(nil, "BACKGROUND")
@@ -354,6 +413,8 @@ local function BuildPage(content, page, idx)
             ctl = Switch(row, function() return NZR.db[item.key] end, function(v) NZR.db[item.key] = v; changed() end)
         elseif item.t == "choice" then
             ctl = Choice(row, item.choices(), function() return NZR.db[item.key] end, function(v) NZR.db[item.key] = v; changed() end)
+        elseif item.t == "cycle" then
+            ctl = Cycle(row, item.choices(), function() return NZR.db[item.key] end, function(v) NZR.db[item.key] = v; changed() end, item.preview)
         elseif item.t == "slider" then
             ctl = Slider(row, item)
         elseif item.t == "button" then
@@ -363,7 +424,7 @@ local function BuildPage(content, page, idx)
                 if item.flat then return NZR.db end         -- cases = réglages oui/non séparés
                 if type(NZR.db[item.key]) ~= "table" then NZR.db[item.key] = {} end
                 return NZR.db[item.key]
-            end, changed, W - 120)
+            end, changed, PW - 50)
         end
         if item.t == "multi" then
             ctl:SetPoint("TOPLEFT", desc, "BOTTOMLEFT", -4, -6)
@@ -380,6 +441,70 @@ local function BuildPage(content, page, idx)
     end
     p:SetHeight(-y + 10)
     return scroll
+end
+
+-- un onglet = colonne de catégories à gauche + la catégorie choisie à droite
+local function BuildPage(content, page, idx)
+    local holder = CreateFrame("Frame", nil, content)
+    holder:SetAllPoints()
+    holder:Hide()
+    holder.controls = {}
+
+    -- regroupe les réglages par catégorie, dans l'ordre
+    local groups, byName = {}, {}
+    for _, item in ipairs(page.items) do
+        local s = item.section or "Général"
+        if not byName[s] then byName[s] = { name = s, items = {} }; table.insert(groups, byName[s]) end
+        table.insert(byName[s].items, item)
+    end
+
+    -- colonne de gauche : fond un peu plus sombre + filet, comme les Options du jeu
+    local list = CreateFrame("Frame", nil, holder)
+    list:SetPoint("TOPLEFT", 4, -4); list:SetPoint("BOTTOMLEFT", 4, 4); list:SetWidth(LIST_W)
+    local lbg = list:CreateTexture(nil, "BACKGROUND")
+    lbg:SetAllPoints(); lbg:SetColorTexture(0, 0, 0, 0.25)
+    local sep = holder:CreateTexture(nil, "ARTWORK")
+    sep:SetPoint("TOPLEFT", list, "TOPRIGHT", 2, 0); sep:SetPoint("BOTTOMLEFT", list, "BOTTOMRIGHT", 2, 0); sep:SetWidth(1)
+    sep:SetColorTexture(0.55, 0.45, 0.25, 0.5)
+
+    holder.sections, holder.entries = {}, {}
+    local function Select(s)
+        holder.current = s
+        for j, sc in ipairs(holder.sections) do sc:SetShown(j == s) end
+        for j, e in ipairs(holder.entries) do
+            e.sel:SetShown(j == s)
+            if j == s then e.text:SetTextColor(1, 1, 1) else e.text:SetTextColor(1, 0.82, 0) end
+        end
+    end
+    holder.Select = Select
+    for s, g in ipairs(groups) do
+        local sc = BuildSection(holder, g.name, g.items, "NZRF_OptionsScroll" .. idx .. "_" .. s)
+        holder.sections[s] = sc
+        for _, c in ipairs(sc.controls) do table.insert(holder.controls, c) end
+
+        local e = CreateFrame("Button", nil, list)
+        e:SetHeight(24)
+        e:SetPoint("TOPLEFT", 4, -8 - (s - 1) * 26); e:SetPoint("RIGHT", list, "RIGHT", -4, 0)
+        e.sel = e:CreateTexture(nil, "BACKGROUND")
+        e.sel:SetAllPoints()
+        if not (pcall(e.sel.SetAtlas, e.sel, "Options_List_Active", false) and e.sel:GetAtlas()) then
+            e.sel:SetColorTexture(1, 0.82, 0, 0.16)
+        end
+        e.sel:Hide()
+        local hov = e:CreateTexture(nil, "HIGHLIGHT")
+        hov:SetAllPoints()
+        if not (pcall(hov.SetAtlas, hov, "Options_List_Hover", false) and hov:GetAtlas()) then
+            hov:SetColorTexture(1, 1, 1, 0.07)
+        end
+        e.text = e:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        e.text:SetPoint("LEFT", 10, 0); e.text:SetPoint("RIGHT", -6, 0); e.text:SetJustifyH("LEFT")
+        e.text:SetWordWrap(false)
+        e.text:SetText(g.name)
+        e:SetScript("OnClick", function() Select(s); PlaySound(856) end)
+        holder.entries[s] = e
+    end
+    Select(1)
+    return holder
 end
 
 local function Create()
