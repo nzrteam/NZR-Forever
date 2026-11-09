@@ -18,5 +18,7 @@ Paladin.lua
 Highlight.lua
 Frames.lua
 Group.lua
+GuideData.lua
+Guide.lua
 Plates.lua
 Options.lua

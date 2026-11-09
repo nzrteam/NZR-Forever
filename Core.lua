@@ -21,7 +21,7 @@ NZR.C = {
 }
 
 local defaults = {
-    theme = false, auras = false, tooltips = false, tooltipCursor = false, moveTooltip = false, moveBags = false, moveMap = false, moveWindows = true, squareMinimap = false, compass = false, paladin = false, questHL = false, unitFrames = false, plates = false, npText = "both", npColor = "game", ufPortrait = "round", ufText = "both", ufName = "full", ufColor = "green", ufShort = true, ufScale = 1, ufFont = "game", ufFontSize = 1, ufOutline = "shadow", ufHealthShade = 1, ufPowerColor = "game", ufPowerShade = 1, ufAuras = true, groupFrames = false, meterShiftBars = false, meterShiftBuffs = true, meterShiftCD = true, grpPartyStyle = "big", grpColor = "class", grpNameColor = "default", grpName = "full", grpText = "auto", grpPower = true, grpRole = true, grpDebuffs = true, grpDebuffAll = false, grpBuffs = "mine", grpCellScale = 1, grpScale = 1, grpAlpha = 0.9, npFont = "game", npFontSize = 1, npOutline = "game", hlStyle = "ping", hlColor = "gold", hlSize = 1, hlObjects = true, hlNPCs = true, hlMobs = true, hlCombat = true, hlSound = false, blessGreater = true, blessSolo = true, blessLock = false, blessScale = 1, menuButton = true, tooltipOpaque = true, tooltipAlpha = 1, lootAll = true, lootAutoClose = true, lootKey = "E",
+    theme = false, auras = false, tooltips = false, tooltipCursor = false, moveTooltip = false, moveBags = false, moveMap = false, moveWindows = true, squareMinimap = false, compass = false, paladin = false, questHL = false, unitFrames = false, plates = false, npText = "both", npColor = "game", ufPortrait = "round", ufText = "both", ufName = "full", ufColor = "green", ufShort = true, ufScale = 1, ufFont = "game", ufFontSize = 1, ufOutline = "shadow", ufHealthShade = 1, ufPowerColor = "game", ufPowerShade = 1, ufAuras = true, groupFrames = false, guide = false, guideAuto = true, meterShiftBars = false, meterShiftBuffs = true, meterShiftCD = true, grpPartyStyle = "big", grpColor = "class", grpNameColor = "default", grpName = "full", grpText = "auto", grpPower = true, grpRole = true, grpDebuffs = true, grpDebuffAll = false, grpBuffs = "mine", grpCellScale = 1, grpScale = 1, grpAlpha = 0.9, npFont = "game", npFontSize = 1, npOutline = "game", hlStyle = "ping", hlColor = "gold", hlSize = 1, hlObjects = true, hlNPCs = true, hlMobs = true, hlCombat = true, hlSound = false, blessGreater = true, blessSolo = true, blessLock = false, blessScale = 1, menuButton = true, tooltipOpaque = true, tooltipAlpha = 1, lootAll = true, lootAutoClose = true, lootKey = "E",
     accent = "violet", font = "inter", damageFont = false,
     meter = true, meterMode = 1, meterOverall = false, meterW = 300, meterH = 180,
     scale = 1, opacity = 1,
@@ -702,6 +702,8 @@ SlashCmdList.NZRF = function(msg)
         if NZR.ResetMeterData then NZR.ResetMeterData() end
     elseif cmd == "plaque" or cmd == "plate" then
         if NZR.InspectPlateText then NZR.InspectPlateText() else NZR:Print("active d'abord « Personnaliser ces barres » (Cadres), puis recharge.") end
+    elseif cmd == "guide" or cmd == "build" then
+        if NZR.GuideToggle then NZR.GuideToggle() else NZR:Print("guide désactivé : /nzr > Pratique > Guide de progression.") end
     elseif cmd == "bene" or cmd == "benedictions" or cmd == "pally" then
         if NZR.BlessOpen then NZR.BlessOpen() else NZR:Print("active l'assistant de bénédictions dans les réglages (onglet Paladin).") end
     elseif cmd == "inspecte" or cmd == "inspect" then
