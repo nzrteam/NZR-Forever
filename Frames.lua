@@ -179,7 +179,7 @@ local function Create(unit, holderKey, default, mirror)
 
     local l, r = mirror and 9 or 16, mirror and -16 or -9
     f.health = Bar(barBox, 16)
-    f.health:SetPoint("TOPLEFT", l, -17); f.health:SetPoint("TOPRIGHT", r, -17)
+    f.health:SetPoint("TOPLEFT", l, -20); f.health:SetPoint("TOPRIGHT", r, -20)
     f.power = Bar(barBox, 10)
     f.power:SetPoint("TOPLEFT", f.health, "BOTTOMLEFT", 0, -2); f.power:SetPoint("TOPRIGHT", f.health, "BOTTOMRIGHT", 0, -2)
 
