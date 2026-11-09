@@ -300,8 +300,16 @@ local function FindMap(name)
     end
 end
 
-local function PointTo(name)
+local function ValidMap(id)
+    if not id or not (C_Map and C_Map.GetMapInfo) then return nil end
+    local ok, info = pcall(C_Map.GetMapInfo, id)
+    return ok and info and id or nil
+end
+
+local function PointTo(name, fallbackId, alias)
     local id = FindMap(name)
+    if not id and alias then for _, a in ipairs(alias) do id = id or FindMap(a) end end
+    id = id or ValidMap(fallbackId)
     if not id then NZR:Print(("« %s » introuvable sur la carte de ce client."):format(name)); return end
     if NZR.CompassPointTo then
         NZR.CompassPointTo(id, 0.5, 0.5, name, "Guide de leveling")
@@ -323,9 +331,13 @@ local function RouteFor()
     local out = {}
     for _, e in ipairs(NZR.GuideData.ROUTE or {}) do
         if not e.f or e.f == f then
-            local name = e[3]
-            if e.start then name = (NZR.GuideData.START or {})[race] or name end
-            out[#out + 1] = { min = e[1], max = e[2], name = name, d = e.d, zone = e.zone, start = e.start }
+            local name, id = e[3], e.id
+            if e.start then
+                local s = (NZR.GuideData.START or {})[race]
+                if s then name, id = s[1], s[2] end
+            end
+            out[#out + 1] = { min = e[1], max = e[2], name = name, d = e.d, zone = e.zone, zid = e.zid,
+                id = id, alias = e.alias, start = e.start, rec = e.rec, new = e.new, known = not e.start or id ~= nil }
         end
     end
     return out
@@ -373,7 +385,9 @@ local function LevelRow(i)
     r.where:SetPoint("LEFT", r.name, "RIGHT", 8, 0)
     r.go = CreateFrame("Button", nil, r, "UIPanelButtonTemplate")
     r.go:SetSize(70, 20); r.go:SetPoint("RIGHT", -6, 0); r.go:SetText("Flèche")
-    r.go:SetScript("OnClick", function(s) PointTo(s.target) end)
+    r.go:SetScript("OnClick", function(s) PointTo(s.target, s.targetId, s.alias) end)
+    r.tag = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    r.tag:SetPoint("RIGHT", r.go, "LEFT", -10, 0)
     lv.rows[i] = r
     return r
 end
@@ -596,7 +610,13 @@ RefreshLeveling = function()
         if not e.d then r.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92) else r.icon:SetTexCoord(0, 1, 0, 1) end
         r.where:SetText(e.d and ("Donjon · " .. (e.zone or "")) or "")
         r.go.target = e.d and e.zone or e.name
-        r.go:SetShown(not e.start or (NZR.GuideData.START and e.name ~= "Zone de départ de ta race"))
+        r.go.targetId = e.d and e.zid or e.id
+        r.go.alias = not e.d and e.alias or nil
+        r.go:SetShown(e.known)
+        local tags = {}
+        if e.new then tags[#tags + 1] = "|cff4fc3ffNouveau|r" end
+        if e.rec then tags[#tags + 1] = "|cffffd100Conseillé|r" elseif not e.d and not e.start then tags[#tags + 1] = "|cff999999Alternative|r" end
+        r.tag:SetText(table.concat(tags, "  "))
         local cur = level >= e.min and level <= e.max
         local past = level > e.max
         if cur then
