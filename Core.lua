@@ -21,7 +21,7 @@ NZR.C = {
 }
 
 local defaults = {
-    theme = false, auras = false, tooltips = false, tooltipCursor = false, moveTooltip = false, moveBags = false, moveMap = false, moveWindows = true, squareMinimap = false, compass = false, paladin = false, questHL = false, unitFrames = false, plates = false, npText = "both", npColor = "game", ufPortrait = "round", ufText = "both", ufName = "full", ufColor = "green", ufShort = true, ufScale = 1, ufFont = "game", ufFontSize = 1, ufOutline = "shadow", ufHealthShade = 1, ufPowerColor = "game", ufPowerShade = 1, ufAuras = true, groupFrames = false, guide = false, guideAuto = true, meterShiftBars = false, meterShiftBuffs = true, meterShiftCD = true, grpPartyStyle = "big", grpColor = "class", grpNameColor = "default", grpName = "full", grpText = "auto", grpPower = true, grpRole = true, grpDebuffs = true, grpDebuffAll = false, grpBuffs = "mine", grpCellScale = 1, grpScale = 1, grpAlpha = 0.9, npFont = "game", npFontSize = 1, npOutline = "game", hlStyle = "ping", hlColor = "gold", hlSize = 1, hlObjects = true, hlNPCs = true, hlMobs = true, hlCombat = true, hlSound = false, blessGreater = true, blessSolo = true, blessLock = false, blessScale = 1, menuButton = true, tooltipOpaque = true, tooltipAlpha = 1, lootAll = true, lootAutoClose = true, lootKey = "E",
+    theme = false, auras = false, tooltips = false, tooltipCursor = false, moveTooltip = false, moveBags = false, moveMap = false, moveWindows = true, squareMinimap = false, compass = false, paladin = false, questHL = false, unitFrames = false, plates = false, npText = "both", npColor = "game", ufPortrait = "round", ufText = "both", ufName = "full", ufColor = "green", ufShort = true, ufScale = 1, ufFont = "game", ufFontSize = 1, ufOutline = "shadow", ufHealthShade = 1, ufPowerColor = "game", ufPowerShade = 1, ufAuras = true, groupFrames = false, guide = false, guideAuto = true, meterShiftBars = false, reopenWindows = false, mmButtonsSave = false, meterShiftBuffs = true, meterShiftCD = true, grpPartyStyle = "big", grpColor = "class", grpNameColor = "default", grpName = "full", grpText = "auto", grpPower = true, grpRole = true, grpDebuffs = true, grpDebuffAll = false, grpBuffs = "mine", grpCellScale = 1, grpScale = 1, grpAlpha = 0.9, npFont = "game", npFontSize = 1, npOutline = "game", hlStyle = "ping", hlColor = "gold", hlSize = 1, hlObjects = true, hlNPCs = true, hlMobs = true, hlCombat = true, hlSound = false, blessGreater = true, blessSolo = true, blessLock = false, blessScale = 1, menuButton = true, tooltipOpaque = true, tooltipAlpha = 1, lootAll = true, lootAutoClose = true, lootKey = "E",
     accent = "violet", font = "inter", damageFont = false,
     meter = true, meterMode = 1, meterOverall = false, meterW = 300, meterH = 180,
     scale = 1, opacity = 1,
@@ -637,6 +637,35 @@ local loader = CreateFrame("Frame")
 loader:RegisterEvent("ADDON_LOADED")
 loader:RegisterEvent("PLAYER_LOGIN")
 loader:RegisterEvent("PLAYER_REGEN_ENABLED")
+
+-- Après un /reload : rouvrir les fenêtres NZR qui étaient ouvertes (réglage « Rouvrir après rechargement »)
+local reopen = CreateFrame("Frame")
+reopen:RegisterEvent("PLAYER_LOGOUT")
+reopen:RegisterEvent("PLAYER_ENTERING_WORLD")
+reopen:SetScript("OnEvent", function(_, ev, isLogin, isReload)
+    local db = NZRF_DB
+    if not db then return end
+    if ev == "PLAYER_LOGOUT" then
+        if not db.reopenWindows then db.reopenState = nil; return end
+        local function shown(n) local f = _G[n]; return f and f:IsShown() or nil end
+        db.reopenState = {
+            options = NZR.OptionsState and NZR.OptionsState() or nil,
+            guide = shown("NZRF_Guide"), guidePage = db.guidePage,
+            bless = shown("NZRF_BlessWindow"),
+        }
+        return
+    end
+    -- seulement après un rechargement, pas à la connexion
+    local st = db.reopenState
+    db.reopenState = nil
+    if not (isReload and db.reopenWindows and st) then return end
+    C_Timer.After(0.8, function()
+        if InCombatLockdown() then return end
+        if st.options and NZR.OptionsRestore then pcall(NZR.OptionsRestore, st.options) end
+        if st.guide and NZR.GuideToggle and not (_G.NZRF_Guide and _G.NZRF_Guide:IsShown()) then pcall(NZR.GuideToggle) end
+        if st.bless and NZR.BlessOpen then pcall(NZR.BlessOpen) end
+    end)
+end)
 loader:SetScript("OnEvent", function(_, ev, arg1)
     if ev == "ADDON_LOADED" then
         if arg1 == ADDON then LoadSettings() end

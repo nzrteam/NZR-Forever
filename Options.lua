@@ -187,6 +187,7 @@ local PAGES = {
         { t = "switch", key = "guide", section = "Guide de progression", label = "Guide de progression", desc = "Petite icône (livre doré) qui ouvre le build à suivre selon ton niveau : talents à prendre, déjà pris, prochain point. Paladin pour l'instant (aussi /nzr guide).", r = true },
         { t = "button", section = "Guide de progression", label = "Ouvrir le guide", desc = "Si le guide est activé et rechargé.", text = function() return "Ouvrir" end,
           click = function() if NZR.GuideToggle then NZR.GuideToggle() end end },
+        { t = "switch", key = "reopenWindows", section = "Fenêtres", label = "Rouvrir les fenêtres après /reload", desc = "Les fenêtres NZR ouvertes avant un rechargement (réglages sur le même onglet, guide, bénédictions) se rouvrent toutes seules." },
         { t = "switch", key = "compass", section = "Flèche de quête", label = "Flèche vers ta quête (Forever Compass)", desc = "Flèche ou boussole à placer où tu veux, vers la quête suivie ; rouge vers ton cadavre quand tu es mort. Inutile si tu as déjà l'addon Forever Compass.", r = true },
         { t = "button", section = "Flèche de quête", label = "Réglages de la flèche", desc = "Style, couleur, taille, infos affichées… (aussi /fc).",
           text = function() return "Ouvrir" end,
@@ -195,6 +196,7 @@ local PAGES = {
               else NZR:Print("active d'abord la flèche, puis clique sur Recharger.") end
           end },
         { t = "switch", key = "squareMinimap", section = "Minicarte", label = "Minicarte carrée", desc = "Carte carrée avec le bord des infobulles du jeu ; boutons et nom de zone inchangés. Molette = zoom.", r = true },
+        { t = "switch", key = "mmButtonsSave", section = "Minicarte", label = "Retenir la place des boutons d'addons", desc = "Les petits boutons ronds autour de la minicarte (Questie…) restent où tu les as glissés, même après un /reload.", r = true },
         { t = "switch", key = "menuButton", section = "Menu Échap", label = "Bouton « NZR Forever » dans le menu Échap", desc = "Tout en haut du menu, pour ouvrir ces réglages. Sinon : /nzr." },
         { t = "switch", key = "tooltipOpaque", section = "Infobulles", label = "Infobulles opaques", desc = "Fond plein (plus de décor qui transparaît) et toujours au-dessus du reste.", r = true },
         { t = "slider", key = "tooltipAlpha", section = "Infobulles", label = "Opacité des infobulles", desc = "100 % = complètement opaque.", min = 0.5, max = 1, step = 0.05 },
@@ -664,6 +666,22 @@ function NZR:ToggleOptions(show, pageId)
         if win:IsShown() and win.wantPage then win.Show(win.wantPage); win.wantPage = nil end
     end
     win:SetShown(show)
+end
+
+-- état de la fenêtre (onglet + catégorie), pour la rouvrir après un /reload
+function NZR.OptionsState()
+    if not win or not win:IsShown() then return nil end
+    local pg = win.pages[win.current or 1]
+    return { page = win.current or 1, section = pg and pg.current or 1 }
+end
+function NZR.OptionsRestore(st)
+    if not st then return end
+    NZR:ToggleOptions(true)
+    if win and win.Show then
+        win.Show(st.page or 1)
+        local pg = win.pages[st.page or 1]
+        if pg and pg.Select and st.section then pcall(pg.Select, st.section) end
+    end
 end
 
 local function OpenFromMenu()

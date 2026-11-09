@@ -8,13 +8,73 @@ local function Fade(obj)
     if obj and obj.SetAlpha then obj:SetAlpha(0) end
 end
 
+-- Boutons des addons autour de la minicarte : on retient leur place (glisser = mémorisé)
+local function DBIcon()
+    return LibStub and LibStub("LibDBIcon-1.0", true)
+end
+
+local function MinimapButtons()
+    local list = {}
+    local lib = DBIcon()
+    if lib and lib.objects then
+        for name, b in pairs(lib.objects) do list[name] = b end
+    end
+    for _, c in ipairs({ Minimap:GetChildren() }) do
+        local n = c.GetName and c:GetName()
+        if n and n:find("^LibDBIcon10_") and not list[n] then list[n] = c end
+    end
+    return list
+end
+
+local function SaveButton(name, b)
+    local mx, my = Minimap:GetCenter()
+    local bx, by = b:GetCenter()
+    if not (mx and bx) then return end
+    NZR.db.mmButtons = NZR.db.mmButtons or {}
+    NZR.db.mmButtons[name] = { bx - mx, by - my }
+end
+
+local function ApplyButtons()
+    local saved = NZR.db.mmButtons or {}
+    for name, b in pairs(MinimapButtons()) do
+        if not b.nzrSaveHook then
+            b.nzrSaveHook = true
+            b:HookScript("OnDragStop", function(s) SaveButton(name, s) end)
+        end
+        local p = saved[name]
+        if p and not (b.isMoving or b.dragging) then
+            b:ClearAllPoints()
+            b:SetPoint("CENTER", Minimap, "CENTER", p[1], p[2])
+        end
+    end
+end
+
+local function SetupButtonMemory()
+    local ev = CreateFrame("Frame")
+    ev:RegisterEvent("PLAYER_ENTERING_WORLD")
+    ev:SetScript("OnEvent", function()
+        -- les addons posent leurs boutons au chargement : on repasse derrière, deux fois
+        C_Timer.After(1, ApplyButtons)
+        C_Timer.After(4, ApplyButtons)
+    end)
+end
+
 function M:Init()
-    if NZR.withUI or not NZR.db.squareMinimap then return end
+    if NZR.withUI then return end
+    if NZR.db.mmButtonsSave and Minimap then SetupButtonMemory() end
+    if not NZR.db.squareMinimap then return end
     local mm = Minimap
     if not mm then return end
 
     -- forme carrée (aussi pour les boutons des autres addons)
     GetMinimapShape = function() return "SQUARE" end
+    -- les boutons déjà posés en mode « rond » sont replacés en mode carré
+    C_Timer.After(0.5, function()
+        local lib = DBIcon()
+        if lib and lib.objects and lib.Refresh then
+            for name in pairs(lib.objects) do pcall(lib.Refresh, lib, name) end
+        end
+    end)
     mm:SetMaskTexture(MASK)
     pcall(mm.SetArchBlobRingScalar, mm, 0)
     pcall(mm.SetArchBlobRingAlpha, mm, 0)

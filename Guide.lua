@@ -344,6 +344,42 @@ local function RouteFor()
     return out
 end
 
+-- quêtes de ton journal, rangées par zone (titres de section du journal)
+local function QuestsByZone()
+    local out, header = {}, nil
+    local n = 0
+    if C_QuestLog and C_QuestLog.GetNumQuestLogEntries then
+        local ok, v = pcall(C_QuestLog.GetNumQuestLogEntries); n = ok and plain(v) and v or 0
+    elseif GetNumQuestLogEntries then
+        local ok, v = pcall(GetNumQuestLogEntries); n = ok and plain(v) and v or 0
+    end
+    for i = 1, n do
+        local title, isHeader, done
+        if C_QuestLog and C_QuestLog.GetInfo then
+            local ok, info = pcall(C_QuestLog.GetInfo, i)
+            if ok and info then
+                title, isHeader = info.title, info.isHeader
+                if not isHeader and info.questID and C_QuestLog.IsComplete then
+                    local okc, c = pcall(C_QuestLog.IsComplete, info.questID); done = okc and c
+                end
+            end
+        elseif GetQuestLogTitle then
+            local ok, t, _, _, h, _, c = pcall(GetQuestLogTitle, i)
+            if ok then title, isHeader, done = t, h, c == 1 or c == true end
+        end
+        if title and plain(title) then
+            if isHeader then header = Norm(title)
+            elseif header then
+                local z = out[header] or { n = 0, done = 0 }
+                z.n = z.n + 1
+                if done then z.done = z.done + 1 end
+                out[header] = z
+            end
+        end
+    end
+    return out
+end
+
 local function BuildLeveling(pg)
     local lv = {}
     win.lv = lv
@@ -398,6 +434,9 @@ local function LevelRow(i)
         GameTooltip:AddLine(("Niveaux %d-%d"):format(e.min, e.max), 1, 1, 1)
         if e.d then GameTooltip:AddLine("Donjon · entrée : " .. (e.zone or "?"), 0.8, 0.8, 0.8) end
         if e.new then GameTooltip:AddLine("Nouveau dans WoW Forever", 0.31, 0.76, 1) end
+        if e.quests and e.quests.n > 0 then
+            GameTooltip:AddLine(("Dans ton journal : %d quête(s), %d à rendre"):format(e.quests.n, e.quests.done), 0.4, 1, 0.4)
+        end
         GameTooltip:Show()
     end)
     r:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -616,6 +655,7 @@ RefreshLeveling = function()
     local route = RouteFor()
     local here = GetZoneText and GetZoneText() or ""
     local firstCur, hereInfo
+    local quests = QuestsByZone()
     for i, e in ipairs(route) do
         local r = LevelRow(i)
         r:Show()
@@ -623,7 +663,16 @@ RefreshLeveling = function()
         r.name:SetText(e.name)
         r.icon:SetTexture(e.d and "Interface\\Minimap\\Dungeon" or "Interface\\Icons\\INV_Misc_Map_01")
         if not e.d then r.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92) else r.icon:SetTexCoord(0, 1, 0, 1) end
-        r.where:SetText(e.d and ("Donjon · " .. (e.zone or "")) or "")
+        -- quêtes en cours dans cette zone (ou ce donjon : section du même nom dans le journal)
+        local q = quests[Norm(e.name)] or (e.en and quests[Norm(e.en)])
+        if not q then for _, a in ipairs(e.alias or {}) do q = q or quests[Norm(a)] end end
+        local qtxt = ""
+        if q and q.n > 0 then
+            qtxt = ("  |cff55ff55%d quête%s|r"):format(q.n, q.n > 1 and "s" or "")
+            if q.done > 0 then qtxt = qtxt .. ("|cffffd100 · %d à rendre|r"):format(q.done) end
+        end
+        r.where:SetText((e.d and ("Donjon · " .. (e.zone or "")) or "") .. qtxt)
+        e.quests = q
         r.go.target = e.d and e.zone or e.name
         r.go.targetId = e.d and e.zid or e.id
         r.go.alias = e.d and e.zalias or e.alias
@@ -722,7 +771,7 @@ function M:Init()
     CreateButton()
     local ev = CreateFrame("Frame")
     for _, e in ipairs({ "PLAYER_LEVEL_UP", "CHARACTER_POINTS_CHANGED", "PLAYER_TALENT_UPDATE",
-                         "SPELLS_CHANGED", "PLAYER_ENTERING_WORLD", "ZONE_CHANGED_NEW_AREA" }) do pcall(ev.RegisterEvent, ev, e) end
+                         "SPELLS_CHANGED", "PLAYER_ENTERING_WORLD", "ZONE_CHANGED_NEW_AREA", "QUEST_LOG_UPDATE" }) do pcall(ev.RegisterEvent, ev, e) end
     ev:SetScript("OnEvent", function() C_Timer.After(0.2, function() pcall(Refresh) end) end)
 end
 
