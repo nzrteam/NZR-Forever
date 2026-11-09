@@ -311,7 +311,7 @@ end
 
 local function MakeButton(i)
     local b = CreateFrame("Button", "NZRF_BlessButton" .. i, bar, "SecureActionButtonTemplate")
-    b:SetSize(180, 34)
+    b:SetSize(150, 34)
     b:SetFrameLevel(bar:GetFrameLevel() + 8)
     b:RegisterForClicks("AnyUp", "AnyDown")
     b.icon = b:CreateTexture(nil, "ARTWORK")
@@ -373,7 +373,16 @@ local function LayoutBar()
     end
     for i = shown + 1, #buttons do buttons[i]:Hide(); buttons[i].class = nil end
     bar.count = shown
-    bar:SetHeight(48 + math.max(1, shown) * 36)
+    -- la taille suit le nombre de classes : seul = un bouton, en raid = un par classe
+    bar:SetHeight(42 + math.max(1, shown) * 36)
+    local widest = 120
+    for i = 1, shown do
+        local b = buttons[i]
+        local w = 44 + math.max(b.name:GetStringWidth() or 0, b.state:GetStringWidth() or 0, 60)
+        if w > widest then widest = w end
+    end
+    bar:SetWidth(math.max(150, math.min(240, widest + 16)))
+    bar.empty:SetWidth(bar:GetWidth() - 20)
     bar.empty:SetShown(shown == 0)
 end
 
@@ -412,7 +421,7 @@ end
 
 local function CreateBar()
     bar = CreateFrame("Frame", "NZRF_BlessBar", UIParent)
-    bar:SetSize(200, 84)
+    bar:SetSize(166, 80)
     bar:SetFrameStrata("MEDIUM")
     bar:SetClampedToScreen(true)
     bar:SetMovable(true)
@@ -420,9 +429,9 @@ local function CreateBar()
     bar:RegisterForDrag("LeftButton")
     NZR:WowFrame(bar, "Bénédictions", 0.9, 0.8)
     bar.info = bar.nzrOver:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    bar.info:SetPoint("BOTTOM", 0, 7); bar.info:SetJustifyH("CENTER")
+    bar.info:SetPoint("BOTTOM", 0, 6); bar.info:SetJustifyH("CENTER")
     bar.empty = bar.nzrOver:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    bar.empty:SetPoint("TOPLEFT", 10, -30); bar.empty:SetWidth(176); bar.empty:SetJustifyH("LEFT")
+    bar.empty:SetPoint("TOPLEFT", 10, -24); bar.empty:SetWidth(146); bar.empty:SetJustifyH("LEFT")
     bar.empty:SetText("Rien d'attribué. Clic droit ici ou /nzr bene pour répartir.")
     local p = DB().blessPos
     if p then bar:SetPoint(p[1], UIParent, p[2], p[3], p[4]) else bar:SetPoint("LEFT", UIParent, "LEFT", 30, 120) end
