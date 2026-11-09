@@ -262,12 +262,16 @@ local function UpdateInfo(f)
     local u = f.unit
     if not UnitExists(u) then return end
     f.lastHasPower = nil
-    NZR.SafeText(f.name, UnitName(u))
-    if UnitIsPlayer(u) and DB().ufColor == "class" then
-        local r, g, b = ClassRGB(u); if r then f.name:SetTextColor(r, g, b) end
-    else
-        f.name:SetTextColor(1, 0.82, 0)
+    -- nom complet (avec le titre, comme le jeu) ou juste le prénom ; toujours doré comme l'UI de WoW
+    local name = UnitName(u)
+    if DB().ufName == "full" and UnitIsPlayer(u) then
+        local ok, full = pcall(UnitPVPName, u)
+        if ok and full and plain(full) and full ~= "" then name = full end
+    elseif plain(name) then
+        name = name:match("^(%S+)") or name
     end
+    NZR.SafeText(f.name, name)
+    f.name:SetTextColor(1, 0.82, 0)
     local lvl = UnitLevel(u)
     if plain(lvl) then
         f.level:SetText(lvl > 0 and lvl or "??")
