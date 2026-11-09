@@ -535,7 +535,11 @@ FC:SetScript("OnDragStop", function(self)
     local p, _, _, x, y = self:GetPoint()
     DB.point, DB.x, DB.y = p, x, y
 end)
-FC:SetScript("OnMouseUp", function(_, btn) if btn == "RightButton" then OpenOptions() end end)
+-- clic droit = réglages ; clic gauche sur une cible posée à la main = retour à la quête suivie
+FC:SetScript("OnMouseUp", function(_, btn)
+    if btn == "RightButton" then OpenOptions()
+    elseif btn == "LeftButton" and FC.manual then FC.manual = nil; NZR:Print("flèche : retour à ta quête.") end
+end)
 FC:SetScript("OnEnter", function(self)
     if not DB or DB.locked then return end
     GameTooltip:SetOwner(self, "ANCHOR_TOP")
@@ -869,6 +873,11 @@ local function Start(self)
 end
 
 local function OnEvent(self, event)
+    -- tu choisis / suis une autre quête : la cible posée par le guide s'efface
+    if event == "SUPER_TRACKING_CHANGED" or event == "QUEST_WATCH_LIST_CHANGED" or event == "QUEST_ACCEPTED" then
+        if FC.manual and FC.manual.sub == "Guide de leveling" then FC.manual = nil end
+        return
+    end
     if event == "PLAYER_DEAD" then
         local map, x, y = PlayerMapPos()
         if map then DB.deathPos = { map = map, x = x, y = y } end
@@ -890,9 +899,11 @@ function MOD:Init()
     FC:RegisterEvent("PLAYER_DEAD")
     FC:RegisterEvent("PLAYER_ALIVE")
     FC:RegisterEvent("PLAYER_UNGHOST")
+    for _, e in ipairs({ "SUPER_TRACKING_CHANGED", "QUEST_WATCH_LIST_CHANGED", "QUEST_ACCEPTED" }) do pcall(FC.RegisterEvent, FC, e) end
     FC:SetScript("OnEvent", OnEvent)
     NZR.CompassOpen = OpenOptions
     -- cible posée par un autre module (ex. guide de leveling : centre d'une zone)
+    NZR.CompassClear = function() FC.manual = nil end
     NZR.CompassPointTo = function(map, x, y, name, desc)
         SetManual(map, x, y, name, desc)
         FC:Show()

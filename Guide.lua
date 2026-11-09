@@ -393,7 +393,7 @@ local function BuildLeveling(pg)
     modes[#modes + 1] = { "zones", "Toutes les zones" }
     for _, m in ipairs(modes) do
         local b = CreateFrame("Button", nil, pg, "UIPanelButtonTemplate")
-        b:SetSize(m[1] == "zones" and 140 or 110, 22)
+        b:SetSize(m[1] == "zones" and 130 or 100, 22)
         b:SetPoint("TOPLEFT", bx, -58)
         b:SetText(m[2]); b.id = m[1]
         b:SetScript("OnClick", function() DB().guideRoute = m[1]; lv.scrolled = nil; PlaySound(841); RefreshLeveling() end)
@@ -401,6 +401,14 @@ local function BuildLeveling(pg)
         bx = bx + b:GetWidth() + 4
     end
     lv.head:SetPoint("TOPLEFT", 18, -88)
+    -- remettre la flèche sur tes quêtes
+    local back = CreateFrame("Button", nil, pg, "UIPanelButtonTemplate")
+    back:SetSize(150, 22); back:SetPoint("TOPRIGHT", -16, -58)
+    back:SetText("Flèche : mes quêtes")
+    back:SetScript("OnClick", function()
+        if NZR.CompassClear then NZR.CompassClear(); NZR:Print("flèche : retour à ta quête suivie.") end
+        if C_Map and C_Map.ClearUserWaypoint then pcall(C_Map.ClearUserWaypoint) end
+    end)
     lv.sub = pg:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     lv.sub:SetPoint("TOPLEFT", lv.head, "BOTTOMLEFT", 0, -4)
     lv.sub:SetPoint("RIGHT", pg, "RIGHT", -18, 0); lv.sub:SetJustifyH("LEFT")
