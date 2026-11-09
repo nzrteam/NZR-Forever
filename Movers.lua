@@ -197,7 +197,7 @@ end
 local function SetupLoot()
     if not LootFrame then return end
     local b = CreateFrame("Button", "NZRF_LootAll", LootFrame, "UIPanelButtonTemplate")
-    b:SetHeight(20)
+    b:SetHeight(22)            -- taille normale des boutons du jeu (sinon le bord se déforme)
     b:SetPoint("TOP", LootFrame, "BOTTOM", 0, -1)
     local function Label()
         local key = NZR.db.lootKey
@@ -207,7 +207,7 @@ local function SetupLoot()
     Label = function()
         oldLabel()
         local fs = b:GetFontString()
-        b:SetWidth(math.max(100, (fs and fs:GetStringWidth() or 90) + 24))
+        b:SetWidth(math.max(100, (fs and fs:GetStringWidth() or 90) + 40))
     end
     Label()
     b:SetScript("OnClick", function()
