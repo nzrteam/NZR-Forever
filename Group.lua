@@ -455,7 +455,6 @@ local function InitConfig(w, h)
         self:SetWidth(%d); self:SetHeight(%d)
         self:SetAttribute("*type1", "target")
         self:SetAttribute("*type2", "togglemenu")
-        self:RegisterForClicks("AnyUp")
     ]]):format(w, h)
 end
 
