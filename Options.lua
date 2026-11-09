@@ -70,6 +70,8 @@ local PAGES = {
         { t = "switch", key = "unitFrames", section = "L'essentiel", label = "Cadres joueur et cible NZR", desc = "Remplace les cadres du jeu par des cadres dorés plus lisibles (portrait, niveau, nom, vie, mana).", r = true },
         { t = "choice", key = "ufPortrait", section = "L'essentiel", label = "Portrait", desc = "Rond comme le jeu, ou carré.", r = true,
           choices = function() return { { "round", "Rond" }, { "square", "Carré" } } end },
+        { t = "switch", key = "ufAuras", section = "L'essentiel", label = "Buffs et débuffs de la cible", desc = "Sous le cadre de ta cible, comme le jeu (débuffs en premier sur un ennemi). Survol = détail.",
+          apply = function() if NZR.FramesRefresh then NZR.FramesRefresh() end end },
         { t = "choice", key = "ufName", section = "L'essentiel", label = "Nom affiché", desc = "Nom complet (avec le titre, comme dans le jeu) ou seulement le premier mot.",
           choices = function() return { { "full", "Nom complet" }, { "first", "Prénom seul" } } end,
           apply = function() if NZR.FramesRefresh then NZR.FramesRefresh() end end },

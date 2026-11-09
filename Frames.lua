@@ -10,6 +10,7 @@ local BAR = "Interface\\TargetingFrame\\UI-StatusBar"
 
 local PANEL_W, PORT, PANEL_H = 214, 60, 58
 local frames = {}
+local AURA_SIZE, AURA_PER_ROW, AURA_MAX = 21, 8, 16
 
 -- police des chiffres (réglage « Police » et « Taille du texte »)
 local fontStrings = {}
@@ -260,6 +261,11 @@ local function Create(unit, holderKey, default, mirror)
     f.tag:SetPoint("BOTTOM", p, "TOP", 0, 2)
     f.tag:SetTextColor(1, 0.82, 0)
 
+    if unit == "target" then
+        f.auraBox = CreateFrame("Frame", nil, f)
+        f.auraBox:SetSize(AURA_PER_ROW * (AURA_SIZE + 3), 1)
+        f.auraBox:SetPoint("TOPLEFT", p, "BOTTOMLEFT", 4, -4)
+    end
     frames[unit] = f
     return f
 end
@@ -404,14 +410,113 @@ local function UpdateInfo(f)
     SetPortraitTexture(f.portrait, u)
 end
 
+---------------------------------------------------------------------------
+-- Buffs et débuffs sous le cadre de la cible (comme le cadre du jeu)
+---------------------------------------------------------------------------
+
+local function AuraButton(parent)
+    local b = CreateFrame("Button", nil, parent)
+    b:SetSize(AURA_SIZE, AURA_SIZE)
+    b.icon = b:CreateTexture(nil, "ARTWORK")
+    b.icon:SetPoint("TOPLEFT", 1, -1); b.icon:SetPoint("BOTTOMRIGHT", -1, 1)
+    b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    b.edge = b:CreateTexture(nil, "BACKGROUND")
+    b.edge:SetAllPoints(); b.edge:SetColorTexture(0, 0, 0, 1)
+    b.cd = CreateFrame("Cooldown", nil, b, "CooldownFrameTemplate")
+    b.cd:SetAllPoints(b.icon); b.cd:SetReverse(true); b.cd:SetDrawEdge(false)
+    if b.cd.SetHideCountdownNumbers then b.cd:SetHideCountdownNumbers(true) end
+    b.count = b:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
+    b.count:SetPoint("BOTTOMRIGHT", 2, -1)
+    b:SetScript("OnEnter", function(s)
+        if not s.auraID then return end
+        GameTooltip:SetOwner(s, "ANCHOR_BOTTOMRIGHT")
+        if GameTooltip.SetUnitAuraByAuraInstanceID then
+            pcall(GameTooltip.SetUnitAuraByAuraInstanceID, GameTooltip, s.unit, s.auraID)
+        elseif s.index then
+            pcall(s.harmful and GameTooltip.SetUnitDebuff or GameTooltip.SetUnitBuff, GameTooltip, s.unit, s.index)
+        end
+        GameTooltip:Show()
+    end)
+    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    b:EnableMouse(true)
+    return b
+end
+
+local function FillAuras(f, list, filter, harmful)
+    local u, n = f.unit, 0
+    for i = 1, 40 do
+        if n >= AURA_MAX then break end
+        local ok, a = pcall(C_UnitAuras.GetAuraDataByIndex, u, i, filter)
+        if not ok or not a then break end
+        n = n + 1
+        local b = list[n] or AuraButton(f.auraBox); list[n] = b
+        b.unit, b.index, b.harmful, b.auraID = u, i, harmful, a.auraInstanceID
+        pcall(b.icon.SetTexture, b.icon, a.icon)
+        -- nombre de charges (peut être secret : passé tel quel)
+        b.count:SetText("")
+        if a.applications ~= nil then
+            local okc, s = pcall(string.format, "%d", a.applications)
+            if okc and not (NZR.plain(a.applications) and a.applications <= 1) then NZR.SafeText(b.count, s) end
+        end
+        -- temps restant
+        b.cd:Hide()
+        local done = false
+        if C_UnitAuras.GetAuraDuration and b.cd.SetCooldownFromDurationObject and a.auraInstanceID then
+            local okd, d = pcall(C_UnitAuras.GetAuraDuration, u, a.auraInstanceID)
+            if okd and d and pcall(b.cd.SetCooldownFromDurationObject, b.cd, d) then b.cd:Show(); done = true end
+        end
+        if not done and NZR.plain(a.duration) and NZR.plain(a.expirationTime) and a.duration > 0 then
+            b.cd:SetCooldown(a.expirationTime - a.duration, a.duration); b.cd:Show()
+        end
+        -- bord rouge pour les débuffs, comme le jeu
+        if harmful then b.edge:SetColorTexture(0.8, 0.1, 0.1, 1) else b.edge:SetColorTexture(0, 0, 0, 1) end
+        b:Show()
+    end
+    for i = n + 1, #list do list[i]:Hide(); list[i].auraID = nil end
+    return n
+end
+
+local function LayoutAuras(f, list, n, startRow)
+    local rows = 0
+    for i = 1, n do
+        local b = list[i]
+        local r, c = math.floor((i - 1) / AURA_PER_ROW), (i - 1) % AURA_PER_ROW
+        b:ClearAllPoints()
+        b:SetPoint("TOPLEFT", f.auraBox, "TOPLEFT", c * (AURA_SIZE + 3), -(startRow + r) * (AURA_SIZE + 3))
+        rows = r + 1
+    end
+    return rows
+end
+
+local function UpdateAuras(f)
+    if not f.auraBox then return end
+    if DB().ufAuras == false or not UnitExists(f.unit) or not C_UnitAuras or not C_UnitAuras.GetAuraDataByIndex then
+        f.auraBox:Hide(); return
+    end
+    f.auraBox:Show()
+    f.buffs, f.debuffs = f.buffs or {}, f.debuffs or {}
+    local nb = FillAuras(f, f.buffs, "HELPFUL", false)
+    local nd = FillAuras(f, f.debuffs, "HARMFUL", true)
+    -- ennemi : débuffs d'abord (ceux qui comptent en combat), sinon buffs d'abord
+    local okA, hostile = pcall(UnitCanAttack, "player", f.unit)
+    hostile = okA and NZR.plain(hostile) and hostile
+    if hostile then
+        local r = LayoutAuras(f, f.debuffs, nd, 0)
+        LayoutAuras(f, f.buffs, nb, r)
+    else
+        local r = LayoutAuras(f, f.buffs, nb, 0)
+        LayoutAuras(f, f.debuffs, nd, r)
+    end
+end
+
 local function UpdateAll(f)
-    pcall(UpdateInfo, f); pcall(UpdateHealth, f); pcall(UpdatePower, f)
+    pcall(UpdateInfo, f); pcall(UpdateHealth, f); pcall(UpdatePower, f); pcall(UpdateAuras, f)
 end
 NZR.FramesRefresh = function() NZR.FramesFont(); for _, f in pairs(frames) do UpdateAll(f) end end
 
 local function Events(f)
     local u = f.unit
-    for _, ev in ipairs({ "UNIT_HEALTH", "UNIT_MAXHEALTH", "UNIT_POWER_UPDATE", "UNIT_MAXPOWER", "UNIT_DISPLAYPOWER", "UNIT_HEAL_PREDICTION",
+    for _, ev in ipairs({ "UNIT_HEALTH", "UNIT_MAXHEALTH", "UNIT_POWER_UPDATE", "UNIT_MAXPOWER", "UNIT_DISPLAYPOWER", "UNIT_HEAL_PREDICTION", "UNIT_AURA",
                           "UNIT_NAME_UPDATE", "UNIT_LEVEL", "UNIT_PORTRAIT_UPDATE", "UNIT_MODEL_CHANGED", "UNIT_FACTION" }) do
         pcall(f.RegisterUnitEvent, f, ev, u)
     end
@@ -419,6 +524,7 @@ local function Events(f)
     if u == "target" then f:RegisterEvent("PLAYER_TARGET_CHANGED") end
     f:SetScript("OnEvent", function(self, ev)
         if ev == "UNIT_HEALTH" or ev == "UNIT_MAXHEALTH" or ev == "UNIT_HEAL_PREDICTION" then pcall(UpdateHealth, self)
+        elseif ev == "UNIT_AURA" then pcall(UpdateAuras, self)
         elseif ev == "UNIT_POWER_UPDATE" or ev == "UNIT_MAXPOWER" or ev == "UNIT_DISPLAYPOWER" then pcall(UpdatePower, self)
         else UpdateAll(self) end
     end)

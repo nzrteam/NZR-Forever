@@ -677,6 +677,7 @@ function NZR.MeterAnchorBody()
     local collapse = not SubShown()
     if win.bodyCollapsed == collapse then return end
     win.bodyCollapsed = collapse
+    if win.ssep then win.ssep:SetShown(not collapse) end   -- pas de trait au travers des cartes
     -- teinte « Jeu » : le cadre doré du jeu est plus épais, on reste à l'intérieur
     local inX = win.nzrRock and 7 or 2
     win.body:ClearAllPoints()
@@ -1265,6 +1266,7 @@ local function CreateWindow()
     ssep:SetColorTexture(0.114, 0.098, 0.149, 1)
     ssep:SetHeight(1)
     ssep:SetPoint("TOPLEFT", win.colHead, "BOTTOMLEFT"); ssep:SetPoint("TOPRIGHT", win.colHead, "BOTTOMRIGHT")
+    win.ssep = ssep
 
     -- corps
     win.body = CreateFrame("Frame", nil, win)
