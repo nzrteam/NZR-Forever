@@ -1,4 +1,4 @@
-# NZR Forever 1.0.0 (WoW Forever)
+# NZR Forever 1.0.1 (WoW Forever)
 
 Le DPS meter NZR et quelques petits plus, sans dénaturer le jeu.
 
