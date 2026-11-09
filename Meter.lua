@@ -999,9 +999,12 @@ local function ShiftHolder()
     end
     return shiftHolder
 end
+-- au chargement, on attend que le jeu ait posé ses barres (mode Édition) avant de décaler
+local shiftReady = false
 local function ShiftBars(on)
     if DB().meterShiftBars then ShiftHolder() end   -- le bloc existe pour pouvoir le placer
     if on and not DB().meterShiftBars then on = false end
+    if on and not shiftReady then return end
     if on == (shifted ~= nil) then return end
     if InCombatLockdown() then return end          -- réessayé à la sortie du combat (minuterie)
     if not on then
@@ -1496,8 +1499,19 @@ function M:Init()
     end
     local pending = false
     ev:RegisterEvent("EDIT_MODE_LAYOUTS_UPDATED")
+    ev:RegisterEvent("PLAYER_ENTERING_WORLD")
     ev:SetScript("OnEvent", function(_, e)
-        if e == "EDIT_MODE_LAYOUTS_UPDATED" then shifted = nil end   -- le jeu a replacé les barres
+        if e == "EDIT_MODE_LAYOUTS_UPDATED" or e == "PLAYER_ENTERING_WORLD" then
+            -- le jeu (re)pose ses barres : on remet les nôtres d'origine, puis on redécale un peu après
+            if e == "EDIT_MODE_LAYOUTS_UPDATED" then shifted = nil      -- le jeu a déjà tout replacé
+            elseif shifted and not InCombatLockdown() then ShiftBars(false) end
+            shiftReady = false
+            C_Timer.After(e == "PLAYER_ENTERING_WORLD" and 2 or 0.5, function()
+                shiftReady = true
+                if mini then mini.nzrDocked = nil end
+                ShowMini(DB().meterMin and true or false)
+            end)
+        end
         if e == "PLAYER_REGEN_ENABLED" or e == "PLAYER_REGEN_DISABLED" then lastCombat = GetTime() end
         UpdateVisibility()
         if pending then return end
