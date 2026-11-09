@@ -136,7 +136,7 @@ local function ScanRoster()
             if cls then
                 roster[cls] = roster[cls] or {}
                 table.insert(roster[cls], u)
-                if cls == "PALADIN" then
+                if cls == "PALADIN" and not UnitIsUnit(u, "player") then
                     local n = UnitName(u)
                     if n then
                         seenPal[n] = true
@@ -211,9 +211,32 @@ end
 
 local refreshAll   -- défini plus bas
 
+-- l'expéditeur d'un message n'a pas toujours le même format que le nom du groupe
+-- (royaume, prénom + nom…) : on le ramène au nom du groupe, et on se reconnaît soi-même
+local function first(s) return s and s:match("^(%S+)") end
+local function ResolveSender(sender)
+    local s = sender or ""
+    if Ambiguate then local ok, v = pcall(Ambiguate, s, "none"); if ok and v then s = v end end
+    local short = ShortName(s)
+    -- 1) correspondance exacte, 2) même premier mot
+    for pass = 1, 2 do
+        for _, u in ipairs(Units()) do
+            if UnitExists(u) then
+                local n = UnitName(u)
+                local full = GetUnitName and GetUnitName(u, true)
+                local hit
+                if pass == 1 then hit = (n == s or n == short or full == s)
+                else hit = n and first(n) == first(short) end
+                if hit then return n, UnitIsUnit(u, "player") end
+            end
+        end
+    end
+    return short, short == MyName()
+end
+
 local function OnMessage(msg, sender)
-    local from = ShortName(sender)
-    if from == MyName() then return end
+    local from, isMe = ResolveSender(sender)
+    if isMe or from == MyName() then return end
     local kind, a, b, c = strsplit("|", msg)
     if kind == "H" then
         paladins[from] = paladins[from] or { known = {} }
