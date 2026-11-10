@@ -338,7 +338,7 @@ function M:Init()
         return
     end
     if DB().sctHideBlizz ~= false then HideBlizzard(true) end
-    HideBlizzardXP(false)               -- l'astuce ne marche pas sur Forever : on rend le réglage
+    HideBlizzardXP(DB().sctHideXP ~= false)
     -- messages rouges du jeu (« Le sort n'est pas encore utilisable. ») : même police
     if DB().sctErrors ~= false and UIErrorsFrame and UIErrorsFrame.SetFont then
         local path = NZR.FontPath(DB().sctFont or "game", STANDARD_TEXT_FONT)
