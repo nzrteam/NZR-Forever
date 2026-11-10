@@ -234,6 +234,13 @@ end
 local function KeepLogFlowing()
     if C_CombatLog and C_CombatLog.SetFilteredEventsEnabled then pcall(C_CombatLog.SetFilteredEventsEnabled, true) end
 end
+-- essai sans clic : appliquer nous-mêmes le filtre « Mes actions » du journal (si le jeu le permet)
+local function TryStartLog()
+    if C_AddOns and C_AddOns.LoadAddOn and not _G.Blizzard_CombatLog_ApplyFilters then pcall(C_AddOns.LoadAddOn, "Blizzard_CombatLog") end
+    local apply, settings = _G.Blizzard_CombatLog_ApplyFilters, _G.Blizzard_CombatLog_CurrentSettings
+    if apply and settings then pcall(apply, settings) end
+    KeepLogFlowing()
+end
 NZR.SctLogLines = logLines
 
 -- ce coup (sur ta cible, ou sur un monstre qui t'attaque) est-il le tien ?
@@ -611,7 +618,7 @@ function M:Init()
             pcall(OnXP)
         elseif e == "PLAYER_ENTERING_WORLD" then
             xpLast = nil; pcall(OnXP)
-            KeepLogFlowing()
+            TryStartLog()
             -- l'onglet « Journal de combat » qui se ferme coupe les lignes : on les relance
             local log = _G.COMBATLOG
             if log and not log.nzrHooked then
