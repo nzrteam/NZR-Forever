@@ -535,10 +535,16 @@ function M:Init()
     local raid = MakeHeader("raid", "NZRF_RaidHeader", holder)
     -- toutes les cases créées tout de suite (hors combat), pour pouvoir les habiller
     for hdr, n in pairs({ [party] = 5, [raid] = 40 }) do
+        -- le jeu ne crée les cases que s'il a au moins une unité à montrer : on fait comme si
+        -- on était seul en groupe le temps de les créer (en combat, il ne peut plus en créer)
+        hdr:SetAttribute("showSolo", true)
+        hdr:SetAttribute("showPlayer", true)
         hdr:Show()
         hdr:SetAttribute("startingIndex", -n + 1)
         hdr:SetAttribute("startingIndex", 1)
         hdr:Hide()
+        hdr:SetAttribute("showSolo", false)
+        if hdr.kind == "raid" then hdr:SetAttribute("showPlayer", nil) end
     end
     -- clic droit = menu du jeu (inviter, chuchoter, inspecter…) : les cases écoutent aussi le clic droit
     for _, b in ipairs(buttons) do pcall(b.RegisterForClicks, b, "AnyUp") end
