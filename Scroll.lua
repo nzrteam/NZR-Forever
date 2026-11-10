@@ -491,17 +491,32 @@ function M:Init()
     -- puis revient au tien. Ensuite le jeu envoie ses lignes, et NZR reconnaît tes coups
     -- en groupe. Une fois par connexion, seulement en groupe. Clic droit : cacher.
     local start = CreateFrame("Button", "NZRF_SctStart", UIParent, "SecureActionButtonTemplate")
-    start:SetSize(200, 24)
-    start:SetPoint("TOP", UIParent, "TOP", 0, -120)
+    start:SetSize(190, 40)
+    start:SetPoint("TOP", UIParent, "TOP", 0, -110)
     start:SetFrameStrata("HIGH")
     start:RegisterForClicks("AnyUp", "AnyDown")
-    local bd = start:CreateTexture(nil, "BACKGROUND"); bd:SetAllPoints(); bd:SetColorTexture(0.78, 0.6, 0.2, 1)
-    local bg = start:CreateTexture(nil, "BORDER"); bg:SetPoint("TOPLEFT", 1, -1); bg:SetPoint("BOTTOMRIGHT", -1, 1)
-    bg:SetColorTexture(0.1, 0.07, 0.03, 0.95)
-    local hl = start:CreateTexture(nil, "HIGHLIGHT"); hl:SetPoint("TOPLEFT", 1, -1); hl:SetPoint("BOTTOMRIGHT", -1, 1)
-    hl:SetColorTexture(1, 0.82, 0, 0.15)
-    local txt = start:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    txt:SetPoint("CENTER"); txt:SetText("NZR : voir mes coups en groupe")
+    -- gros bouton rouge façon « Jouer » de l'écran de connexion
+    local function Atlas(name) return C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(name) ~= nil end
+    if Atlas("128-RedButton-Up") then
+        start:SetNormalAtlas("128-RedButton-Up")
+        start:SetPushedAtlas(Atlas("128-RedButton-Pressed") and "128-RedButton-Pressed" or "128-RedButton-Up")
+        start:SetHighlightAtlas(Atlas("128-RedButton-Highlight") and "128-RedButton-Highlight" or "128-RedButton-Up", "ADD")
+    else
+        start:SetNormalTexture("Interface\\Buttons\\UI-Panel-Button-Up")
+        start:SetPushedTexture("Interface\\Buttons\\UI-Panel-Button-Down")
+        start:SetHighlightTexture("Interface\\Buttons\\UI-Panel-Button-Highlight", "ADD")
+        for _, t in ipairs({ start:GetNormalTexture(), start:GetPushedTexture(), start:GetHighlightTexture() }) do
+            if t then t:SetTexCoord(0, 0.625, 0, 0.6875) end
+        end
+    end
+    local txt = start:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    txt:SetPoint("CENTER", 0, 1); txt:SetText("Jouer")
+    txt:SetTextColor(1, 0.82, 0); txt:SetShadowColor(0, 0, 0, 1); txt:SetShadowOffset(1, -1)
+    start:SetFontString(txt); start:SetPushedTextOffset(1, -1)
+    local sub = start:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    sub:SetPoint("TOP", start, "BOTTOM", 0, -2)
+    sub:SetText("NZR : voir mes coups en groupe")
+    sub:SetTextColor(0.85, 0.85, 0.85)
     start:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
         GameTooltip:AddLine("Voir mes coups en groupe", 1, 0.82, 0)
