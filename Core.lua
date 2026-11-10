@@ -883,10 +883,10 @@ function NZR:BuildMainIcon()
     local shade = b:CreateTexture(nil, "BORDER")
     shade:SetPoint("TOPLEFT", 4, -4); shade:SetPoint("BOTTOMRIGHT", -4, 4); shade:SetColorTexture(0.05, 0.03, 0.08, 0.55)
     local t = b:CreateFontString(nil, "OVERLAY")
-    if not pcall(t.SetFont, t, "Fonts\\FRIZQT__.TTF", 9, "OUTLINE") then t:SetFontObject("GameFontNormalSmall") end
+    if not pcall(t.SetFont, t, "Fonts\\FRIZQT__.TTF", 8, "OUTLINE") then t:SetFontObject("GameFontNormalSmall") end
+    t:SetWordWrap(false)
+    t:SetPoint("CENTER", b, "CENTER", 0, 0)        -- centré, sans largeur imposée (sinon le jeu écrit « … »)
     t:SetText("NZR"); t:SetTextColor(1, 0.82, 0)
-    t:SetJustifyH("CENTER"); t:SetJustifyV("MIDDLE")
-    t:SetPoint("TOPLEFT", 5, -5); t:SetPoint("BOTTOMRIGHT", -5, 5)     -- tient dans le carré intérieur, centré
     local ring = b:CreateTexture(nil, "OVERLAY")
     ring:SetAllPoints(); ring:SetTexture("Interface\\AddOns\\NZRForever\\Media\\uf\\ring_square")
     local hl = b:CreateTexture(nil, "HIGHLIGHT")
