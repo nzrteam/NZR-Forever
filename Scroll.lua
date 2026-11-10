@@ -105,6 +105,31 @@ local function Amount(v)
     return ok and s or ""
 end
 
+local lastHit = { t = 0 }
+
+---------------------------------------------------------------------------
+-- Gains de ressource (toutes les classes) : rage, énergie, mana, puissance runique…
+-- La régénération normale n'est pas affichée : seulement les vrais gains.
+---------------------------------------------------------------------------
+local lastPower = {}
+local function OnPower(token)
+    if DB().sctPower == false then return end
+    local ptype, tok = UnitPowerType("player")
+    local cur, max = UnitPower("player", ptype), UnitPowerMax("player", ptype)
+    if not (plain(cur) and plain(max) and plain(tok)) or max <= 0 then lastPower = {}; return end
+    local prev = lastPower[tok]
+    lastPower[tok] = cur
+    if not prev or cur <= prev then return end
+    local gain = cur - prev
+    -- mana et énergie se régénèrent toutes seules : on ne montre que les gros gains
+    if tok == "MANA" and gain < max * 0.04 then return end
+    if tok == "ENERGY" and gain < 25 then return end
+    if tok == "FOCUS" and gain < 15 then return end
+    local c = PowerBarColor and PowerBarColor[tok]
+    local name = _G[tok] or tok
+    Spawn("inc", ("+%d %s"):format(gain, name), c and c.r or 0.4, c and c.g or 0.6, c and c.b or 1)
+end
+
 local function OnUnitCombat(unit, action, flag, amount, school)
     if not plain(action) then return end
     local crit = plain(flag) and (flag == "CRITICAL" or flag == "CRUSHING")
@@ -125,6 +150,7 @@ local function OnUnitCombat(unit, action, flag, amount, school)
     if DB().sctOut == false then return end
     if not IsInGroup() or DB().sctOthers then
         if action == "WOUND" then
+            lastHit.t = GetTime()
             local icon = (GetTime() - lastCast.t < 0.8 and lastCast.icon) or SWING_ICON
             local txt = Amount(amount)
             if plain(flag) and flag == "GLANCING" then txt = txt .. " (érafle)" end
@@ -166,6 +192,8 @@ function NZR.ScrollTest()
     C_Timer.After(1.8, function() Spawn("inc", "+150", 0.3, 1, 0.3); Spawn("note", "-Combat", 0.3, 1, 0.3) end)
 end
 
+local targetDead
+
 function M:Init()
     if NZR.withUI then return end
     driver = CreateFrame("Frame")
@@ -179,6 +207,9 @@ function M:Init()
 
     local ev = CreateFrame("Frame")
     ev:RegisterEvent("UNIT_COMBAT")
+    pcall(ev.RegisterUnitEvent, ev, "UNIT_POWER_UPDATE", "player")
+    pcall(ev.RegisterUnitEvent, ev, "UNIT_HEALTH", "target")
+    ev:RegisterEvent("PLAYER_TARGET_CHANGED")
     ev:RegisterEvent("PLAYER_REGEN_DISABLED")
     ev:RegisterEvent("PLAYER_REGEN_ENABLED")
     ev:RegisterEvent("PLAYER_LOGOUT")
@@ -187,6 +218,21 @@ function M:Init()
         if e == "UNIT_COMBAT" then
             if unit == "player" then pcall(OnUnitCombat, "player", a, b, c, d)
             elseif unit == "target" then pcall(OnUnitCombat, "target", a, b, c, d) end
+        elseif e == "UNIT_POWER_UPDATE" then
+            pcall(OnPower, a)
+        elseif e == "PLAYER_TARGET_CHANGED" then
+            local ok, dead = pcall(UnitIsDead, "target")
+            targetDead = ok and plain(dead) and dead or nil      -- déjà mort : pas de « coup fatal »
+        elseif e == "UNIT_HEALTH" then
+            -- coup fatal : ta cible meurt juste après ton coup (sûr seulement en solo)
+            local ok, dead = pcall(UnitIsDead, "target")
+            if ok and plain(dead) and dead and not targetDead then
+                targetDead = true
+                if DB().sctKill ~= false and GetTime() - lastHit.t < 1.5 and (not IsInGroup() or DB().sctOthers) then
+                    local okN, n = pcall(UnitName, "target")
+                    Spawn("note", "Coup fatal ! " .. ((okN and plain(n) and n) or ""), 1, 0.82, 0, "Interface\\TargetingFrame\\UI-TargetingFrame-Skull")
+                end
+            end
         elseif e == "UNIT_SPELLCAST_SUCCEEDED" then
             local spellID = c
             local tex = spellID and C_Spell and C_Spell.GetSpellTexture and C_Spell.GetSpellTexture(spellID)

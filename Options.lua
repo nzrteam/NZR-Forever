@@ -172,6 +172,8 @@ local PAGES = {
         { t = "switch", key = "sctIn", section = "Texte de combat", label = "Dégâts reçus", desc = "Ce que tu prends, et les esquives / parades / ratés." },
         { t = "switch", key = "sctHeal", section = "Texte de combat", label = "Soins reçus", desc = "En vert, à gauche." },
         { t = "switch", key = "sctNotice", section = "Texte de combat", label = "Entrée et sortie de combat", desc = "« +Combat » / « -Combat » au centre." },
+        { t = "switch", key = "sctPower", section = "Texte de combat", label = "Gains de ressource", desc = "+Rage, +Énergie, +Mana… pour toutes les classes. La régénération normale n'est pas affichée, seulement les vrais gains." },
+        { t = "switch", key = "sctKill", section = "Texte de combat", label = "Coup fatal", desc = "« Coup fatal ! » quand ta cible meurt juste après ton coup (en solo)." },
         { t = "switch", key = "sctOthers", section = "Texte de combat", label = "En groupe : tous les coups sur ma cible", desc = "Le jeu ne dit pas qui frappe : en groupe, seuls tes coups seuls sont sûrs. Coche pour tout voir quand même." },
         { t = "switch", key = "sctHideBlizz", section = "Texte de combat", label = "Cacher les chiffres du jeu", desc = "Évite les doublons. Tes réglages du jeu reviennent quand tu coupes, à la déconnexion, ou si tu retires NZR.", r = true },
         { t = "cycle", key = "sctFont", section = "Texte de combat", label = "Police", desc = "Police des chiffres.",
