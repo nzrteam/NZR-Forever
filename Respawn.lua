@@ -577,13 +577,14 @@ local function BuildLauncher()
         end
     end)
     b:SetScript("OnClick", function(_, btn)
-        if btn == "RightButton" then NZR:OpenOptionsAt("quest", "Temps de respawn") return end
+        if btn == "RightButton" then NZR:OpenOptionsAt("quest", "Temps de respawn (Alpha)") return end
         userHidden, forceOpen = nil, true
         pcall(Refresh)
     end)
     b:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-        GameTooltip:AddLine("Respawn")
+        GameTooltip:AddLine("Respawn (Alpha)")
+        GameTooltip:AddLine("Module en Alpha : encore en test, pas fini.", 1, 0.5, 0.3, true)
         GameTooltip:AddLine("Clic : ouvrir la fenêtre des temps de respawn.", 1, 1, 1, true)
         GameTooltip:AddLine("Clic droit : réglages du respawn. Glisser : déplacer.", 0.8, 0.8, 0.8, true)
         GameTooltip:Show()
@@ -594,7 +595,7 @@ local function BuildLauncher()
 end
 
 local function BuildWindow()
-    holder = NZR:Holder("respawn", "Respawn", WIN_W, MIN_H, { "TOPRIGHT", "TOPRIGHT", -230, -260 })
+    holder = NZR:Holder("respawn", "Respawn (Alpha)", WIN_W, MIN_H, { "TOPRIGHT", "TOPRIGHT", -230, -260 })
     win = CreateFrame("Frame", "NZRF_Respawn", UIParent)
     win:SetSize(WIN_W, MIN_H)
     win:SetFrameStrata("MEDIUM")
@@ -627,7 +628,7 @@ local function BuildWindow()
         Anchor()
     end)
     Anchor()
-    local over, ttl = NZR:WowFrame(win, "Respawn", DB().meterAlpha or 0.95, 0.9)
+    local over, ttl = NZR:WowFrame(win, "Respawn (Alpha)", DB().meterAlpha or 0.95, 0.9)
     if ttl then ttl:SetFontObject("GameFontNormal") end        -- titre lisible
     local add = CreateFrame("Button", nil, over)
     add:SetSize(16, 16)
