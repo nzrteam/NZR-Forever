@@ -609,11 +609,13 @@ local function BuildWindow()
     mini:SetScript("OnLeave", function() GameTooltip:Hide() end)
     win.more = over:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     win.empty = over:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    win.empty:SetPoint("TOPLEFT", PAD, -30)
+    win.empty:SetPoint("TOP", 0, -34)
+    win.empty:SetWidth(WIN_W - PAD * 2); win.empty:SetJustifyH("CENTER")
     win.empty:SetText("Aucun chrono en cours")
     win.hint = over:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     win.hint:SetPoint("BOTTOM", 0, 12)
-    win.hint:SetText("Clic : flèche  ·  Clic droit : retirer")
+    win.hint:SetWidth(WIN_W - PAD * 2); win.hint:SetJustifyH("CENTER"); win.hint:SetWordWrap(true)
+    win.hint:SetText("Clic : flèche · Clic droit : retirer")
     win:Hide()
 end
 
@@ -798,10 +800,10 @@ Refresh = function()
         local extra = #list - shown
         if #list == 0 then
             win.empty:Show()
-            win.hint:SetText("Tue un monstre, ou cible-le et clique sur +")
+            win.hint:SetText("Cible un monstre puis clique sur +")
         else
             win.empty:Hide()
-            win.hint:SetText("Clic : flèche  ·  Clic droit : retirer")
+            win.hint:SetText("Clic : flèche · Clic droit : retirer")
         end
         if extra > 0 then
             win.more:SetText(("+ %d autre%s"):format(extra, extra > 1 and "s" or ""))
