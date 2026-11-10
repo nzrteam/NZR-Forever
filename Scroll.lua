@@ -492,7 +492,7 @@ function M:Init()
     -- en groupe. Une fois par connexion, seulement en groupe. Clic droit : cacher.
     local start = CreateFrame("Button", "NZRF_SctStart", UIParent, "SecureActionButtonTemplate")
     start:SetSize(190, 40)
-    start:SetPoint("TOP", UIParent, "TOP", 0, -110)
+    start:SetPoint("CENTER", UIParent, "CENTER", 0, 120)      -- vers le milieu de l'écran
     start:SetFrameStrata("HIGH")
     start:RegisterForClicks("AnyUp", "AnyDown")
     -- gros bouton rouge façon « Jouer » de l'écran de connexion
