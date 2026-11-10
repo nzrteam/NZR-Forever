@@ -426,7 +426,7 @@ end
 function NZR.ScrollTest()
     if not driver then return end
     local icons = { "Interface\\Icons\\Spell_Holy_SealOfMight", SWING_ICON, "Interface\\Icons\\Spell_Holy_HolyBolt" }
-    Spawn("note", "+Combat", 1, 0.3, 0.3)
+    Spawn("note", "En combat !", 1, 0.35, 0.25, "Interface\\Icons\\Ability_DualWield", true)
     for i = 1, 6 do
         C_Timer.After(0.25 * i, function()
             local crit = i == 4
@@ -434,7 +434,7 @@ function NZR.ScrollTest()
             if i % 2 == 0 then Spawn("inc", "-" .. (20 + i * 3), 1, 0.25, 0.2) end
         end)
     end
-    C_Timer.After(1.8, function() Spawn("inc", "+150", 0.3, 1, 0.3); Spawn("note", "-Combat", 0.3, 1, 0.3) end)
+    C_Timer.After(1.8, function() Spawn("inc", "+150", 0.3, 1, 0.3); Spawn("note", "Fin du combat", 0.4, 1, 0.45, "Interface\\Icons\\Ability_Warrior_DefensiveStance") end)
 end
 
 local targetDead
@@ -598,9 +598,9 @@ function M:Init()
                 end
             end
         elseif e == "PLAYER_REGEN_DISABLED" then
-            if DB().sctNotice ~= false then Spawn("note", "+Combat", 1, 0.3, 0.3) end
+            if DB().sctNotice ~= false then Spawn("note", "En combat !", 1, 0.35, 0.25, "Interface\\Icons\\Ability_DualWield", true) end
         elseif e == "PLAYER_REGEN_ENABLED" then
-            if DB().sctNotice ~= false then Spawn("note", "-Combat", 0.3, 1, 0.3) end
+            if DB().sctNotice ~= false then Spawn("note", "Fin du combat", 0.4, 1, 0.45, "Interface\\Icons\\Ability_Warrior_DefensiveStance") end
             if NZR.SctStartUpdate then NZR.SctStartUpdate() end
         elseif e == "CHAT_MSG_COMBAT_XP_GAIN" then
             pcall(OnXPMessage, unit)
