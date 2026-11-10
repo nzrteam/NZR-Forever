@@ -10,7 +10,13 @@ local plain = NZR.plain
 
 local function DB() return NZR.db end
 local MAX_SAMPLES, MAX_ROWS, KEEP_ALIVE = 8, 8, 60
-local WIN_W, ROW_H, PAD = 214, 20, 14
+-- mise en page (une seule source de vérité) :
+--   bandeau du titre | rangée des boutons rapides | liste | « + N autres » | aide
+local WIN_W, ROW_H, PAD = 230, 20, 14
+local BAR_Y, BAR_H = 30, 18                  -- boutons rapides sous le titre
+local LIST_Y = BAR_Y + BAR_H + 8             -- début de la liste
+local FOOT = 36                              -- zone du bas (aide) + marge
+local MIN_H = LIST_Y + ROW_H + FOOT          -- jamais plus petit : le cadre doré reste entier
 
 local data                  -- NZRF_DB.respawnData = { npcs, active, watch }
 local aliveGUID, npcGuids = {}, {}
@@ -175,7 +181,7 @@ local function IsWatched(unit, npc, guid)
     end
     if db.respawnQuest ~= false and questGUID[guid] then return true, true end
     -- tes victimes : un monstre mort que ni personne d'autre n'avait tagué
-    if db.respawnMine ~= false then
+    if db.respawnMine == true then
         local okT, denied = pcall(UnitIsTapDenied, unit)
         if okT and plain(denied) and not denied then return true, true end
     end
@@ -435,7 +441,7 @@ end
 local function MakeRow(i)
     local r = CreateFrame("Button", nil, win)
     r:SetSize(WIN_W - PAD * 2, ROW_H - 1)
-    r:SetPoint("TOPLEFT", win, "TOPLEFT", PAD, -32 - (i - 1) * ROW_H)
+    r:SetPoint("TOPLEFT", win, "TOPLEFT", PAD, -LIST_Y - (i - 1) * ROW_H)
     r:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     r:RegisterForDrag("LeftButton")
     r:SetScript("OnDragStart", function() local f = win:GetScript("OnDragStart"); if f then f(win) end end)
@@ -580,9 +586,9 @@ local function BuildLauncher()
 end
 
 local function BuildWindow()
-    holder = NZR:Holder("respawn", "Respawn", WIN_W, 70, { "TOPRIGHT", "TOPRIGHT", -230, -260 })
+    holder = NZR:Holder("respawn", "Respawn", WIN_W, MIN_H, { "TOPRIGHT", "TOPRIGHT", -230, -260 })
     win = CreateFrame("Frame", "NZRF_Respawn", UIParent)
-    win:SetSize(WIN_W, 50)
+    win:SetSize(WIN_W, MIN_H)
     win:SetFrameStrata("MEDIUM")
     -- la fenêtre suit le bloc « Respawn » (mode édition) mais reste accrochée à l'écran,
     -- pour pouvoir aussi la glisser directement à la souris
@@ -667,13 +673,64 @@ local function BuildWindow()
         GameTooltip:Show()
     end)
     mini:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    -- boutons rapides : ce que NZR suit tout seul
+    local TOGGLES = {
+        { key = "respawnAuto", label = "Élites", def = true, tip = "Élites et rares : chronométrés tout seuls (hors donjons)." },
+        { key = "respawnQuest", label = "Quêtes", def = true, tip = "Monstres liés à une de tes quêtes, même tués par d'autres joueurs." },
+        { key = "respawnMine", label = "Victimes", def = false, tip = "Chaque monstre que tu tues (toi ou ton groupe). Ça peut faire beaucoup de chronos." },
+    }
+    local GAP = 6
+    local bw = math.floor((WIN_W - PAD * 2 - GAP * (#TOGGLES - 1)) / #TOGGLES)
+    local toggles = {}
+    local function IsOn(t) if t.def then return DB()[t.key] ~= false end return DB()[t.key] == true end
+    for i, t in ipairs(TOGGLES) do
+        local b = CreateFrame("Button", nil, over)
+        b:SetSize(bw, BAR_H)
+        b:SetPoint("TOPLEFT", win, "TOPLEFT", PAD + (i - 1) * (bw + GAP), -BAR_Y)
+        b.edge = b:CreateTexture(nil, "BACKGROUND"); b.edge:SetAllPoints()
+        b.fill = b:CreateTexture(nil, "BORDER"); b.fill:SetPoint("TOPLEFT", 1, -1); b.fill:SetPoint("BOTTOMRIGHT", -1, 1)
+        b.hl = b:CreateTexture(nil, "HIGHLIGHT"); b.hl:SetPoint("TOPLEFT", 1, -1); b.hl:SetPoint("BOTTOMRIGHT", -1, 1)
+        b.hl:SetColorTexture(1, 0.82, 0, 0.12)
+        b.text = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        b.text:SetPoint("CENTER", 0, 0); b.text:SetText(t.label)
+        b:SetScript("OnClick", function()
+            DB()[t.key] = not IsOn(t)
+            win.SyncToggles()
+            NZR:Print("Respawn — " .. t.label .. (IsOn(t) and " : suivis." or " : plus suivis."))
+        end)
+        b:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:AddLine(t.label .. (IsOn(t) and " (activé)" or " (désactivé)"), 1, 0.82, 0)
+            GameTooltip:AddLine(t.tip, 1, 1, 1, true)
+            GameTooltip:AddLine("Clic : activer / désactiver", 0.7, 0.7, 0.7)
+            GameTooltip:Show()
+        end)
+        b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        b.t = t
+        toggles[i] = b
+    end
+    function win.SyncToggles()
+        for _, b in ipairs(toggles) do
+            if IsOn(b.t) then
+                b.edge:SetColorTexture(0.85, 0.66, 0.22, 1)
+                b.fill:SetColorTexture(0.24, 0.17, 0.05, 0.95)
+                b.text:SetTextColor(1, 0.82, 0)
+            else
+                b.edge:SetColorTexture(0.3, 0.28, 0.25, 1)
+                b.fill:SetColorTexture(0.06, 0.05, 0.04, 0.9)
+                b.text:SetTextColor(0.55, 0.55, 0.55)
+            end
+        end
+    end
+    win.SyncToggles()
+
     win.more = over:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     win.empty = over:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    win.empty:SetPoint("TOP", 0, -40)
+    win.empty:SetPoint("TOP", 0, -LIST_Y - 3)
     win.empty:SetWidth(WIN_W - PAD * 2); win.empty:SetJustifyH("CENTER")
     win.empty:SetText("Aucun chrono en cours")
     win.hint = over:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    win.hint:SetPoint("BOTTOM", 0, 12)
+    win.hint:SetPoint("BOTTOM", 0, 13)
     win.hint:SetWidth(WIN_W - PAD * 2); win.hint:SetJustifyH("CENTER"); win.hint:SetWordWrap(true)
     win.hint:SetText("Clic : flèche · Clic droit : retirer")
     win:Hide()
@@ -860,14 +917,14 @@ Refresh = function()
         local extra = #list - shown
         if #list == 0 then
             win.empty:Show()
-            win.hint:SetText("Cible un monstre\npuis clique sur +")
+            win.hint:SetText("Cible un monstre puis clique sur +")
         else
             win.empty:Hide()
             win.hint:SetText("Clic : flèche · Clic droit : retirer")
         end
         if extra > 0 then
             win.more:SetText(("+ %d autre%s"):format(extra, extra > 1 and "s" or ""))
-            win.more:SetPoint("TOPLEFT", win, "TOPLEFT", PAD, -34 - shown * ROW_H)
+            win.more:SetPoint("TOPLEFT", win, "TOPLEFT", PAD, -LIST_Y - shown * ROW_H - 2)
             win.more:Show()
         else
             win.more:Hide()
@@ -875,9 +932,10 @@ Refresh = function()
         local sc = DB().respawnScale or 1
         if win:GetScale() ~= sc then win:SetScale(sc); win.Anchor() end
         -- hauteur minimale : en dessous, le cadre doré du jeu ne dessine plus son bas
-        local h = 46 + math.max(shown, 1) * ROW_H + (extra > 0 and 14 or 0)
-        win.hint:SetShown(h + 22 <= 118)
-        win:SetHeight(math.max(118, h))
+        local h = LIST_Y + math.max(shown, 1) * ROW_H + (extra > 0 and 14 or 0) + FOOT
+        win.hint:Show()
+        win:SetHeight(math.max(MIN_H, h))
+        if win.SyncToggles then win.SyncToggles() end
         win:Show()
     else
         win:Hide()
