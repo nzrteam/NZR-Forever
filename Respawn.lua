@@ -376,7 +376,7 @@ end
 local function MakeRow(i)
     local r = CreateFrame("Button", nil, win)
     r:SetSize(WIN_W - PAD * 2, ROW_H - 1)
-    r:SetPoint("TOPLEFT", win, "TOPLEFT", PAD, -27 - (i - 1) * ROW_H)
+    r:SetPoint("TOPLEFT", win, "TOPLEFT", PAD, -32 - (i - 1) * ROW_H)
     r:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     r:RegisterForDrag("LeftButton")
     r:SetScript("OnDragStart", function() local f = win:GetScript("OnDragStart"); if f then f(win) end end)
@@ -554,14 +554,14 @@ local function BuildWindow()
         Anchor()
     end)
     Anchor()
-    local over, ttl = NZR:WowFrame(win, "Respawn", DB().meterAlpha or 0.95, 0.7)
+    local over, ttl = NZR:WowFrame(win, "Respawn", DB().meterAlpha or 0.95, 0.9)
     -- bande invisible à la hauteur exacte du titre : les boutons s'y centrent
     local band = CreateFrame("Frame", nil, over)
     band:SetPoint("TOP", ttl, "TOP", 0, 0); band:SetPoint("BOTTOM", ttl, "BOTTOM", 0, 0)
     band:SetPoint("LEFT", over, "LEFT", 0, 0); band:SetPoint("RIGHT", over, "RIGHT", 0, 0)
     local add = CreateFrame("Button", nil, over)
-    add:SetSize(13, 13)
-    add:SetPoint("LEFT", band, "LEFT", 12, 0)           -- même hauteur que le titre
+    add:SetSize(18, 18)
+    add:SetPoint("LEFT", band, "LEFT", 14, 0)           -- même hauteur que le titre
     add:SetNormalTexture("Interface\\Buttons\\UI-PlusButton-Up")
     add:SetPushedTexture("Interface\\Buttons\\UI-PlusButton-Down")
     add:SetHighlightTexture("Interface\\Buttons\\UI-PlusButton-Hilight", "ADD")
@@ -599,8 +599,8 @@ local function BuildWindow()
     add:SetScript("OnLeave", function() GameTooltip:Hide() end)
     -- petit trait « – » : réduire la fenêtre en icône
     local mini = CreateFrame("Button", nil, over)
-    mini:SetSize(13, 13)
-    mini:SetPoint("RIGHT", band, "RIGHT", -12, 0)
+    mini:SetSize(18, 18)
+    mini:SetPoint("RIGHT", band, "RIGHT", -14, 0)
     mini:SetNormalTexture("Interface\\Buttons\\UI-MinusButton-Up")
     mini:SetPushedTexture("Interface\\Buttons\\UI-MinusButton-Down")
     mini:SetHighlightTexture("Interface\\Buttons\\UI-PlusButton-Hilight", "ADD")
@@ -613,7 +613,7 @@ local function BuildWindow()
     mini:SetScript("OnLeave", function() GameTooltip:Hide() end)
     win.more = over:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     win.empty = over:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    win.empty:SetPoint("TOP", 0, -34)
+    win.empty:SetPoint("TOP", 0, -40)
     win.empty:SetWidth(WIN_W - PAD * 2); win.empty:SetJustifyH("CENTER")
     win.empty:SetText("Aucun chrono en cours")
     win.hint = over:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
@@ -804,14 +804,14 @@ Refresh = function()
         local extra = #list - shown
         if #list == 0 then
             win.empty:Show()
-            win.hint:SetText("Cible un monstre puis clique sur +")
+            win.hint:SetText("Cible un monstre\npuis clique sur +")
         else
             win.empty:Hide()
             win.hint:SetText("Clic : flèche · Clic droit : retirer")
         end
         if extra > 0 then
             win.more:SetText(("+ %d autre%s"):format(extra, extra > 1 and "s" or ""))
-            win.more:SetPoint("TOPLEFT", win, "TOPLEFT", PAD, -29 - shown * ROW_H)
+            win.more:SetPoint("TOPLEFT", win, "TOPLEFT", PAD, -34 - shown * ROW_H)
             win.more:Show()
         else
             win.more:Hide()
@@ -819,9 +819,9 @@ Refresh = function()
         local sc = DB().respawnScale or 1
         if win:GetScale() ~= sc then win:SetScale(sc); win.Anchor() end
         -- hauteur minimale : en dessous, le cadre doré du jeu ne dessine plus son bas
-        local h = 40 + math.max(shown, 1) * ROW_H + (extra > 0 and 14 or 0)
-        win.hint:SetShown(h + 14 <= 104)
-        win:SetHeight(math.max(104, h))
+        local h = 46 + math.max(shown, 1) * ROW_H + (extra > 0 and 14 or 0)
+        win.hint:SetShown(h + 22 <= 118)
+        win:SetHeight(math.max(118, h))
         win:Show()
     else
         win:Hide()
