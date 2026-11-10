@@ -39,6 +39,7 @@ local function Ensure()
     data.npcs = data.npcs or {}
     data.active = data.active or {}
     data.watch = data.watch or {}
+    data.ignore = data.ignore or {}     -- monstres retirés à la main : plus suivis automatiquement
 end
 
 -- GUID de créature -> numéro du monstre (rien si secret ou pas une créature)
@@ -138,6 +139,7 @@ local firstPos = {}    -- [guid] = ta position au premier coup échangé (≈ l�
 -- suivi ? renvoie aussi si c'est un monstre « courant » (plusieurs du même nom autour)
 local function IsWatched(unit, npc, guid)
     if data.watch[npc] then return true, false end
+    if data.ignore[npc] then return false end
     local db = DB()
     if db.respawnAuto ~= false then
         local ok, c = pcall(UnitClassification, unit)
@@ -426,6 +428,23 @@ local function MakeRow(i)
     return r
 end
 
+local function TargetInList()
+    if not UnitExists("target") then return end
+    local npc = UnitNPC("target")
+    if not npc then return end
+    if data.watch[npc] then return npc end
+    for _, e in pairs(data.active) do if e.npc == npc then return npc end end
+end
+
+local function RemoveTarget(npc)
+    data.watch[npc] = nil
+    data.ignore[npc] = true
+    for k, e in pairs(data.active) do if e.npc == npc then data.active[k] = nil end end
+    if ourWP and not data.active[ourWP.npc] then ClearWaypoint() end
+    local nm = (data.npcs[npc] and data.npcs[npc].n) or SafeName("target") or "monstre"
+    NZR:Print(nm .. " retiré de la liste Respawn.")
+end
+
 local function AddTarget()
     if not UnitExists("target") then NZR:Print("cible d'abord le monstre à suivre.") return end
     local npc = UnitNPC("target")
@@ -437,7 +456,7 @@ local function AddTarget()
         data.watch[npc] = nil
         NZR:Print(nm .. " n'est plus suivi.")
     else
-        data.watch[npc] = true
+        data.watch[npc] = true; data.ignore[npc] = nil
         NZR:Print(nm .. " suivi : quand tu le verras mourir, le chrono démarre.")
     end
 end
@@ -533,13 +552,37 @@ local function BuildWindow()
     add:SetNormalTexture("Interface\\Buttons\\UI-PlusButton-Up")
     add:SetPushedTexture("Interface\\Buttons\\UI-PlusButton-Down")
     add:SetHighlightTexture("Interface\\Buttons\\UI-PlusButton-Hilight", "ADD")
-    add:SetScript("OnClick", function() AddTarget(); pcall(Refresh) end)
+    -- « + » : suivre ta cible ; devient une croix si ta cible est déjà dans la liste
+    function add:Sync()
+        local inList = TargetInList()
+        if inList == self.state then return end
+        self.state = inList
+        if inList then
+            self:SetNormalTexture("Interface\\Buttons\\UI-StopButton")
+            self:SetPushedTexture("Interface\\Buttons\\UI-StopButton")
+        else
+            self:SetNormalTexture("Interface\\Buttons\\UI-PlusButton-Up")
+            self:SetPushedTexture("Interface\\Buttons\\UI-PlusButton-Down")
+        end
+    end
+    add.state = false
+    add:SetScript("OnClick", function(self)
+        local npc = TargetInList()
+        if npc then RemoveTarget(npc) else AddTarget() end
+        self:Sync(); pcall(Refresh)
+    end)
     add:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-        GameTooltip:AddLine("Suivre ma cible", 1, 0.82, 0)
-        GameTooltip:AddLine("Ajoute (ou retire) le monstre ciblé. Aussi : /nzr respawn", 1, 1, 1, true)
+        if TargetInList() then
+            GameTooltip:AddLine("Retirer ma cible", 1, 0.82, 0)
+            GameTooltip:AddLine("Ce monstre ne sera plus suivi et ses chronos disparaissent.", 1, 1, 1, true)
+        else
+            GameTooltip:AddLine("Suivre ma cible", 1, 0.82, 0)
+            GameTooltip:AddLine("Ajoute le monstre ciblé à la liste. Aussi : /nzr respawn", 1, 1, 1, true)
+        end
         GameTooltip:Show()
     end)
+    win.add = add
     add:SetScript("OnLeave", function() GameTooltip:Hide() end)
     -- petit trait « – » : réduire la fenêtre en icône
     local mini = CreateFrame("Button", nil, over)
@@ -768,6 +811,7 @@ Refresh = function()
     else
         win:Hide()
     end
+    if win.add then pcall(win.add.Sync, win.add) end
     if launcher then
         launcher:SetShown(not want and not editing)
         local n = 0
@@ -956,7 +1000,7 @@ function NZR.RespawnCmd(arg)
     if arg == "test" or arg == "essai" then NZR.RespawnTest()
     elseif arg == "oublie" or arg == "reset" then
         ClearWaypoint()
-        wipe(data.active); wipe(data.npcs); wipe(data.watch); data.spots = {}
+        wipe(data.active); wipe(data.npcs); wipe(data.watch); wipe(data.ignore); data.spots = {}
         NZR:Print("temps de respawn oubliés.")
         Refresh()
     elseif arg == "voir" or arg == "show" then
@@ -1003,6 +1047,7 @@ function M:Init()
             pcall(Check, unit)
         elseif e == "PLAYER_TARGET_CHANGED" then
             if UnitExists("target") then pcall(SeenAlive, "target") end
+            if win and win.add then pcall(win.add.Sync, win.add) end
         elseif e == "UPDATE_MOUSEOVER_UNIT" then
             pcall(SeenAlive, "mouseover")
         elseif e == "PLAYER_ENTERING_WORLD" then
