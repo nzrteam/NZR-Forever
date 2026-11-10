@@ -310,6 +310,16 @@ function M:Init()
     end
     if DB().sctHideBlizz ~= false then HideBlizzard(true) end
     HideBlizzardXP(false)               -- l'astuce ne marche pas sur Forever : on rend le réglage
+    -- messages rouges du jeu (« Le sort n'est pas encore utilisable. ») : même police
+    if DB().sctErrors ~= false and UIErrorsFrame and UIErrorsFrame.SetFont then
+        local path = NZR.FontPath(DB().sctFont or "game", STANDARD_TEXT_FONT)
+        local size = math.floor(17 * (DB().sctSize or 1) + 0.5)
+        if not pcall(UIErrorsFrame.SetFont, UIErrorsFrame, path, size, "OUTLINE") then
+            pcall(UIErrorsFrame.SetFont, UIErrorsFrame, STANDARD_TEXT_FONT, size, "OUTLINE")
+        end
+        pcall(UIErrorsFrame.SetShadowColor, UIErrorsFrame, 0, 0, 0, 1)
+        pcall(UIErrorsFrame.SetShadowOffset, UIErrorsFrame, 1, -1)
+    end
     anchors.out = NZR:Holder("sctOut", "Texte : tes coups", 150, 34, { "CENTER", "CENTER", 140, 90 })
     anchors.inc = NZR:Holder("sctIn", "Texte : reçu", 150, 34, { "CENTER", "CENTER", -110, 60 })
     anchors.note = NZR:Holder("sctNote", "Texte : combat", 150, 34, { "CENTER", "CENTER", 0, 230 })
