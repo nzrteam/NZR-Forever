@@ -573,7 +573,7 @@ function M:Init()
         if changed then Remap() end
         UpdateRange()
         nameTick = (nameTick or 0) + 1
-        if nameTick >= 8 then nameTick = 0; for _, b in ipairs(buttons) do if b.unit then pcall(UpdateName, b) end end end
+        if nameTick >= 20 then nameTick = 0; for _, b in ipairs(buttons) do if b.unit then pcall(UpdateName, b) end end end
     end)
 
     NZR.GroupRefresh = function()

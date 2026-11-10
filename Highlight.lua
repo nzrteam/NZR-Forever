@@ -78,7 +78,7 @@ end
 local function Play(x, y)
     local d = DB()
     local f = GetFx()
-    f.busy = true
+    f.busy = true; if NZR.HighlightWake then NZR.HighlightWake() end
     f.style = d.hlStyle or "ping"
     f.t = 0
     f.dur = (f.style == "halo") and 1.1 or 0.9
@@ -185,8 +185,12 @@ function M:Init()
     InitLineTypes()
     local driver = CreateFrame("Frame")
     driver:SetScript("OnUpdate", function(_, e)
-        for _, f in ipairs(pool) do if f.busy then Animate(f, e) end end
+        local any = false
+        for _, f in ipairs(pool) do if f.busy then any = true; Animate(f, e) end end
+        if not any then driver:Hide() end          -- rien à animer : on s'arrête
     end)
+    driver:Hide()
+    NZR.HighlightWake = function() driver:Show() end
     local ev = CreateFrame("Frame")
     ev:RegisterEvent("UPDATE_MOUSEOVER_UNIT")
     pcall(ev.RegisterEvent, ev, "WORLD_CURSOR_TOOLTIP_UPDATE")

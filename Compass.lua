@@ -440,7 +440,16 @@ local function Update(self, e)
     acc = 0
     local map, px, py = PlayerMapPos()
     if not map then return ShowEmpty("Position inconnue") end
-    local tmap, tx, ty, name, desc, isManual = Target(map, px, py)
+    -- la cible bouge rarement : on la recalcule 4 fois par seconde, la flèche tourne à chaque image
+    local now = GetTime()
+    local tc = FC.tcache
+    if not tc or now - tc.t > 0.25 or tc.manual ~= FC.manual then
+        local a, b, c, d, f, g = Target(map, px, py)
+        tc = { t = now, manual = FC.manual, a, b, c, d, f, g, noPos = FC.noPos, corpse = FC.isCorpse }
+        FC.tcache = tc
+    end
+    FC.noPos, FC.isCorpse = tc.noPos, tc.corpse
+    local tmap, tx, ty, name, desc, isManual = tc[1], tc[2], tc[3], tc[4], tc[5], tc[6]
     if not tmap then
         if FC.noPos then
             SetVisible(true)

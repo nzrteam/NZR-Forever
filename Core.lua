@@ -819,6 +819,9 @@ local fullNameCache = {}
 function NZR.FullName(unit)
     local okN, first = pcall(UnitName, unit)
     if not okN or not NZR.plain(first) or first == "" then return nil end
+    -- déjà connu (plus long que le prénom) : pas besoin de relire l'infobulle
+    local known = fullNameCache[first]
+    if known and #known > #first then return known end
     local best = first
     local function take(v)
         if NZR.plain(v) and type(v) == "string" and #v > #best and v:sub(1, #first) == first then best = v end
