@@ -281,16 +281,24 @@ local function QuestieSpawns(npc, map)
     end
     return out
 end
--- le point d'apparition de la base le plus proche (moins de ~80 m), sinon rien
+-- le point d'apparition de la base le plus proche (moins de ~80 m) qui n'est pas
+-- déjà pris par un autre chrono en cours du même monstre (3 tués au même endroit =
+-- 3 points différents), sinon rien
 local function SnapToSpawn(npc, map, x, y)
     local pts = map and QuestieSpawns(npc, map)
     if not pts then return end
     local w, h = MapSize(map)
+    local used = {}
+    for _, e in pairs(data.active) do
+        if e.npc == npc and e.exact and not e.alive and e.map == map then used[("%.4f:%.4f"):format(e.x, e.y)] = true end
+    end
     local best, bd
     for _, p in ipairs(pts) do
-        local dx, dy = (p[1] - x) * (w or 1000), (p[2] - y) * (h or 1000)
-        local d = math.sqrt(dx * dx + dy * dy)
-        if not bd or d < bd then best, bd = p, d end
+        if not used[("%.4f:%.4f"):format(p[1], p[2])] then
+            local dx, dy = (p[1] - x) * (w or 1000), (p[2] - y) * (h or 1000)
+            local d = math.sqrt(dx * dx + dy * dy)
+            if not bd or d < bd then best, bd = p, d end
+        end
     end
     if best and bd <= 80 then return best[1], best[2] end
 end
