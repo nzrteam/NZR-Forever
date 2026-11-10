@@ -66,27 +66,50 @@ local function InInstance()
     return ok and inside and (kind == "party" or kind == "raid" or kind == "scenario")
 end
 
+local QUEST_LINES
 local function UnitIsQuest(unit)
     if C_QuestLog and C_QuestLog.UnitIsRelatedToActiveQuest then
         local ok, r = pcall(C_QuestLog.UnitIsRelatedToActiveQuest, unit)
-        if ok and plain(r) then return r and true or false end
+        if ok and plain(r) and r then return true end
+    end
+    -- sur Forever : les lignes « quête » de l'infobulle du monstre
+    if not QUEST_LINES then
+        QUEST_LINES = {}
+        local T = Enum and Enum.TooltipDataLineType
+        if T then for _, k in ipairs({ "QuestObjective", "QuestTitle", "QuestPlayer" }) do if T[k] then QUEST_LINES[T[k]] = true end end end
+    end
+    if C_TooltipInfo and C_TooltipInfo.GetUnit then
+        local ok, d = pcall(C_TooltipInfo.GetUnit, unit)
+        if ok and d and d.lines then
+            for _, line in ipairs(d.lines) do
+                if line.type and plain(line.type) and QUEST_LINES[line.type] then return true end
+            end
+        end
     end
     return false
 end
+local questGUID = {}
 
-local function IsWatched(unit, npc)
-    if data.watch[npc] then return true end
+-- suivi ? renvoie aussi si c'est un monstre « courant » (plusieurs du même nom autour)
+local function IsWatched(unit, npc, guid)
+    if data.watch[npc] then return true, false end
     local db = DB()
     if db.respawnAuto ~= false then
         local ok, c = pcall(UnitClassification, unit)
-        if ok and plain(c) and (c == "elite" or c == "rare" or c == "rareelite" or c == "worldboss") then return true end
+        if ok and plain(c) and (c == "elite" or c == "rare" or c == "rareelite" or c == "worldboss") then return true, false end
     end
-    if db.respawnQuest and UnitIsQuest(unit) then return true end
+    if db.respawnQuest ~= false and questGUID[guid] then return true, true end
+    -- tes victimes : un monstre mort que ni personne d'autre n'avait tagué
+    if db.respawnMine ~= false then
+        local okT, denied = pcall(UnitIsTapDenied, unit)
+        if okT and plain(denied) and not denied then return true, true end
+    end
     return false
 end
 
 -- temps connus : rapide, moyen, lent, nombre
 local function Stats(npc, e)
+    if e and e.npc then npc = e.npc end
     local s = (e and e.test) or (data.npcs[npc] and data.npcs[npc].s)
     if not s or #s == 0 then return end
     local lo, hi, sum = math.huge, 0, 0
@@ -302,10 +325,11 @@ local function MakeRow(i)
                 NZR:Print("pas de position pour ce monstre (en donjon, ou carte inconnue).")
             end
         elseif IsShiftKeyDown() then
-            data.active[self.npc] = nil
-            data.npcs[self.npc] = nil
-            data.watch[self.npc] = nil
-            if ourWP and ourWP.npc == self.npc then ClearWaypoint() end
+            local id = e and e.npc or self.npc
+            for k, x in pairs(data.active) do if (x.npc or k) == id then data.active[k] = nil end end
+            data.npcs[id] = nil
+            data.watch[id] = nil
+            if ourWP and not data.active[ourWP.npc] then ClearWaypoint() end
             NZR:Print((self.nm or "monstre") .. " oublié.")
         else
             data.active[self.npc] = nil
@@ -480,7 +504,7 @@ end
 -- Boucle (seulement quand un chrono tourne)
 ---------------------------------------------------------------------------
 local function Alert(npc, e)
-    local nm = (data.npcs[npc] and data.npcs[npc].n) or e.n or "Monstre"
+    local nm = (data.npcs[e.npc or npc] and data.npcs[e.npc or npc].n) or e.n or "Monstre"
     local msg = nm .. " devrait réapparaître !"
     pcall(UIErrorsFrame.AddMessage, UIErrorsFrame, msg, 1, 0.82, 0)
     if DB().respawnSound ~= false then pcall(PlaySound, SOUNDKIT and SOUNDKIT.RAID_WARNING or 8959, "Master") end
@@ -510,7 +534,8 @@ Refresh = function()
     Prune(now)
     local list = SortedActive()
     for _, it in ipairs(list) do
-        it.nm = (data.npcs[it.npc] and data.npcs[it.npc].n) or it.e.n or ("#" .. tostring(it.npc))
+        local id = it.e.npc or it.npc
+        it.nm = (data.npcs[id] and data.npcs[id].n) or it.e.n or ("#" .. tostring(id))
     end
 
     -- fenêtre
@@ -558,7 +583,7 @@ Refresh = function()
             local s = State(ourWP.npc, e, now)
             label:ClearAllPoints()
             label:SetPoint("BOTTOM", st, "TOP", 0, 14)
-            label.name:SetText((data.npcs[ourWP.npc] and data.npcs[ourWP.npc].n) or e.n or "")
+            label.name:SetText((data.npcs[e.npc or 0] and data.npcs[e.npc or 0].n) or e.n or "")
             label.time:SetText(s.left and Clock(s.left) or (s.avg and "maintenant" or "?"))
             label:Show()
         else
@@ -591,22 +616,29 @@ local function SeenAlive(unit)
     aliveGUID[guid] = t
     npcGuids[npc] = npcGuids[npc] or {}
     npcGuids[npc][guid] = t
-    -- réapparition d'un monstre qu'on attendait ?
-    local e = data.active[npc]
-    if e and not e.alive and not e.test and guid ~= e.guid and not (e.before and e.before[guid]) then
-        local el = Now() - e.t
-        if el < 10 then return end
-        local de, ds = Offset(e)
-        if de and math.sqrt(de * de + ds * ds) > 90 then return end    -- un autre du même nom, ailleurs
+    if DB().respawnQuest ~= false and questGUID[guid] == nil then questGUID[guid] = UnitIsQuest(unit) end
+    -- réapparition d'un monstre qu'on attendait ? (le plus proche de ceux de ce type)
+    local best, bestK, bestD
+    local now = Now()
+    for k, e in pairs(data.active) do
+        if e.npc == npc and not e.alive and not e.test and guid ~= e.guid and not (e.before and e.before[guid])
+           and now - e.t >= (e.common and 25 or 10) then
+            local de, ds = Offset(e)
+            local d = de and math.sqrt(de * de + ds * ds) or 0
+            if d <= (e.common and 40 or 90) and (not bestD or d < bestD) then best, bestK, bestD = e, k, d end
+        end
+    end
+    if best then
+        local el = now - best.t
         local rec = data.npcs[npc] or { s = {} }
         data.npcs[npc] = rec
-        rec.n = rec.n or e.n
+        rec.n = rec.n or best.n
         if el <= 3600 then
             table.insert(rec.s, el)
             while #rec.s > MAX_SAMPLES do table.remove(rec.s, 1) end
         end
-        e.alive = Now()
-        if ourWP and ourWP.npc == npc then ClearWaypoint() end
+        best.alive = now
+        if ourWP and ourWP.npc == bestK then ClearWaypoint() end
         Wake()
     end
 end
@@ -615,9 +647,10 @@ local function SeenDead(unit)
     local npc, guid = UnitNPC(unit)
     if not npc or not aliveGUID[guid] then return end      -- pas vu vivant : on ne sait pas quand il est mort
     aliveGUID[guid] = nil
-    if InInstance() or not IsWatched(unit, npc) then return end
-    local e = data.active[npc]
-    if e and e.guid == guid then return end
+    if InInstance() then return end
+    local watched, common = IsWatched(unit, npc, guid)
+    questGUID[guid] = nil
+    if not watched or data.active[guid] then return end
     local map, x, y = PlayerSpot()
     local before = {}
     for g in pairs(npcGuids[npc] or {}) do if g ~= guid then before[g] = true end end
@@ -629,7 +662,11 @@ local function SeenDead(unit)
         local ok, info = pcall(C_Map.GetMapInfo, map)
         zone = ok and info and plain(info.name) and info.name or nil
     end
-    data.active[npc] = { t = Now(), guid = guid, map = map, x = x, y = y, zone = zone, before = before, n = nm }
+    data.active[guid] = { npc = npc, t = Now(), guid = guid, map = map, x = x, y = y, zone = zone, before = before, n = nm, common = common or nil }
+    -- pas plus de 40 chronos : on oublie les plus vieux
+    local n, oldK, oldT = 0, nil, math.huge
+    for k, x in pairs(data.active) do n = n + 1; if x.t < oldT then oldK, oldT = k, x.t end end
+    if n > 40 and oldK then data.active[oldK] = nil end
     userHidden = nil
     Wake()
 end
@@ -640,7 +677,7 @@ end
 
 local function Cleanup()
     local t = GetTime()
-    for g, v in pairs(aliveGUID) do if t - v > 900 then aliveGUID[g] = nil end end
+    for g, v in pairs(aliveGUID) do if t - v > 900 then aliveGUID[g] = nil; questGUID[g] = nil end end
     for npc, set in pairs(npcGuids) do
         for g, v in pairs(set) do if t - v > 900 then set[g] = nil end end
         if not next(set) then npcGuids[npc] = nil end
@@ -658,7 +695,7 @@ local function OnTooltip(tt, d)
     if typ ~= "Creature" and typ ~= "Vehicle" then return end
     npc = tonumber(npc)
     if not npc then return end
-    local e = data.active[npc]
+    local e = data.active[guid]
     if e and not e.alive then
         local st = State(npc, e, Now())
         tt:AddLine("|TInterface\\TargetingFrame\\UI-TargetingFrame-Skull:12|t Respawn : " .. st.long, 0.78, 0.63, 0.25)
@@ -678,9 +715,9 @@ end
 function NZR.RespawnTest()
     if not data then NZR:Print("active « Temps de respawn » (Quêtes), puis recharge.") return end
     local map, x, y = PlayerSpot()
-    data.active[-1] = { t = Now(), guid = "test", map = map, x = x, y = y, n = "Essai de respawn", test = { 15, 20, 25 } }
+    data.active.test = { npc = -1, t = Now(), guid = "test", map = map, x = x, y = y, n = "Essai de respawn", test = { 15, 20, 25 } }
     userHidden = nil
-    if map then SetWaypoint(-1, data.active[-1], true) end
+    if map then SetWaypoint("test", data.active.test, true) end
     NZR:Print("essai : un faux monstre « revient » dans 20 s, ici même." .. (map and "" or " (pas de position ici : pas de repère)"))
     Wake()
 end
@@ -710,7 +747,11 @@ function M:Init()
     if not DB().respawn then return end
     Ensure()
     -- les essais d'une session précédente ne restent pas
-    data.active[-1] = nil
+    data.active[-1] = nil; data.active.test = nil
+    -- anciennes sauvegardes : un chrono par numéro de monstre
+    for k, e in pairs(data.active) do
+        if type(k) == "number" then data.active[k] = nil; if e.guid then e.npc = k; data.active[e.guid] = e end end
+    end
     BuildWindow()
     BuildLabel()
 
