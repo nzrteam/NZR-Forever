@@ -142,6 +142,28 @@ local function OnPower(token)
     Spawn("inc", ("+%d %s"):format(gain, name), c and c.r or 0.4, c and c.g or 0.6, c and c.b or 1)
 end
 
+-- icône d'un coup : le jeu ne dit pas quel sort a frappé.
+-- Sort lancé à l'instant -> son icône ; dégâts physiques -> ton arme ;
+-- dégâts magiques (sceau, consécration, aura…) -> ton dernier sort, sinon une icône de l'école.
+local SCHOOL_ICON = {
+    [2] = "Interface\\Icons\\Spell_Holy_HolyBolt", [4] = "Interface\\Icons\\Spell_Fire_FlameBolt",
+    [8] = "Interface\\Icons\\Spell_Nature_Lightning", [16] = "Interface\\Icons\\Spell_Frost_FrostBolt02",
+    [32] = "Interface\\Icons\\Spell_Shadow_ShadowBolt", [64] = "Interface\\Icons\\Spell_Arcane_Blast",
+}
+local function WeaponIcon()
+    local ok, tex = pcall(GetInventoryItemTexture, "player", 16)
+    if ok and plain(tex) and tex then return tex end
+    return SWING_ICON
+end
+local function HitIcon(school)
+    local since = GetTime() - lastCast.t
+    if lastCast.icon and since < 0.8 then return lastCast.icon end
+    local sc = plain(school) and type(school) == "number" and school or 1
+    if sc == 1 then return WeaponIcon() end
+    if lastCast.icon and since < 9 then return lastCast.icon end
+    return SCHOOL_ICON[sc] or SCHOOL_ICON[2]
+end
+
 local function OnUnitCombat(unit, action, flag, amount, school)
     if not plain(action) then return end
     local crit = plain(flag) and (flag == "CRITICAL" or flag == "CRUSHING")
@@ -163,12 +185,12 @@ local function OnUnitCombat(unit, action, flag, amount, school)
     if not IsInGroup() or DB().sctOthers then
         if action == "WOUND" then
             lastHit.t = GetTime()
-            local icon = (GetTime() - lastCast.t < 0.8 and lastCast.icon) or SWING_ICON
+            local icon = HitIcon(school)
             local txt = Amount(amount)
             if plain(flag) and flag == "GLANCING" then txt = txt .. " (érafle)" end
             Spawn("out", txt, 1, crit and 0.85 or 1, crit and 0.1 or 1, icon, crit)
         elseif MISS[action] then
-            Spawn("out", MISS[action], 0.8, 0.8, 0.8, SWING_ICON)
+            Spawn("out", MISS[action], 0.8, 0.8, 0.8, WeaponIcon())
         end
     end
 end

@@ -21,5 +21,6 @@ Group.lua
 GuideData.lua
 Guide.lua
 Scroll.lua
+Respawn.lua
 Plates.lua
 Options.lua
