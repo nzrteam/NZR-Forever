@@ -134,7 +134,16 @@ local function UnitIsQuest(unit)
     return false
 end
 local questGUID = {}
-local firstPos = {}    -- [guid] = ta position au premier coup échangé (≈ là où il attendait)
+local firstPos = {}
+local idlePos = {}     -- [guid] = ta position quand tu es passé tout près de lui, tranquille (≈ son point)
+
+-- le jeu dit seulement (hors combat) si un monstre est à moins de ~10 m (3) ou ~28 m (4) de toi
+local function Near(unit, idx)
+    if not CheckInteractDistance then return nil end
+    local ok, r = pcall(CheckInteractDistance, unit, idx)
+    if ok and plain(r) then return r and true or false end
+    return nil
+end    -- [guid] = ta position au premier coup échangé (≈ là où il attendait)
 
 -- suivi ? renvoie aussi si c'est un monstre « courant » (plusieurs du même nom autour)
 local function IsWatched(unit, npc, guid)
@@ -872,6 +881,8 @@ local function SeenAlive(unit)
     local okH, hp = pcall(UnitHealth, unit); local okM, mx = pcall(UnitHealthMax, unit)
     local full = okH and okM and plain(hp) and plain(mx) and mx > 0 and hp >= mx
     if not full or Bool(UnitAffectingCombat, unit) then return end
+    local near = Near(unit, 4)
+    if near == false then return end          -- trop loin de toi pour savoir d'où il vient
     local best, bestK, bestD
     local now = Now()
     for k, e in pairs(data.active) do
@@ -879,7 +890,7 @@ local function SeenAlive(unit)
            and now - e.t >= (e.common and 30 or 10) then
             local de, ds = Offset(e)
             local d = de and math.sqrt(de * de + ds * ds) or 0
-            if d <= (e.common and 25 or 90) and (not bestD or d < bestD) then best, bestK, bestD = e, k, d end
+            if d <= (e.common and (near and 20 or 25) or 90) and (not bestD or d < bestD) then best, bestK, bestD = e, k, d end
         end
     end
     if best then
@@ -910,9 +921,9 @@ local function SeenDead(unit)
     questGUID[guid] = nil
     if not watched or data.active[guid] then return end
     local map, x, y
-    local fp = firstPos[guid]
+    local fp = idlePos[guid] or firstPos[guid]
     if fp then map, x, y = fp[1], fp[2], fp[3] else map, x, y = PlayerSpot() end
-    firstPos[guid] = nil
+    firstPos[guid], idlePos[guid] = nil, nil
     local before = {}
     for g in pairs(npcGuids[npc] or {}) do if g ~= guid then before[g] = true end end
     local nm = SafeName(unit)
@@ -949,7 +960,7 @@ end
 
 local function Cleanup()
     local t = GetTime()
-    for g, v in pairs(aliveGUID) do if t - v > 900 then aliveGUID[g] = nil; questGUID[g] = nil; firstPos[g] = nil end end
+    for g, v in pairs(aliveGUID) do if t - v > 900 then aliveGUID[g] = nil; questGUID[g] = nil; firstPos[g] = nil; idlePos[g] = nil end end
     for npc, set in pairs(npcGuids) do
         for g, v in pairs(set) do if t - v > 900 then set[g] = nil end end
         if not next(set) then npcGuids[npc] = nil end
@@ -1055,6 +1066,24 @@ function M:Init()
         end
     end)
     C_Timer.NewTicker(60, Cleanup)
+    -- toutes les secondes : monstres tranquilles tout près de toi (point d'apparition)
+    -- et réapparitions dans ton entourage
+    C_Timer.NewTicker(1, function()
+        if InInstance() then return end
+        for i = 1, 40 do
+            local u = "nameplate" .. i
+            if UnitExists(u) and not Bool(UnitIsDead, u) then
+                local npc, guid = UnitNPC(u)
+                if npc and not Bool(UnitAffectingCombat, u) then
+                    if not idlePos[guid] and Near(u, 3) then
+                        local map, x, y = PlayerSpot()
+                        if map then idlePos[guid] = { map, x, y } end
+                    end
+                    if next(data.active) then pcall(SeenAlive, u) end
+                end
+            end
+        end
+    end)
 
     if TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall and Enum and Enum.TooltipDataType then
         pcall(TooltipDataProcessor.AddTooltipPostCall, Enum.TooltipDataType.Unit, function(tt, d) pcall(OnTooltip, tt, d) end)
