@@ -295,6 +295,9 @@ local function MakeRow(i)
     r:SetSize(WIN_W - 24, ROW_H - 1)
     r:SetPoint("TOPLEFT", win, "TOPLEFT", 12, -30 - (i - 1) * ROW_H)
     r:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    r:RegisterForDrag("LeftButton")
+    r:SetScript("OnDragStart", function() local f = win:GetScript("OnDragStart"); if f then f(win) end end)
+    r:SetScript("OnDragStop", function() local f = win:GetScript("OnDragStop"); if f then f(win) end end)
     r.state = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     r.state:SetPoint("TOPRIGHT", 0, -2)
     r.state:SetJustifyH("RIGHT")
@@ -361,26 +364,36 @@ local function BuildWindow()
     holder = NZR:Holder("respawn", "Respawn", WIN_W, 70, { "TOPRIGHT", "TOPRIGHT", -230, -260 })
     win = CreateFrame("Frame", "NZRF_Respawn", UIParent)
     win:SetSize(WIN_W, 50)
-    win:SetPoint("TOPLEFT", holder, "TOPLEFT", 0, 0)
     win:SetFrameStrata("MEDIUM")
-    -- se déplace directement à la souris (titre ou fond), sans passer par le mode édition
+    -- la fenêtre suit le bloc « Respawn » (mode édition) mais reste accrochée à l'écran,
+    -- pour pouvoir aussi la glisser directement à la souris
+    local function Anchor()
+        local l, t = holder:GetLeft(), holder:GetTop()
+        if not (l and t) then win:ClearAllPoints(); win:SetPoint("TOPLEFT", holder, "TOPLEFT", 0, 0) return end
+        local k = UIParent:GetEffectiveScale() / win:GetEffectiveScale()
+        win:ClearAllPoints()
+        win:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", l * k, t * k)
+    end
+    win.Anchor = Anchor
     win:SetMovable(true)
+    if win.SetDontSavePosition then win:SetDontSavePosition(true) end
     win:SetClampedToScreen(true)
     win:EnableMouse(true)
     win:RegisterForDrag("LeftButton")
-    win:SetScript("OnDragStart", function(self) if not InCombatLockdown() or not self:IsProtected() then self:StartMoving() end end)
+    win:SetScript("OnDragStart", function(self) self:StartMoving() end)
     win:SetScript("OnDragStop", function(self)
         self:StopMovingOrSizing()
-        local sc = self:GetEffectiveScale() / UIParent:GetEffectiveScale()
+        if self.SetUserPlaced then pcall(self.SetUserPlaced, self, false) end
+        local k = self:GetEffectiveScale() / UIParent:GetEffectiveScale()
         local l, t = self:GetLeft(), self:GetTop()
         if l and t then
             holder:ClearAllPoints()
-            holder:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", l * sc, t * sc)
-            NZRF_DB.pos[holder.key] = { "TOPLEFT", "BOTTOMLEFT", l * sc, t * sc }
+            holder:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", l * k, t * k)
+            NZRF_DB.pos[holder.key] = { "TOPLEFT", "BOTTOMLEFT", l * k, t * k }
         end
-        self:ClearAllPoints()
-        self:SetPoint("TOPLEFT", holder, "TOPLEFT", 0, 0)
+        Anchor()
     end)
+    Anchor()
     local over = NZR:WowFrame(win, "Respawn", DB().meterAlpha or 0.95)
     local add = CreateFrame("Button", nil, over)
     add:SetSize(18, 18)
@@ -580,7 +593,8 @@ Refresh = function()
         else
             win.more:Hide()
         end
-        win:SetScale(DB().respawnScale or 1)
+        local sc = DB().respawnScale or 1
+        if win:GetScale() ~= sc then win:SetScale(sc); win.Anchor() end
         win:SetHeight(math.max(66, 44 + shown * ROW_H + (extra > 0 and 14 or 0)))
         win:Show()
     else
@@ -803,6 +817,6 @@ function M:Init()
     if WorldMapFrame then
         WorldMapFrame:HookScript("OnShow", function() if next(data.active) then Wake() end end)
     end
-    table.insert(NZR.editHooks, function() pcall(Refresh) end)
+    table.insert(NZR.editHooks, function(on) if not on and win then pcall(win.Anchor) end; pcall(Refresh) end)
     if next(data.active) then Wake() end
 end
