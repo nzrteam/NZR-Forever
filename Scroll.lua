@@ -206,6 +206,43 @@ OthersCheck = function()
     return false
 end
 
+-- Journal de combat (filtre « Mes actions »). Le jeu cache le texte des lignes en
+-- combat, mais chaque ligne qui arrive est une action À TOI : un coup qui arrive
+-- avec (ou juste après) une ligne est donc le tien. Une ligne = un coup.
+local logLines = { started = false, credits = {} }
+local LINE_WINDOW = 1.2          -- un coup peut suivre sa ligne d'un peu (l'animation de l'arme)
+local function OnLogLine(msg, _, _, _, order)
+    local oldest = Enum and Enum.CombatLogMessageOrder and Enum.CombatLogMessageOrder.Oldest
+    if oldest ~= nil and plain(order) and order == oldest then return end   -- vieilles lignes réaffichées
+    local now = GetTime()
+    if not logLines.started then
+        logLines.started = true
+        if NZR.SctStartUpdate then NZR.SctStartUpdate() end
+    end
+    local c = logLines.credits
+    while c[1] and (now - c[1] > LINE_WINDOW or #c >= 20) do table.remove(c, 1) end
+    c[#c + 1] = now
+end
+local function ClaimLine()
+    local now, c = GetTime(), logLines.credits
+    while c[1] and now - c[1] > LINE_WINDOW do table.remove(c, 1) end
+    if c[1] then table.remove(c, 1); return true end
+    return false
+end
+-- le jeu n'écrit ces lignes pour les addons que si on le lui demande (et après une
+-- première ouverture de l'onglet « Journal de combat » du chat)
+local function KeepLogFlowing()
+    if C_CombatLog and C_CombatLog.SetFilteredEventsEnabled then pcall(C_CombatLog.SetFilteredEventsEnabled, true) end
+end
+NZR.SctLogLines = logLines
+
+-- ce coup (sur ta cible, ou sur un monstre qui t'attaque) est-il le tien ?
+local function MineHit(unit)
+    if not IsInGroup() or DB().sctOthers then return true end
+    if logLines.started then return ClaimLine() end
+    return unit == "target" and not OthersOnTarget()
+end
+
 local function OnUnitCombat(unit, action, flag, amount, school)
     if not plain(action) then return end
     local crit = plain(flag) and (flag == "CRITICAL" or flag == "CRUSHING")
@@ -222,11 +259,11 @@ local function OnUnitCombat(unit, action, flag, amount, school)
         end
         return
     end
-    -- tes coups sur ta cible (en groupe, le jeu ne dit pas qui frappe : réglage « dégâts des autres »)
+    -- tes coups (en groupe, le jeu ne dit pas qui frappe : voir MineHit)
     if DB().sctOut == false then return end
-    if not IsInGroup() or DB().sctOthers or not OthersOnTarget() then
+    if MineHit(unit) then
         if action == "WOUND" then
-            lastHit.t = GetTime()
+            if unit == "target" then lastHit.t = GetTime() end
             local icon = HitIcon(school)
             local txt = Amount(amount)
             if plain(flag) and flag == "GLANCING" then txt = txt .. " (érafle)" end
@@ -441,6 +478,70 @@ function M:Init()
     pcall(ev.RegisterUnitEvent, ev, "UNIT_AURA", "player", "target")
     ev:RegisterEvent("PLAYER_ENTERING_WORLD")
     pcall(ev.RegisterUnitEvent, ev, "UNIT_SPELLCAST_SUCCEEDED", "player")
+    pcall(ev.RegisterEvent, ev, "COMBAT_LOG_MESSAGE")
+    ev:RegisterEvent("GROUP_ROSTER_UPDATE")
+    -- Bouton « Mes coups en groupe » : un clic ouvre l'onglet Journal de combat du chat
+    -- puis revient au tien. Ensuite le jeu envoie ses lignes, et NZR reconnaît tes coups
+    -- en groupe. Une fois par connexion, seulement en groupe. Clic droit : cacher.
+    local start = CreateFrame("Button", "NZRF_SctStart", UIParent, "SecureActionButtonTemplate")
+    start:SetSize(200, 24)
+    start:SetPoint("TOP", UIParent, "TOP", 0, -120)
+    start:SetFrameStrata("HIGH")
+    start:RegisterForClicks("AnyUp", "AnyDown")
+    local bd = start:CreateTexture(nil, "BACKGROUND"); bd:SetAllPoints(); bd:SetColorTexture(0.78, 0.6, 0.2, 1)
+    local bg = start:CreateTexture(nil, "BORDER"); bg:SetPoint("TOPLEFT", 1, -1); bg:SetPoint("BOTTOMRIGHT", -1, 1)
+    bg:SetColorTexture(0.1, 0.07, 0.03, 0.95)
+    local hl = start:CreateTexture(nil, "HIGHLIGHT"); hl:SetPoint("TOPLEFT", 1, -1); hl:SetPoint("BOTTOMRIGHT", -1, 1)
+    hl:SetColorTexture(1, 0.82, 0, 0.15)
+    local txt = start:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    txt:SetPoint("CENTER"); txt:SetText("NZR : voir mes coups en groupe")
+    start:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+        GameTooltip:AddLine("Voir mes coups en groupe", 1, 0.82, 0)
+        GameTooltip:AddLine("En groupe, le jeu ne dit pas qui frappe. Avec ce clic, il envoie le journal de combat (« Mes actions ») et NZR reconnaît tes coups.", 1, 1, 1, true)
+        GameTooltip:AddLine("Le clic ouvre l'onglet Journal de combat du chat et revient au tien. Une fois par connexion. Clic droit : cacher.", 0.7, 0.7, 0.7, true)
+        GameTooltip:Show()
+    end)
+    start:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    start:SetAttribute("type2", "attribute")
+    start:SetAttribute("attribute-name", "nzr-hidden")
+    start:SetAttribute("attribute-value", true)
+    local function SetMacro()
+        if InCombatLockdown() then return end
+        local sel
+        if FCFDock_GetSelectedWindow and GENERAL_CHAT_DOCK then
+            local ok, f = pcall(FCFDock_GetSelectedWindow, GENERAL_CHAT_DOCK); if ok then sel = f end
+        end
+        local back = "ChatFrame1Tab"
+        if sel and sel ~= _G.ChatFrame2 and sel.GetName then
+            local okN, n = pcall(sel.GetName, sel)
+            if okN and plain(n) and n and _G[n .. "Tab"] then back = n .. "Tab" end
+        end
+        local macro = (sel == _G.ChatFrame2) and "/click ChatFrame1Tab\n/click ChatFrame2Tab" or ("/click ChatFrame2Tab\n/click " .. back)
+        start:SetAttribute("type", "macro")
+        start:SetAttribute("macrotext", macro)
+    end
+    SetMacro()
+    start:SetScript("PreClick", SetMacro)
+    local hidden
+    start:SetScript("PostClick", function(_, btn)
+        if btn == "RightButton" then hidden = true; NZR.SctStartUpdate(); return end
+        KeepLogFlowing()
+        C_Timer.After(0.5, function()
+            if not logLines.started and not start.said then
+                start.said = true
+                NZR:Print("le clic n'a pas pu ouvrir l'onglet Journal de combat (un addon de chat le cache peut-être). En groupe, NZR montrera tes coups tant que personne d'autre ne tape ta cible.")
+            end
+            NZR.SctStartUpdate()
+        end)
+    end)
+    start:Hide()
+    function NZR.SctStartUpdate()
+        if InCombatLockdown() then return end
+        local want = DB().sctOut ~= false and DB().sctStartBtn ~= false and IsInGroup() and not logLines.started and not hidden
+        start:SetShown(want and true or false)
+    end
+
     ev:SetScript("OnEvent", function(_, e, unit, a, b, c, d)
         if e == "UNIT_COMBAT" then
             if unit == "target" and NZR.sctDebug then
@@ -448,7 +549,19 @@ function M:Init()
                     "groupe=" .. tostring(IsInGroup()), "dégâts des autres=" .. tostring(DB().sctOthers and true or false))
             end
             if unit == "player" then pcall(OnUnitCombat, "player", a, b, c, d)
-            elseif unit == "target" then pcall(OnUnitCombat, "target", a, b, c, d) end
+            elseif unit == "target" then pcall(OnUnitCombat, "target", a, b, c, d)
+            elseif unit and unit:sub(1, 9) == "nameplate" and DB().sctAround ~= false then
+                -- un monstre qui n'est pas ta cible mais qui t'attaque (Consécration, coups de zone…)
+                local okU, same = pcall(UnitIsUnit, unit, "target")
+                local okT, threat = pcall(UnitThreatSituation, "player", unit)
+                if okU and plain(same) and not same and okT and plain(threat) and threat ~= nil then
+                    pcall(OnUnitCombat, unit, a, b, c, d)
+                end
+            end
+        elseif e == "COMBAT_LOG_MESSAGE" then
+            pcall(OnLogLine, unit, a, b, c, d)
+        elseif e == "GROUP_ROSTER_UPDATE" then
+            if NZR.SctStartUpdate then NZR.SctStartUpdate() end
         elseif e == "UNIT_POWER_UPDATE" then
             pcall(OnPower, a)
         elseif e == "PLAYER_TARGET_CHANGED" then
@@ -488,6 +601,7 @@ function M:Init()
             if DB().sctNotice ~= false then Spawn("note", "+Combat", 1, 0.3, 0.3) end
         elseif e == "PLAYER_REGEN_ENABLED" then
             if DB().sctNotice ~= false then Spawn("note", "-Combat", 0.3, 1, 0.3) end
+            if NZR.SctStartUpdate then NZR.SctStartUpdate() end
         elseif e == "CHAT_MSG_COMBAT_XP_GAIN" then
             pcall(OnXPMessage, unit)
         elseif e == "UNIT_AURA" then
@@ -497,6 +611,15 @@ function M:Init()
             pcall(OnXP)
         elseif e == "PLAYER_ENTERING_WORLD" then
             xpLast = nil; pcall(OnXP)
+            KeepLogFlowing()
+            -- l'onglet « Journal de combat » qui se ferme coupe les lignes : on les relance
+            local log = _G.COMBATLOG
+            if log and not log.nzrHooked then
+                log.nzrHooked = true
+                log:HookScript("OnShow", function() logLines.started = true; if NZR.SctStartUpdate then NZR.SctStartUpdate() end end)
+                log:HookScript("OnHide", KeepLogFlowing)
+            end
+            if NZR.SctStartUpdate then C_Timer.After(2, NZR.SctStartUpdate) end
         elseif e == "PLAYER_LOGOUT" then
             HideBlizzardXP(false)
             HideBlizzard(false)         -- tes réglages du jeu reviennent même si tu retires NZR
