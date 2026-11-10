@@ -418,6 +418,14 @@ local function Remap()
             UpdateButton(b)
         end
     end
+    -- le cadre doré seulement s'il y a au moins une case (pas pendant une invitation en attente)
+    for kind, hdr in pairs(headers) do
+        local n = 0
+        for _, b in ipairs(buttons) do
+            if b.kind == kind and b:IsVisible() and b:GetAttribute("unit") then n = n + 1 end
+        end
+        if boxes[kind] then boxes[kind]:SetShown(hdr:IsShown() and n > 0) end
+    end
 end
 
 local function ForUnit(u, fn)
@@ -487,7 +495,7 @@ local function MakeHeader(kind, name, holder)
     box:SetPoint("BOTTOMRIGHT", hdr, "BOTTOMRIGHT", 10, -10)
     NZR:WowFrame(box, kind == "party" and "Groupe" or "Raid", DB().grpAlpha or 0.9)
     box:Hide()
-    hdr:HookScript("OnShow", function() box:Show() end)
+    hdr:HookScript("OnShow", function() C_Timer.After(0.1, function() pcall(Remap) end) end)
     hdr:HookScript("OnHide", function() box:Hide() end)
     hdr:SetFrameStrata("LOW"); hdr:SetFrameLevel(box:GetFrameLevel() + 10)
     boxes[kind] = box
