@@ -270,6 +270,29 @@ local function OnXPMessage(msg)
 end
 
 -- effets que TU poses sur ta cible (étourdissement, ralentissement…) : « [Marteau de la justice] »
+-- contrôle posé par TON sort : on lit sa description (étourdit, effraie, ralentit…)
+local CC_WORDS = {
+    { "tourdi", "Étourdi" }, { "assomm", "Assommé" }, { "stun", "Étourdi" },   -- « tourdi » : lower() ne change pas le É
+    { "effraie", "Apeuré" }, { "fuir", "Apeuré" }, { "fear", "Apeuré" },
+    { "immobilis", "Immobilisé" }, { "enracin", "Immobilisé" }, { "root", "Immobilisé" },
+    { "silence", "Silence" }, { "désorient", "Désorienté" }, { "incapacit", "Neutralisé" },
+    { "repentir", "Neutralisé" }, { "ralenti", "Ralenti" }, { "slow", "Ralenti" },
+    { "interromp", "Interrompu" }, { "interrupt", "Interrompu" },
+}
+local ccCache = {}
+local function CCKind(spellID)
+    local c = ccCache[spellID]
+    if c ~= nil then return c or nil end
+    ccCache[spellID] = false
+    if not (C_Spell and C_Spell.GetSpellDescription) then return end
+    local ok, d = pcall(C_Spell.GetSpellDescription, spellID)
+    if not ok or not plain(d) or type(d) ~= "string" then return end
+    d = d:lower()
+    for _, w in ipairs(CC_WORDS) do
+        if d:find(w[1], 1, true) then ccCache[spellID] = w[2]; return w[2] end
+    end
+end
+
 -- diagnostic : /nzr diag combat (écrit dans le chat ce que le jeu envoie)
 local function Dbg(...) if NZR.sctDebug then NZR:Print("|cffaaaaaa[diag]|r " .. table.concat({ ... }, " ")) end end
 local function Show(v) if v == nil then return "rien" end if not plain(v) then return "SECRET" end return tostring(v) end
@@ -421,6 +444,13 @@ function M:Init()
                 lastCast.t, lastCast.icon, lastCast.shown = GetTime(), tex, nil
                 local okN, nm = pcall(C_Spell.GetSpellName, spellID)
                 lastCast.name = okN and plain(nm) and nm or nil
+                -- ton sort contrôle la cible (étourdit, effraie…) : on l'écrit au centre comme les états
+                local kind = DB().sctAuras ~= false and lastCast.name and CCKind(spellID)
+                local okA, att = pcall(UnitCanAttack, "player", "target")
+                if kind and okA and plain(att) and att then
+                    lastCast.shown = true
+                    Spawn("note", kind .. " ! [" .. lastCast.name .. "]", 1, 0.6, 0.2, tex)
+                end
             end
         elseif e == "PLAYER_REGEN_DISABLED" then
             if DB().sctNotice ~= false then Spawn("note", "+Combat", 1, 0.3, 0.3) end
