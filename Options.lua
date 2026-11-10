@@ -210,6 +210,18 @@ local PAGES = {
         { t = "switch", key = "hlMobs", section = "Surbrillance : sur quoi", label = "Monstres", desc = "Les monstres à tuer ou à fouiller pour une quête." },
         { t = "switch", key = "hlCombat", section = "Surbrillance : sur quoi", label = "Rien en combat", desc = "Pas d'effet pendant les combats." },
       } },
+    { id = "edit", name = "Édition", desc = "Placer toute l'interface NZR au même endroit : un clic et tout ce qui se déplace s'affiche en doré (cadres, groupe, meter, barres, bénédictions, flèche, texte de combat). Aussi : /nzr edit.",
+      items = {
+        { t = "button", section = "Placer l'interface", label = "Mode édition", desc = "Affiche tous les blocs NZR à glisser, avec une barre d'outils (grille, positions par défaut, Terminer). Hors combat.",
+          text = function() return NZR.unlocked and "Terminer" or "Mode édition" end,
+          click = function() NZR:SetUnlocked(not NZR.unlocked) end },
+        { t = "button", section = "Placer l'interface", label = "Positions par défaut", desc = "Remet tous les blocs NZR (cadres, groupe, barres, texte de combat…) à leur place d'origine.",
+          text = function() return "Remettre" end,
+          click = function()
+              for key, hd in pairs(NZR.holders) do NZRF_DB.pos[key] = nil; NZR:PlaceHolder(hd) end
+              NZR:Print("positions des blocs remises par défaut.")
+          end },
+      } },
     { id = "paladin", name = "Paladin", desc = "Assistant de bénédictions (comme PallyPower) : répartition entre paladins du groupe et barre pour les lancer. Désactivé de base.",
       items = {
         { t = "switch", section = "Assistant", key = "paladin", label = "Assistant de bénédictions", desc = "Seulement si tu joues un paladin. Les autres paladins avec NZR Forever partagent la même répartition.", r = true },

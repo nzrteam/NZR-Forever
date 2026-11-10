@@ -538,7 +538,7 @@ local function OpenOptions()
     end
 end
 
-FC:SetScript("OnDragStart", function(self) if DB and not DB.locked then self:StartMoving() end end)
+FC:SetScript("OnDragStart", function(self) if DB and (not DB.locked or NZR.editing) then self:StartMoving() end end)
 FC:SetScript("OnDragStop", function(self)
     self:StopMovingOrSizing()
     local p, _, _, x, y = self:GetPoint()
@@ -913,6 +913,7 @@ function MOD:Init()
     NZR.CompassOpen = OpenOptions
     -- cible posée par un autre module (ex. guide de leveling : centre d'une zone)
     NZR.CompassClear = function() FC.manual = nil end
+    NZR.CompassEdit = function(on) FC:EnableMouse(on or not DB.locked); if on then FC:Show() end end
     NZR.CompassPointTo = function(map, x, y, name, desc)
         SetManual(map, x, y, name, desc)
         FC:Show()

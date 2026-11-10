@@ -49,8 +49,15 @@ local AREAS = {
 local lastSpawn = { out = 0, inc = 0, note = 0 }
 local stagger = { out = 0, inc = 0, note = 0 }
 
+local anchors = {}
 local function Spawn(area, value, r, g, b, icon, crit)
     local a = AREAS[area]
+    -- point de départ = bloc placé en mode édition (sinon la place par défaut)
+    local hd = anchors[area]
+    if hd and hd:GetCenter() then
+        local hx, hy = hd:GetCenter(); local cx, cy = UIParent:GetCenter()
+        a.x, a.y = hx - cx - (area == "note" and 0 or 0), hy - cy
+    end
     local f = Get()
     local scale = DB().sctSize or 1
     local size = math.floor(((area == "note") and 26 or (crit and 30 or 22)) * scale + 0.5)
@@ -212,6 +219,9 @@ function M:Init()
         return
     end
     if DB().sctHideBlizz ~= false then HideBlizzard(true) end
+    anchors.out = NZR:Holder("sctOut", "Texte : tes coups", 150, 34, { "CENTER", "CENTER", 140, 90 })
+    anchors.inc = NZR:Holder("sctIn", "Texte : reçu", 150, 34, { "CENTER", "CENTER", -110, 60 })
+    anchors.note = NZR:Holder("sctNote", "Texte : combat", 150, 34, { "CENTER", "CENTER", 0, 230 })
 
     local ev = CreateFrame("Frame")
     ev:RegisterEvent("UNIT_COMBAT")

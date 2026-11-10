@@ -570,6 +570,11 @@ local function CreateWindow()
     close:SetPoint("TOPRIGHT", 2, 1)
     close:SetScript("OnClick", function() win:Hide() end)
     tinsert(UISpecialFrames, "NZRF_Guide")
+    -- accès direct aux réglages NZR Forever
+    local opt = CreateFrame("Button", nil, root, "UIPanelButtonTemplate")
+    opt:SetSize(150, 20); opt:SetPoint("TOPRIGHT", -30, -28)
+    opt:SetText("Réglages NZR Forever")
+    opt:SetScript("OnClick", function() NZR:ToggleOptions(true) end)
 
     -- deux onglets : Talents / Leveling
     win.pages, win.pageTabs = {}, {}
@@ -879,11 +884,15 @@ local function CreateButton()
         local a, _, r, x, y = s:GetPoint()
         DB().guideBtnPos = { a, r, x, y }
     end)
-    btn:SetScript("OnClick", function() NZR.GuideToggle() end)
+    btn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    btn:SetScript("OnClick", function(_, b)
+        if b == "RightButton" then NZR:ToggleOptions(true) else NZR.GuideToggle() end
+    end)
     btn:SetScript("OnEnter", function(s)
         GameTooltip:SetOwner(s, "ANCHOR_LEFT")
         GameTooltip:AddLine("Guide de progression")
-        GameTooltip:AddLine("Talents à suivre et zones de leveling selon ton niveau. Glisser : déplacer.", 1, 1, 1, true)
+        GameTooltip:AddLine("Clic : talents à suivre et zones de leveling selon ton niveau.", 1, 1, 1, true)
+        GameTooltip:AddLine("Clic droit : réglages NZR Forever. Glisser : déplacer.", 0.8, 0.8, 0.8, true)
         GameTooltip:Show()
     end)
     btn:SetScript("OnLeave", function() GameTooltip:Hide() end)

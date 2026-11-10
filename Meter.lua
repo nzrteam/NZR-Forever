@@ -967,7 +967,7 @@ local function ApplySettings(resize)
     win.foot:SetShown(DB().meterFooter)
     win.bodyCollapsed = nil
     NZR.MeterAnchorBody()
-    win.grip:SetShown(not DB().meterLock)
+    win.grip:SetShown(not DB().meterLock or NZR.editing)
     if win.lock then win.lock.Refresh() end
     for _, r in ipairs(tabRows) do r.layoutKey = nil end
     LayoutHeader()
@@ -1329,7 +1329,7 @@ local function CreateWindow()
     head:SetBackdropBorderColor(0, 0, 0, 0)
     head:EnableMouse(true)
     head:RegisterForDrag("LeftButton")
-    head:SetScript("OnDragStart", function() if not DB().meterLock then win:StartMoving() end end)
+    head:SetScript("OnDragStart", function() if not DB().meterLock or NZR.editing then win:StartMoving() end end)
     head:SetScript("OnDragStop", function() win:StopMovingOrSizing(); SavePos() end)
     head:SetScript("OnMouseUp", function(_, btn)
         if btn == "RightButton" and NZR.ToggleOptions then NZR:ToggleOptions(true, "meter") end
@@ -1474,7 +1474,7 @@ local function CreateWindow()
     gt:SetAllPoints()
     gt:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
     gt:SetVertexColor(MA[1], MA[2], MA[3], 0.6)
-    grip:SetScript("OnMouseDown", function() if not DB().meterLock then win:StartSizing("BOTTOMRIGHT") end end)
+    grip:SetScript("OnMouseDown", function() if not DB().meterLock or NZR.editing then win:StartSizing("BOTTOMRIGHT") end end)
     grip:SetScript("OnMouseUp", function() win:StopMovingOrSizing(); SavePos(); Render() end)
     win.grip = grip
     win:SetScript("OnSizeChanged", function() Render() end)

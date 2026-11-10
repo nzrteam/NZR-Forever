@@ -480,7 +480,7 @@ local function CreateBar()
     if p then bar:SetPoint(p[1], UIParent, p[2], p[3], p[4]) else bar:SetPoint("LEFT", UIParent, "LEFT", 30, 120) end
     bar:SetScale(DB().blessScale or 1)
     bar:SetScript("OnDragStart", function(s)
-        if DB().blessLock or InCombatLockdown() then return end
+        if (DB().blessLock and not NZR.editing) or InCombatLockdown() then return end
         s:StartMoving()
     end)
     bar:SetScript("OnDragStop", function(s)

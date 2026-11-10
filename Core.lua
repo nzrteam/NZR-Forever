@@ -465,10 +465,10 @@ function NZR:Holder(key, label, w, h, default)
 end
 
 function NZR:ShowHolder(hd, show)
-    local a = self.C.accent
     if show then
-        hd:SetBackdropColor(a[1], a[2], a[3], 0.25)
-        hd:SetBackdropBorderColor(a[1], a[2], a[3], 1)
+        -- bloc doré, comme le jeu (mode édition)
+        hd:SetBackdropColor(1, 0.82, 0, 0.18)
+        hd:SetBackdropBorderColor(1, 0.82, 0, 1)
         hd.label:Show()
         hd:EnableMouse(true)
     else
@@ -479,15 +479,76 @@ function NZR:ShowHolder(hd, show)
     end
 end
 
+---------------------------------------------------------------------------
+-- Mode édition NZR : tout ce qui se déplace s'affiche d'un coup, avec une barre
+-- d'outils (grille, positions par défaut, terminer). /nzr edit, ou l'onglet Édition.
+---------------------------------------------------------------------------
+local editBar, editGrid
+
+local function BuildGrid()
+    editGrid = CreateFrame("Frame", nil, UIParent)
+    editGrid:SetAllPoints(); editGrid:SetFrameStrata("BACKGROUND"); editGrid:Hide()
+    local step = 40
+    local w, h = UIParent:GetWidth(), UIParent:GetHeight()
+    local function line(vertical, off, center)
+        local t = editGrid:CreateTexture(nil, "OVERLAY")
+        if center then t:SetColorTexture(1, 0.82, 0, 0.45) else t:SetColorTexture(1, 1, 1, 0.08) end
+        if vertical then
+            t:SetWidth(center and 2 or 1); t:SetPoint("TOP", editGrid, "TOP", off, 0); t:SetPoint("BOTTOM", editGrid, "BOTTOM", off, 0)
+        else
+            t:SetHeight(center and 2 or 1); t:SetPoint("LEFT", editGrid, "LEFT", 0, off); t:SetPoint("RIGHT", editGrid, "RIGHT", 0, off)
+        end
+    end
+    for x = 0, w / 2, step do line(true, x, x == 0); if x > 0 then line(true, -x) end end
+    for y = 0, h / 2, step do line(false, y, y == 0); if y > 0 then line(false, -y) end end
+end
+
+local function BuildBar()
+    editBar = CreateFrame("Frame", "NZRF_EditBar", UIParent)
+    editBar:SetSize(470, 86)
+    editBar:SetPoint("TOP", 0, -60)
+    editBar:SetFrameStrata("FULLSCREEN_DIALOG")
+    editBar:SetMovable(true); editBar:EnableMouse(true); editBar:RegisterForDrag("LeftButton")
+    editBar:SetScript("OnDragStart", editBar.StartMoving)
+    editBar:SetScript("OnDragStop", editBar.StopMovingOrSizing)
+    local over = NZR:WowFrame(editBar, "Mode édition NZR", 0.97)
+    local t = over:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    t:SetPoint("TOP", 0, -28); t:SetWidth(440)
+    t:SetText("Glisse les blocs dorés (cadres, groupe, meter, barres, flèche, texte de combat…).")
+    local function btn(label, x, w, fn)
+        local b = CreateFrame("Button", nil, over, "UIPanelButtonTemplate")
+        b:SetSize(w, 22); b:SetPoint("BOTTOMLEFT", x, 10); b:SetText(label)
+        b:SetScript("OnClick", fn)
+        return b
+    end
+    editBar.grid = btn("Grille", 14, 110, function()
+        if not editGrid then BuildGrid() end
+        editGrid:SetShown(not editGrid:IsShown())
+    end)
+    btn("Positions par défaut", 130, 170, function()
+        for key, hd in pairs(NZR.holders) do NZRF_DB.pos[key] = nil; NZR:PlaceHolder(hd) end
+        NZR:Print("positions des blocs remises par défaut.")
+    end)
+    btn("Terminer", 346, 110, function() NZR:SetUnlocked(false) end)
+end
+
+NZR.editHooks = NZR.editHooks or {}
+
 function NZR:SetUnlocked(on)
     if InCombatLockdown() then
         self:Print("impossible en combat.")
         return
     end
+    self.editing = on and true or nil
     for _, hd in pairs(self.holders) do hd.nzrOpen = on; self:ShowHolder(hd, on) end
     self.unlocked = on
-    self:Print(on and "cadres déverrouillés : glisse les blocs, puis |cffffffff/nzr lock|r."
-                  or "cadres verrouillés.")
+    for _, fn in ipairs(self.editHooks) do pcall(fn, on) end
+    if NZR.CompassEdit then pcall(NZR.CompassEdit, on) end
+    if on and not editBar then BuildBar() end
+    if editBar then editBar:SetShown(on and true or false) end
+    if editGrid and not on then editGrid:Hide() end
+    self:Print(on and "mode édition : glisse les blocs dorés, puis « Terminer »."
+                  or "mode édition terminé, positions enregistrées.")
 end
 
 ---------------------------------------------------------------------------
@@ -731,6 +792,8 @@ SlashCmdList.NZRF = function(msg)
         if NZR.ResetMeterData then NZR.ResetMeterData() end
     elseif cmd == "plaque" or cmd == "plate" then
         if NZR.InspectPlateText then NZR.InspectPlateText() else NZR:Print("active d'abord « Personnaliser ces barres » (Cadres), puis recharge.") end
+    elseif cmd == "edit" or cmd == "edition" or cmd == "move" then
+        NZR:SetUnlocked(not NZR.unlocked)
     elseif cmd == "guide" or cmd == "build" then
         if NZR.GuideToggle then NZR.GuideToggle() else NZR:Print("guide désactivé : /nzr > Pratique > Guide de progression.") end
     elseif cmd == "bene" or cmd == "benedictions" or cmd == "pally" then
