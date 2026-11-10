@@ -133,6 +133,7 @@ local function UnitIsQuest(unit)
     return false
 end
 local questGUID = {}
+local firstPos = {}    -- [guid] = ta position au premier coup échangé (≈ là où il attendait)
 
 -- suivi ? renvoie aussi si c'est un monstre « courant » (plusieurs du même nom autour)
 local function IsWatched(unit, npc, guid)
@@ -449,11 +450,17 @@ local function BuildWindow()
     Anchor()
     local over = NZR:WowFrame(win, "Respawn", DB().meterAlpha or 0.95, 0.7)
     local add = CreateFrame("Button", nil, over)
+    -- petit carré doré « + » : suivre le monstre ciblé
     add:SetSize(15, 15)
-    add:SetPoint("TOPLEFT", 5, -1)
-    add:SetNormalTexture("Interface\\Buttons\\UI-PlusButton-Up")
-    add:SetPushedTexture("Interface\\Buttons\\UI-PlusButton-Down")
-    add:SetHighlightTexture("Interface\\Buttons\\UI-PlusButton-Hilight", "ADD")
+    add:SetPoint("TOPLEFT", 6, -2)
+    local edge = add:CreateTexture(nil, "BACKGROUND")
+    edge:SetAllPoints(); edge:SetColorTexture(0.78, 0.6, 0.2, 1)
+    local inner = add:CreateTexture(nil, "BORDER")
+    inner:SetPoint("TOPLEFT", 1, -1); inner:SetPoint("BOTTOMRIGHT", -1, 1); inner:SetColorTexture(0.08, 0.06, 0.03, 1)
+    local plus = add:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    plus:SetPoint("CENTER", 0, 1); plus:SetText("+")
+    local hl = add:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetPoint("TOPLEFT", 1, -1); hl:SetPoint("BOTTOMRIGHT", -1, 1); hl:SetColorTexture(1, 0.82, 0, 0.25)
     add:SetScript("OnClick", AddTarget)
     add:SetScript("OnEnter", function(s)
         GameTooltip:SetOwner(s, "ANCHOR_LEFT")
@@ -745,7 +752,10 @@ local function SeenDead(unit)
     local watched, common = IsWatched(unit, npc, guid)
     questGUID[guid] = nil
     if not watched or data.active[guid] then return end
-    local map, x, y = PlayerSpot()
+    local map, x, y
+    local fp = firstPos[guid]
+    if fp then map, x, y = fp[1], fp[2], fp[3] else map, x, y = PlayerSpot() end
+    firstPos[guid] = nil
     local before = {}
     for g in pairs(npcGuids[npc] or {}) do if g ~= guid then before[g] = true end end
     local nm = SafeName(unit)
@@ -769,13 +779,21 @@ local function SeenDead(unit)
     Wake()
 end
 
+-- premier coup entre toi et ce monstre : on note où tu es
+local function FirstHit(unit)
+    local npc, guid = UnitNPC(unit)
+    if not npc or firstPos[guid] or Bool(UnitIsDead, unit) then return end
+    local map, x, y = PlayerSpot()
+    if map then firstPos[guid] = { map, x, y } end
+end
+
 local function Check(unit)
     if Bool(UnitIsDead, unit) then SeenDead(unit) else SeenAlive(unit) end
 end
 
 local function Cleanup()
     local t = GetTime()
-    for g, v in pairs(aliveGUID) do if t - v > 900 then aliveGUID[g] = nil; questGUID[g] = nil end end
+    for g, v in pairs(aliveGUID) do if t - v > 900 then aliveGUID[g] = nil; questGUID[g] = nil; firstPos[g] = nil end end
     for npc, set in pairs(npcGuids) do
         for g, v in pairs(set) do if t - v > 900 then set[g] = nil end end
         if not next(set) then npcGuids[npc] = nil end
@@ -855,13 +873,16 @@ function M:Init()
 
     local ev = CreateFrame("Frame")
     ev:RegisterEvent("UNIT_HEALTH")
+    ev:RegisterEvent("UNIT_COMBAT")
     ev:RegisterEvent("NAME_PLATE_UNIT_ADDED")
     ev:RegisterEvent("NAME_PLATE_UNIT_REMOVED")
     ev:RegisterEvent("PLAYER_TARGET_CHANGED")
     ev:RegisterEvent("UPDATE_MOUSEOVER_UNIT")
     ev:RegisterEvent("PLAYER_ENTERING_WORLD")
     ev:SetScript("OnEvent", function(_, e, unit)
-        if e == "UNIT_HEALTH" then
+        if e == "UNIT_COMBAT" then
+            if unit == "target" or (unit and unit:sub(1, 9) == "nameplate") then pcall(FirstHit, unit) end
+        elseif e == "UNIT_HEALTH" then
             if unit == "target" or (unit and unit:sub(1, 9) == "nameplate") then
                 if Bool(UnitIsDead, unit) then pcall(SeenDead, unit) end
             end
