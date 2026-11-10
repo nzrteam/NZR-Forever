@@ -178,6 +178,34 @@ local function HitIcon(school)
     return SCHOOL_ICON[sc] or SCHOOL_ICON[2]
 end
 
+-- en groupe : quelqu'un d'autre (ou son familier) est-il en combat sur ta cible ?
+-- si personne, les coups qu'elle prend sont les tiens (ou ceux de ton familier)
+local othersT, othersV = 0, false
+local OthersCheck
+local function OthersOnTarget()
+    local ok, r = pcall(OthersCheck)
+    if not ok then return true end
+    return r
+end
+OthersCheck = function()
+    local now = GetTime()
+    if now - othersT < 0.4 then return othersV end
+    othersT, othersV = now, false
+    local raid = IsInRaid()
+    local n = raid and GetNumGroupMembers() or GetNumSubgroupMembers()
+    for i = 1, n do
+        for _, u in ipairs(raid and { "raid" .. i, "raidpet" .. i } or { "party" .. i, "partypet" .. i }) do
+            if UnitExists(u) and not UnitIsUnit(u, "player") then
+                local okT, same = pcall(UnitIsUnit, u .. "target", "target")
+                local okC, fight = pcall(UnitAffectingCombat, u)
+                if okT and okC and plain(same) and plain(fight) and same and fight then othersV = true; return true end
+                if not (okT and plain(same)) then othersV = true; return true end   -- inconnu : prudence
+            end
+        end
+    end
+    return false
+end
+
 local function OnUnitCombat(unit, action, flag, amount, school)
     if not plain(action) then return end
     local crit = plain(flag) and (flag == "CRITICAL" or flag == "CRUSHING")
@@ -196,7 +224,7 @@ local function OnUnitCombat(unit, action, flag, amount, school)
     end
     -- tes coups sur ta cible (en groupe, le jeu ne dit pas qui frappe : réglage « dégâts des autres »)
     if DB().sctOut == false then return end
-    if not IsInGroup() or DB().sctOthers then
+    if not IsInGroup() or DB().sctOthers or not OthersOnTarget() then
         if action == "WOUND" then
             lastHit.t = GetTime()
             local icon = HitIcon(school)

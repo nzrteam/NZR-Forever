@@ -187,7 +187,7 @@ local PAGES = {
         { t = "switch", key = "sctErrors", section = "Texte de combat", label = "Messages rouges du jeu", desc = "« Le sort n'est pas encore utilisable. » et les autres messages en haut prennent la même police.", r = true },
         { t = "switch", key = "sctHideXP", section = "Texte de combat", label = "Cacher le « PX » violet du jeu", desc = "Le jeu n'a pas d'option pour ça : NZR agrandit son texte flottant au point qu'il ne s'affiche plus. Remis comme avant si tu décoches ou coupes NZR.", r = true },
         { t = "switch", key = "sctAuras", section = "Texte de combat", label = "Buffs et procs gagnés", desc = "« [Maîtrise du blocage] » en jaune quand un proc ou un buff court arrive, en rouge pour un debuff sur toi." },
-        { t = "switch", key = "sctOthers", section = "Texte de combat", label = "En groupe : tous les coups sur ma cible", desc = "Le jeu ne dit pas qui frappe : en groupe, seuls tes coups seuls sont sûrs. Coche pour tout voir quand même." },
+        { t = "switch", key = "sctOthers", section = "Texte de combat", label = "En groupe : tous les coups sur ma cible", desc = "Le jeu ne dit pas qui frappe. En groupe, tes coups s'affichent tant que personne d'autre ne tape ta cible ; coche pour tout voir même quand un ami tape le même monstre." },
         { t = "switch", key = "sctHideBlizz", section = "Texte de combat", label = "Cacher les chiffres du jeu", desc = "Évite les doublons. Tes réglages du jeu reviennent quand tu coupes, à la déconnexion, ou si tu retires NZR.", r = true },
         { t = "cycle", key = "sctFont", section = "Texte de combat", label = "Police", desc = "Police des chiffres.",
           choices = function() return NZR.FONTS end, preview = function(k) return NZR.FontPath(k) end },
