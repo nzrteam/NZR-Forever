@@ -20,5 +20,6 @@ Frames.lua
 Group.lua
 GuideData.lua
 Guide.lua
+Scroll.lua
 Plates.lua
 Options.lua
