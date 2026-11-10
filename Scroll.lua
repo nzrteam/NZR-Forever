@@ -415,6 +415,10 @@ function M:Init()
     pcall(ev.RegisterUnitEvent, ev, "UNIT_SPELLCAST_SUCCEEDED", "player")
     ev:SetScript("OnEvent", function(_, e, unit, a, b, c, d)
         if e == "UNIT_COMBAT" then
+            if unit == "target" and NZR.sctDebug then
+                Dbg("coup cible : action=" .. Show(a), "montant=" .. Show(c), "école=" .. Show(d),
+                    "groupe=" .. tostring(IsInGroup()), "dégâts des autres=" .. tostring(DB().sctOthers and true or false))
+            end
             if unit == "player" then pcall(OnUnitCombat, "player", a, b, c, d)
             elseif unit == "target" then pcall(OnUnitCombat, "target", a, b, c, d) end
         elseif e == "UNIT_POWER_UPDATE" then
