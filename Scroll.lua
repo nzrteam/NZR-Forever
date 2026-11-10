@@ -398,8 +398,11 @@ function M:Init()
                 end
             end
         elseif e == "UNIT_SPELLCAST_SUCCEEDED" then
-            local spellID = c
-            local tex = spellID and C_Spell and C_Spell.GetSpellTexture and C_Spell.GetSpellTexture(spellID)
+            -- arguments de l'évènement : unité, n° du lancer, n° du sort
+            local spellID = plain(b) and b or nil
+            local okT, tex = false, nil
+            if spellID and C_Spell and C_Spell.GetSpellTexture then okT, tex = pcall(C_Spell.GetSpellTexture, spellID) end
+            if not okT or not plain(tex) then tex = nil end
             if tex then
                 lastCast.t, lastCast.icon, lastCast.shown = GetTime(), tex, nil
                 local okN, nm = pcall(C_Spell.GetSpellName, spellID)
