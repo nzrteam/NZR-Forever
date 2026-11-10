@@ -500,8 +500,14 @@ local function BuildWindow()
     local close = CreateFrame("Button", nil, over, "UIPanelCloseButton")
     close:SetSize(18, 18)
     close:SetPoint("TOPRIGHT", 0, 0)
-    close:SetScript("OnClick", function() userHidden = true; win:Hide() end)
+    close:SetScript("OnClick", function()
+        userHidden = true; win:Hide()
+        NZR:Print("fenêtre Respawn cachée : elle revient au prochain monstre suivi, ou avec /nzr respawn voir.")
+    end)
     win.more = over:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    win.empty = over:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    win.empty:SetPoint("TOPLEFT", PAD, -30)
+    win.empty:SetText("Aucun chrono en cours")
     win.hint = over:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     win.hint:SetPoint("BOTTOM", 0, 12)
     win.hint:SetText("Clic : flèche  ·  Clic droit : retirer")
@@ -664,7 +670,8 @@ Refresh = function()
     -- fenêtre
     local editing = NZR.editing
     for _, tex in pairs(portraits) do tex:Hide() end
-    local want = #list > 0 and not userHidden and not editing
+    -- toujours affichée quand l'option est active (même vide), sauf si tu l'as fermée
+    local want = not userHidden and not editing
     if want then
         local shown = math.min(#list, MAX_ROWS)
         for i = 1, shown do
@@ -686,6 +693,13 @@ Refresh = function()
         end
         for i = shown + 1, #rows do rows[i]:Hide() end
         local extra = #list - shown
+        if #list == 0 then
+            win.empty:Show()
+            win.hint:SetText("Tue un monstre, ou cible-le et clique sur +")
+        else
+            win.empty:Hide()
+            win.hint:SetText("Clic : flèche  ·  Clic droit : retirer")
+        end
         if extra > 0 then
             win.more:SetText(("+ %d autre%s"):format(extra, extra > 1 and "s" or ""))
             win.more:SetPoint("TOPLEFT", win, "TOPLEFT", PAD, -29 - shown * ROW_H)
@@ -696,7 +710,7 @@ Refresh = function()
         local sc = DB().respawnScale or 1
         if win:GetScale() ~= sc then win:SetScale(sc); win.Anchor() end
         -- hauteur minimale : en dessous, le cadre doré du jeu ne dessine plus son bas
-        local h = 40 + shown * ROW_H + (extra > 0 and 14 or 0)
+        local h = 40 + math.max(shown, 1) * ROW_H + (extra > 0 and 14 or 0)
         win.hint:SetShown(h + 14 <= 104)
         win:SetHeight(math.max(104, h))
         win:Show()
@@ -947,5 +961,6 @@ function M:Init()
         WorldMapFrame:HookScript("OnShow", function() if next(data.active) then Wake() end end)
     end
     table.insert(NZR.editHooks, function(on) if not on and win then pcall(win.Anchor) end; pcall(Refresh) end)
+    C_Timer.After(1, function() pcall(Refresh) end)
     if next(data.active) then Wake() end
 end
