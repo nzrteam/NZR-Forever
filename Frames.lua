@@ -385,8 +385,8 @@ local function UpdateInfo(f)
     -- nom complet (avec le titre, comme le jeu) ou juste le prénom ; toujours doré comme l'UI de WoW
     local name = UnitName(u)
     if DB().ufName == "full" and UnitIsPlayer(u) then
-        local ok, full = pcall(UnitPVPName, u)
-        if ok and full and plain(full) and full ~= "" then name = full end
+        local full = NZR.FullName and NZR.FullName(u)
+        if full then name = full end
     elseif plain(name) then
         name = name:match("^(%S+)") or name
     end

@@ -278,20 +278,7 @@ local function UpdateName(b)
     local u = b.unit
     if not u or not UnitExists(u) then return end
     -- nom complet (prénom + nom, comme au-dessus des têtes) ou prénom seul
-    local n
-    if DB().grpName ~= "first" and UnitPVPName then
-        local ok, v = pcall(UnitPVPName, u)
-        if ok and v and plain(v) and v ~= "" then n = v end
-    end
-    n = n or UnitName(u) or ""
-    -- loin de toi, le jeu ne donne parfois que le prénom : on garde le nom complet déjà vu
-    if plain(n) and n ~= "" then
-        local key = (UnitName(u)) or n
-        if plain(key) then
-            fullNames[key] = (fullNames[key] and #fullNames[key] > #n) and fullNames[key] or n
-            n = fullNames[key]
-        end
-    end
+    local n = NZR.FullName and NZR.FullName(u) or UnitName(u) or ""
     if plain(n) and DB().grpName == "first" then n = n:match("^(%S+)") or n end
     NZR.SafeText(b.name, n)
     if DB().grpNameColor == "class" then

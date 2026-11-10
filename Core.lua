@@ -812,3 +812,25 @@ function NZR.ApplyShadow(fs, on)
     if on then fs:SetShadowColor(0, 0, 0, 1); fs:SetShadowOffset(1, -1)
     else fs:SetShadowOffset(0, 0) end
 end
+
+-- Nom complet (prénom + nom de WoW Forever). Pour les autres joueurs, le jeu ne le donne
+-- souvent que dans l'infobulle : on le lit là, et on le garde en mémoire (même loin de toi).
+local fullNameCache = {}
+function NZR.FullName(unit)
+    local okN, first = pcall(UnitName, unit)
+    if not okN or not NZR.plain(first) or first == "" then return nil end
+    local best = first
+    local function take(v)
+        if NZR.plain(v) and type(v) == "string" and #v > #best and v:sub(1, #first) == first then best = v end
+    end
+    local okP, pvp = pcall(UnitPVPName, unit); if okP then take(pvp) end
+    if C_TooltipInfo and C_TooltipInfo.GetUnit then
+        local okT, data = pcall(C_TooltipInfo.GetUnit, unit)
+        local line = okT and data and data.lines and data.lines[1]
+        if line then take(line.leftText) end
+    end
+    local key = first
+    if fullNameCache[key] and #fullNameCache[key] > #best then best = fullNameCache[key] end
+    fullNameCache[key] = best
+    return best
+end
