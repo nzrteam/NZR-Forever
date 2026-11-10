@@ -42,6 +42,47 @@ local function SetupTooltip()
     if _G.EditModeManagerFrame then
         _G.EditModeManagerFrame:HookScript("OnHide", function() C_Timer.After(0.3, Place) end)
     end
+    -- Certains boutons (sorts au centre, menu des sceaux, buffs, barres)
+    -- accrochent l'infobulle à eux-mêmes au lieu de la place par défaut : on la
+    -- remet à ta place, juste après « SetOwner » (avant que le jeu la remplisse).
+    if not NZR.db.tooltipCursor then
+        local PAT = { "ActionButton", "MultiBar", "MainActionBar", "MainMenuBar", "StanceButton", "PetActionButton",
+                      "CooldownViewer", "SpellFlyout", "BuffFrame", "DebuffFrame", "ExtraActionButton", "ZoneAbility", "NZRF" }
+        local cache = setmetatable({}, { __mode = "k" })
+        local function Ours(owner)
+            local v = cache[owner]
+            if v ~= nil then return v end
+            v = false
+            if type(owner) == "table" and owner.GetName then
+                if owner.action or owner.cooldownID or owner.spellID or owner.flyoutID then v = true end
+                local f, depth = owner, 0
+                while not v and f and depth < 5 do
+                    local ok, n = pcall(f.GetName, f)
+                    if ok and type(n) == "string" then
+                        for _, p in ipairs(PAT) do if n:find(p, 1, true) then v = true; break end end
+                    end
+                    local okP, par = pcall(f.GetParent, f)
+                    f = okP and par or nil
+                    depth = depth + 1
+                end
+            end
+            cache[owner] = v
+            return v
+        end
+        local busy
+        hooksecurefunc(GameTooltip, "SetOwner", function(tt, owner, anchor)
+            if busy or Editing() or anchor == "ANCHOR_NONE" or anchor == "ANCHOR_CURSOR"
+               or anchor == "ANCHOR_CURSOR_RIGHT" or anchor == "ANCHOR_CURSOR_LEFT" then return end
+            if not owner or not Ours(owner) then return end
+            busy = true
+            pcall(function()
+                tt:SetOwner(owner, "ANCHOR_NONE")
+                tt:ClearAllPoints()
+                tt:SetPoint("BOTTOMRIGHT", cont, "BOTTOMRIGHT", 0, 0)
+            end)
+            busy = nil
+        end)
+    end
     -- à la souris : l'emplacement suit le curseur (l'infobulle reste celle du jeu)
     if NZR.db.tooltipCursor then
         local follow = CreateFrame("Frame")
