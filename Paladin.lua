@@ -549,6 +549,30 @@ local function AutoAssign()
     end
 end
 
+-- une nouvelle classe arrive dans le groupe : si aucun paladin ne la couvre, je prends
+-- la meilleure bénédiction encore libre pour elle (sans toucher aux choix déjà faits)
+local function FillMissing()
+    local me = MyName()
+    if not paladins[me] then return end
+    for _, cls in ipairs(GroupClasses()) do
+        local covered, used = false, {}
+        for n in pairs(paladins) do
+            local k = Assign(n, cls)
+            if k then used[k] = true; if n == me then covered = true end end
+        end
+        local anyone = next(used) ~= nil
+        if not covered and not anyone then
+            local known = paladins[me].known or {}
+            for _, key in ipairs(PRIO[cls] or PRIO_DEFAULT) do
+                if (next(known) == nil or known[key]) and not used[key] then
+                    SetAssign(me, cls, key); SendAssign(me, cls, key)
+                    break
+                end
+            end
+        end
+    end
+end
+
 local function BuildGrid()
     if not win then return end
     for _, w in ipairs(win.cells or {}) do w:Hide() end
@@ -773,6 +797,7 @@ function M:Init()
         end
         if e == "SPELLS_CHANGED" then LoadNames() end
         ScanRoster()
+        if e == "GROUP_ROSTER_UPDATE" or e == "PLAYER_ENTERING_WORLD" then pcall(FillMissing) end
         refreshAll()
         if GetTime() - helloAt > 3 then
             helloAt = GetTime()
