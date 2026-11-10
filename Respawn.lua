@@ -442,6 +442,58 @@ local function AddTarget()
     end
 end
 
+-- petit carré « + » à part (comme l'icône du DPS) : suivre ta cible, afficher la fenêtre
+local function BuildButton()
+    local b = CreateFrame("Button", "NZRF_RespawnButton", UIParent)
+    b:SetSize(22, 22)
+    b:SetFrameStrata("MEDIUM")
+    b:SetMovable(true); b:SetClampedToScreen(true)
+    if b.SetDontSavePosition then b:SetDontSavePosition(true) end
+    b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    b:RegisterForDrag("LeftButton")
+    local edge = b:CreateTexture(nil, "BACKGROUND")
+    edge:SetAllPoints(); edge:SetColorTexture(0.78, 0.6, 0.2, 1)
+    local inner = b:CreateTexture(nil, "BORDER")
+    inner:SetPoint("TOPLEFT", 1, -1); inner:SetPoint("BOTTOMRIGHT", -1, 1); inner:SetColorTexture(0.08, 0.06, 0.03, 0.95)
+    local plus = b:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    plus:SetPoint("CENTER", 0, 1); plus:SetText("+")
+    local hl = b:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetPoint("TOPLEFT", 1, -1); hl:SetPoint("BOTTOMRIGHT", -1, 1); hl:SetColorTexture(1, 0.82, 0, 0.25)
+    local p = NZRF_DB.pos.respawnBtn
+    if p then b:SetPoint(p[1], UIParent, p[2], p[3], p[4]) else b:SetPoint("TOPRIGHT", win, "TOPLEFT", -4, 0) end
+    b:SetScript("OnDragStart", function(self) self:StartMoving() end)
+    b:SetScript("OnDragStop", function(self)
+        self:StopMovingOrSizing()
+        local l, t = self:GetLeft(), self:GetTop()
+        if l and t then
+            self:ClearAllPoints()
+            self:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", l, t)
+            NZRF_DB.pos.respawnBtn = { "TOPLEFT", "BOTTOMLEFT", l, t }
+        end
+    end)
+    b:SetScript("OnClick", function(_, btn)
+        if btn == "RightButton" then
+            userHidden = win:IsShown() and true or nil
+            if userHidden then win:Hide() end
+            pcall(Refresh)
+        else
+            AddTarget()
+            userHidden = nil
+            pcall(Refresh)
+        end
+    end)
+    b:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Respawn", 1, 0.82, 0)
+        GameTooltip:AddLine("Clic : suivre (ou ne plus suivre) ta cible", 1, 1, 1)
+        GameTooltip:AddLine("Clic droit : afficher / cacher la fenêtre", 1, 1, 1)
+        GameTooltip:AddLine("Glisser : déplacer", 0.7, 0.7, 0.7)
+        GameTooltip:Show()
+    end)
+    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    return b
+end
+
 local function BuildWindow()
     holder = NZR:Holder("respawn", "Respawn", WIN_W, 70, { "TOPRIGHT", "TOPRIGHT", -230, -260 })
     win = CreateFrame("Frame", "NZRF_Respawn", UIParent)
@@ -477,26 +529,6 @@ local function BuildWindow()
     end)
     Anchor()
     local over = NZR:WowFrame(win, "Respawn", DB().meterAlpha or 0.95, 0.7)
-    local add = CreateFrame("Button", nil, over)
-    -- petit carré doré « + » : suivre le monstre ciblé
-    add:SetSize(15, 15)
-    add:SetPoint("TOPLEFT", 6, -2)
-    local edge = add:CreateTexture(nil, "BACKGROUND")
-    edge:SetAllPoints(); edge:SetColorTexture(0.78, 0.6, 0.2, 1)
-    local inner = add:CreateTexture(nil, "BORDER")
-    inner:SetPoint("TOPLEFT", 1, -1); inner:SetPoint("BOTTOMRIGHT", -1, 1); inner:SetColorTexture(0.08, 0.06, 0.03, 1)
-    local plus = add:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    plus:SetPoint("CENTER", 0, 1); plus:SetText("+")
-    local hl = add:CreateTexture(nil, "HIGHLIGHT")
-    hl:SetPoint("TOPLEFT", 1, -1); hl:SetPoint("BOTTOMRIGHT", -1, 1); hl:SetColorTexture(1, 0.82, 0, 0.25)
-    add:SetScript("OnClick", AddTarget)
-    add:SetScript("OnEnter", function(s)
-        GameTooltip:SetOwner(s, "ANCHOR_LEFT")
-        GameTooltip:AddLine("Suivre ma cible", 1, 0.82, 0)
-        GameTooltip:AddLine("Ajoute (ou retire) le monstre ciblé. Aussi : /nzr respawn", 1, 1, 1, true)
-        GameTooltip:Show()
-    end)
-    add:SetScript("OnLeave", function() GameTooltip:Hide() end)
     local close = CreateFrame("Button", nil, over, "UIPanelCloseButton")
     close:SetSize(18, 18)
     close:SetPoint("TOPRIGHT", 0, 0)
@@ -695,7 +727,7 @@ Refresh = function()
         local extra = #list - shown
         if #list == 0 then
             win.empty:Show()
-            win.hint:SetText("Tue un monstre, ou cible-le et clique sur +")
+            win.hint:SetText("Tue un monstre, ou cible-le et clique sur le carré +")
         else
             win.empty:Hide()
             win.hint:SetText("Clic : flèche  ·  Clic droit : retirer")
@@ -925,6 +957,7 @@ function M:Init()
         if type(k) == "number" then data.active[k] = nil; if e.guid then e.npc = k; data.active[e.guid] = e end end
     end
     BuildWindow()
+    BuildButton()
     BuildLabel()
 
     local ev = CreateFrame("Frame")
