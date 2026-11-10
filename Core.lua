@@ -496,9 +496,18 @@ function NZR:Holder(key, label, w, h, default)
     hd:RegisterForDrag("LeftButton")
     hd.key, hd.default = key, default
     self:FlatBackdrop(hd, true, 1, 5)
-    hd.label = self:Text(hd, 11, nil, "CENTER")
-    hd.label:SetPoint("CENTER")
+    -- étiquette du bloc : petit onglet au-dessus (ne recouvre pas le contenu)
+    local tab = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
+    tab:SetFrameStrata("DIALOG"); tab:SetFrameLevel(hd:GetFrameLevel() + 5)
+    self:FlatBackdrop(tab, true, 1, 3)
+    tab:SetBackdropColor(0.08, 0.06, 0.03, 0.92); tab:SetBackdropBorderColor(1, 0.82, 0, 1)
+    hd.label = self:Text(tab, 10, nil, "CENTER")
+    hd.label:SetPoint("CENTER", 0, 0)
     hd.label:SetText(label)
+    hd.label:SetTextColor(1, 0.82, 0)
+    tab:SetSize(math.max(40, hd.label:GetStringWidth() + 14), 16)
+    tab:Hide()
+    hd.tab = tab
     hd:SetScript("OnDragStart", hd.StartMoving)
     hd:SetScript("OnDragStop", function(s) s:StopMovingOrSizing(); SaveHolder(s); NZR.editMoved = true end)
     self:PlaceHolder(hd)
@@ -507,18 +516,68 @@ function NZR:Holder(key, label, w, h, default)
     return hd
 end
 
+-- Aperçu du mode édition : si la vraie fenêtre est visible (hd.preview), le cadre doré
+-- l'entoure exactement et on la glisse directement ; sinon on montre le bloc lui-même.
+local function StyleBox(f, hot)
+    f:SetBackdropColor(1, 0.82, 0, hot and 0.16 or 0.06)
+    f:SetBackdropBorderColor(1, 0.82, 0, hot and 1 or 0.85)
+end
+local function Overlay(hd)
+    if hd.ov then return hd.ov end
+    local ov = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
+    ov:SetFrameStrata("DIALOG")
+    NZR:FlatBackdrop(ov, true, 1, 4)
+    ov:EnableMouse(true); ov:RegisterForDrag("LeftButton")
+    ov:SetScript("OnDragStart", function() hd:StartMoving() end)
+    ov:SetScript("OnDragStop", function()
+        hd:StopMovingOrSizing(); SaveHolder(hd); NZR.editMoved = true
+    end)
+    ov:SetScript("OnEnter", function(s) StyleBox(s, true) end)
+    ov:SetScript("OnLeave", function(s) StyleBox(s, false) end)
+    ov:Hide()
+    hd.ov = ov
+    return ov
+end
 function NZR:ShowHolder(hd, show)
-    if show then
-        -- bloc doré, comme le jeu (mode édition)
-        hd:SetBackdropColor(1, 0.82, 0, 0.18)
-        hd:SetBackdropBorderColor(1, 0.82, 0, 1)
-        hd.label:Show()
-        hd:EnableMouse(true)
-    else
-        hd:SetBackdropColor(0, 0, 0, 0)
-        hd:SetBackdropBorderColor(0, 0, 0, 0)
-        hd.label:Hide()
+    local fr
+    if show and hd.preview then
+        local ok, f = pcall(hd.preview)
+        if ok and f and f.IsVisible and f:IsVisible() and f:GetWidth() > 4 then fr = f end
+    end
+    local box = hd
+    if show and fr then
+        local ov = Overlay(hd)
+        ov:ClearAllPoints(); ov:SetAllPoints(fr); ov:Show()
+        hd:SetBackdropColor(0, 0, 0, 0); hd:SetBackdropBorderColor(0, 0, 0, 0)
         hd:EnableMouse(false)
+        box = ov
+        StyleBox(ov, false)
+    else
+        if hd.ov then hd.ov:Hide() end
+        if show then
+            StyleBox(hd, false)
+            hd:EnableMouse(true)
+            if not hd.hoverHooked then
+                hd.hoverHooked = true
+                hd:HookScript("OnEnter", function(s) if s.nzrOpen then StyleBox(s, true) end end)
+                hd:HookScript("OnLeave", function(s) if s.nzrOpen then StyleBox(s, false) end end)
+            end
+        else
+            hd:SetBackdropColor(0, 0, 0, 0); hd:SetBackdropBorderColor(0, 0, 0, 0)
+            hd:EnableMouse(false)
+        end
+    end
+    if hd.tab then
+        if show then
+            hd.tab:ClearAllPoints()
+            -- au-dessus du cadre ; s'il est collé en haut de l'écran, juste dedans
+            local top = box:GetTop()
+            if top and top > UIParent:GetTop() - 20 then hd.tab:SetPoint("TOPLEFT", box, "TOPLEFT", 3, -3)
+            else hd.tab:SetPoint("BOTTOMLEFT", box, "TOPLEFT", 0, 2) end
+            hd.tab:Show()
+        else
+            hd.tab:Hide()
+        end
     end
 end
 
@@ -573,7 +632,20 @@ local function BuildBar()
         NZR.editMoved = true
         NZR:Print("positions des blocs remises par défaut.")
     end)
-    btn("Terminer", 346, 110, function() NZR:FinishEdit() end)
+    -- « Terminer » : bouton protégé. Le jeu interdit aux addons de recharger l'interface
+    -- eux-mêmes ; un bouton protégé peut, lui, lancer « /reload » comme une macro.
+    local done = CreateFrame("Button", "NZRF_EditDone", over, "SecureActionButtonTemplate, UIPanelButtonTemplate")
+    done:SetSize(110, 22); done:SetPoint("BOTTOMLEFT", 346, 10); done:SetText("Terminer")
+    done:RegisterForClicks("AnyUp", "AnyDown")
+    done:SetScript("PreClick", function(self)
+        if InCombatLockdown() then return end
+        if NZR.EditWillReload() then
+            self:SetAttribute("type", "macro"); self:SetAttribute("macrotext", "/reload")
+        else
+            self:SetAttribute("type", nil); self:SetAttribute("macrotext", nil)
+        end
+    end)
+    done:SetScript("PostClick", function() NZR:FinishEdit(true) end)
 end
 
 NZR.editHooks = NZR.editHooks or {}
@@ -609,12 +681,19 @@ local function PosSig()
 end
 NZR.EditPosSig = PosSig
 
-function NZR:FinishEdit()
+-- quelque chose a bougé pendant l'édition ? (il faudra recharger l'interface)
+function NZR.EditWillReload()
+    return NZR.editMoved or (NZR.editSig and NZR.editSig ~= PosSig()) and true or false
+end
+-- viaButton : appelé par le bouton « Terminer », qui lance lui-même /reload
+function NZR:FinishEdit(viaButton)
     if InCombatLockdown() then self:Print("impossible en combat.") return end
+    local moved = NZR.EditWillReload()
     self:SetUnlocked(false)
-    local moved = self.editMoved or (self.editSig and self.editSig ~= PosSig())
     self.editMoved, self.editSig = nil, nil
-    if moved then ReloadUI() end
+    if moved and not viaButton then
+        self:Print("positions enregistrées. Tape |cffffffff/reload|r (ou clique sur « Terminer » la prochaine fois) pour tout remettre en place.")
+    end
 end
 function NZR:ToggleEdit()
     if self.unlocked then self:FinishEdit() else self:SetUnlocked(true) end
@@ -874,19 +953,11 @@ function NZR:BuildMainIcon()
     if b.SetDontSavePosition then b:SetDontSavePosition(true) end
     b:RegisterForDrag("LeftButton")
     b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-    -- fond sombre + « NZR » doré façon titre WoW, dans l'anneau doré
-    local bg = b:CreateTexture(nil, "BACKGROUND")
-    bg:SetPoint("TOPLEFT", 4, -4); bg:SetPoint("BOTTOMRIGHT", -4, 4)
-    bg:SetTexture("Interface\\Icons\\INV_Misc_Gem_Variety_02")
-    bg:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-    bg:SetVertexColor(0.35, 0.22, 0.6)
-    local shade = b:CreateTexture(nil, "BORDER")
-    shade:SetPoint("TOPLEFT", 4, -4); shade:SetPoint("BOTTOMRIGHT", -4, 4); shade:SetColorTexture(0.05, 0.03, 0.08, 0.55)
-    local t = b:CreateFontString(nil, "OVERLAY")
-    if not pcall(t.SetFont, t, "Fonts\\FRIZQT__.TTF", 8, "OUTLINE") then t:SetFontObject("GameFontNormalSmall") end
-    t:SetWordWrap(false)
-    t:SetPoint("CENTER", b, "CENTER", 0, 0)        -- centré, sans largeur imposée (sinon le jeu écrit « … »)
-    t:SetText("NZR"); t:SetTextColor(1, 0.82, 0)
+    -- même construction que le livre du guide et la montre du respawn : vraie icône + anneau doré
+    local ic = b:CreateTexture(nil, "ARTWORK")
+    ic:SetPoint("TOPLEFT", 4, -4); ic:SetPoint("BOTTOMRIGHT", -4, 4)
+    ic:SetTexture("Interface\\Icons\\Trade_Engineering")
+    ic:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     local ring = b:CreateTexture(nil, "OVERLAY")
     ring:SetAllPoints(); ring:SetTexture("Interface\\AddOns\\NZRForever\\Media\\uf\\ring_square")
     local hl = b:CreateTexture(nil, "HIGHLIGHT")

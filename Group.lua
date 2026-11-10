@@ -532,6 +532,9 @@ function M:Init()
     UF = NZR.UF
     if not UF then return end
     local holder = NZR:Holder("group", "Groupe et raid", 200, 220, { "TOPLEFT", "TOPLEFT", 24, -170 })
+    holder.preview = function()                     -- mode édition : le cadre doré entoure le vrai groupe
+        for _, b in pairs(boxes) do if b:IsShown() then return b end end
+    end
     local party = MakeHeader("party", "NZRF_PartyHeader", holder)
     local raid = MakeHeader("raid", "NZRF_RaidHeader", holder)
     -- toutes les cases créées tout de suite (hors combat), pour pouvoir les habiller

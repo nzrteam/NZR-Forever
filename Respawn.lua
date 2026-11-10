@@ -596,6 +596,7 @@ end
 
 local function BuildWindow()
     holder = NZR:Holder("respawn", "Respawn (Alpha)", WIN_W, MIN_H, { "TOPRIGHT", "TOPRIGHT", -230, -260 })
+    holder.preview = function() if win and win:IsShown() then return win end end
     win = CreateFrame("Frame", "NZRF_Respawn", UIParent)
     win:SetSize(WIN_W, MIN_H)
     win:SetFrameStrata("MEDIUM")
@@ -902,7 +903,7 @@ Refresh = function()
     local editing = NZR.editing
     for _, tex in pairs(portraits) do tex:Hide() end
     -- fenêtre : quand un monstre est suivi (ou rouverte à la main) ; sinon l'icône
-    local want = not userHidden and not editing and (#list > 0 or forceOpen)
+    local want = not userHidden and (#list > 0 or forceOpen)
     if want then
         local shown = math.min(#list, MAX_ROWS)
         for i = 1, shown do
@@ -951,7 +952,7 @@ Refresh = function()
     end
     if win.add then pcall(win.add.Sync, win.add) end
     if launcher then
-        launcher:SetShown(not want and not editing and DB().respawnIcon ~= false)
+        launcher:SetShown(not want and DB().respawnIcon ~= false)
         local n = 0
         for _, it in ipairs(list) do if not it.e.alive then n = n + 1 end end
         launcher.count:SetText(n > 0 and n or "")
@@ -1243,7 +1244,14 @@ function M:Init()
     if WorldMapFrame then
         WorldMapFrame:HookScript("OnShow", function() if next(data.active) then Wake() end end)
     end
-    table.insert(NZR.editHooks, function(on) if not on and win then pcall(win.Anchor) end; pcall(Refresh) end)
+    -- mode édition : la fenêtre suit son bloc en direct ; ensuite elle se réaccroche à l'écran
+    table.insert(NZR.editHooks, function(on)
+        if win then
+            if on then win:ClearAllPoints(); win:SetPoint("TOPLEFT", holder, "TOPLEFT", 0, 0)
+            else pcall(win.Anchor) end
+        end
+        pcall(Refresh)
+    end)
     C_Timer.After(1, function() pcall(Refresh) end)
     if next(data.active) then Wake() end
 end

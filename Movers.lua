@@ -147,6 +147,10 @@ local BAG_DEFAULT = { "BOTTOMRIGHT", "BOTTOMRIGHT", -60, 110 }
 
 local function SetupBags()
     local hd = NZR:Holder("bags", "Sacs", 340, 360, BAG_DEFAULT)
+    hd.preview = function()                         -- mode édition : entoure les sacs s'ils sont ouverts
+        local cb = ContainerFrameCombinedBags
+        if cb and cb:IsShown() then return cb end
+    end
     hd.scaled = false
 
     local function Offset()

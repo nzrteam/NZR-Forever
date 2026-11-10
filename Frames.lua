@@ -153,6 +153,7 @@ local function Create(unit, holderKey, default, mirror)
     f.unit, f.mirror = unit, mirror
     f:SetSize(PANEL_W + PORT - 12, PORT + 6)
     f:SetPoint("CENTER", hd, "CENTER")
+    hd.preview = function() return f end          -- mode édition : le cadre doré entoure le vrai cadre
     f:SetAttribute("unit", unit)
     f:SetAttribute("*type1", "target")
     f:SetAttribute("*type2", "togglemenu")
