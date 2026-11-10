@@ -153,13 +153,40 @@ local function IsWatched(unit, npc, guid)
 end
 
 -- temps connus : rapide, moyen, lent, nombre
+-- point d'apparition : case d'environ 10 m sur la carte ; on regarde aussi les cases voisines
+local CELL = 0.005
+local function SpotSamples(npc, e)
+    if not (e and e.map and e.x and data.spots) then return end
+    local gx, gy = math.floor(e.x / CELL + 0.5), math.floor(e.y / CELL + 0.5)
+    local out
+    for dx = -1, 1 do for dy = -1, 1 do
+        local list = data.spots[("%d:%d:%d:%d"):format(npc, e.map, gx + dx, gy + dy)]
+        if list then out = out or {}; for _, v in ipairs(list) do out[#out + 1] = v end end
+    end end
+    return out
+end
+local function AddSpotSample(npc, e, el)
+    if not (e.map and e.x) then return end
+    data.spots = data.spots or {}
+    local key = ("%d:%d:%d:%d"):format(npc, e.map, math.floor(e.x / CELL + 0.5), math.floor(e.y / CELL + 0.5))
+    local list = data.spots[key] or {}
+    data.spots[key] = list
+    table.insert(list, el)
+    while #list > MAX_SAMPLES do table.remove(list, 1) end
+end
+
 local function Stats(npc, e)
     if e and e.npc then npc = e.npc end
-    local s = (e and e.test) or (data.npcs[npc] and data.npcs[npc].s)
+    -- le temps de CE point d'apparition s'il est connu, sinon celui du monstre en général
+    local s = (e and e.test) or SpotSamples(npc, e) or (data.npcs[npc] and data.npcs[npc].s)
     if not s or #s == 0 then return end
-    local lo, hi, sum = math.huge, 0, 0
-    for _, v in ipairs(s) do lo = math.min(lo, v); hi = math.max(hi, v); sum = sum + v end
-    return lo, sum / #s, hi, #s
+    -- médiane plutôt que moyenne : un relevé faux ne fait pas sauter les chronos
+    local t = {}
+    for i, v in ipairs(s) do t[i] = v end
+    table.sort(t)
+    local n = #t
+    local mid = (n % 2 == 1) and t[(n + 1) / 2] or (t[n / 2] + t[n / 2 + 1]) / 2
+    return t[1], mid, t[n], n
 end
 
 ---------------------------------------------------------------------------
@@ -386,6 +413,7 @@ local function MakeRow(i)
             for k, x in pairs(data.active) do if (x.npc or k) == id then data.active[k] = nil end end
             data.npcs[id] = nil
             data.watch[id] = nil
+            if data.spots then for k in pairs(data.spots) do if k:match("^(%-?%d+):") == tostring(id) then data.spots[k] = nil end end end
             if ourWP and not data.active[ourWP.npc] then ClearWaypoint() end
             NZR:Print((self.nm or "monstre") .. " oublié.")
         else
@@ -474,6 +502,9 @@ local function BuildWindow()
     close:SetPoint("TOPRIGHT", 0, 0)
     close:SetScript("OnClick", function() userHidden = true; win:Hide() end)
     win.more = over:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    win.hint = over:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    win.hint:SetPoint("BOTTOM", 0, 12)
+    win.hint:SetText("Clic : flèche  ·  Clic droit : retirer")
     win:Hide()
 end
 
@@ -664,7 +695,10 @@ Refresh = function()
         end
         local sc = DB().respawnScale or 1
         if win:GetScale() ~= sc then win:SetScale(sc); win.Anchor() end
-        win:SetHeight(math.max(70, 40 + shown * ROW_H + (extra > 0 and 14 or 0)))
+        -- hauteur minimale : en dessous, le cadre doré du jeu ne dessine plus son bas
+        local h = 40 + shown * ROW_H + (extra > 0 and 14 or 0)
+        win.hint:SetShown(h + 14 <= 104)
+        win:SetHeight(math.max(104, h))
         win:Show()
     else
         win:Hide()
@@ -719,14 +753,18 @@ local function SeenAlive(unit)
     npcGuids[npc][guid] = t
     if DB().respawnQuest ~= false and questGUID[guid] == nil then questGUID[guid] = UnitIsQuest(unit) end
     -- réapparition d'un monstre qu'on attendait ? (le plus proche de ceux de ce type)
+    -- un monstre qui vient de réapparaître : pleine vie et pas en combat
+    local okH, hp = pcall(UnitHealth, unit); local okM, mx = pcall(UnitHealthMax, unit)
+    local full = okH and okM and plain(hp) and plain(mx) and mx > 0 and hp >= mx
+    if not full or Bool(UnitAffectingCombat, unit) then return end
     local best, bestK, bestD
     local now = Now()
     for k, e in pairs(data.active) do
         if e.npc == npc and not e.alive and not e.test and guid ~= e.guid and not (e.before and e.before[guid])
-           and now - e.t >= (e.common and 25 or 10) then
+           and now - e.t >= (e.common and 30 or 10) then
             local de, ds = Offset(e)
             local d = de and math.sqrt(de * de + ds * ds) or 0
-            if d <= (e.common and 40 or 90) and (not bestD or d < bestD) then best, bestK, bestD = e, k, d end
+            if d <= (e.common and 25 or 90) and (not bestD or d < bestD) then best, bestK, bestD = e, k, d end
         end
     end
     if best then
@@ -734,7 +772,11 @@ local function SeenAlive(unit)
         local rec = data.npcs[npc] or { s = {} }
         data.npcs[npc] = rec
         rec.n = rec.n or best.n
-        if el <= 3600 then
+        -- relevé trop différent de ce qu'on sait déjà (moins de la moitié) : sans doute un autre
+        local _, med, _, n = Stats(npc)
+        local plausible = not (med and n and n >= 2 and el < med * 0.5)
+        if el <= 3600 and plausible then
+            AddSpotSample(npc, best, el)
             table.insert(rec.s, el)
             while #rec.s > MAX_SAMPLES do table.remove(rec.s, 1) end
         end
@@ -844,7 +886,7 @@ function NZR.RespawnCmd(arg)
     if arg == "test" or arg == "essai" then NZR.RespawnTest()
     elseif arg == "oublie" or arg == "reset" then
         ClearWaypoint()
-        wipe(data.active); wipe(data.npcs); wipe(data.watch)
+        wipe(data.active); wipe(data.npcs); wipe(data.watch); data.spots = {}
         NZR:Print("temps de respawn oubliés.")
         Refresh()
     elseif arg == "voir" or arg == "show" then
