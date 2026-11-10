@@ -334,8 +334,10 @@ local function Target(map, px, py)
     end
     if DB.useMapPin and C_Map.HasUserWaypoint and C_Map.HasUserWaypoint() then
         local wp = C_Map.GetUserWaypoint()
-        if wp and wp.position then
-            local x, y = wp.position:GetXY()
+        if wp and type(wp.position) == "table" then
+            local pos = wp.position
+            local x, y
+            if pos.GetXY then x, y = pos:GetXY() else x, y = pos.x, pos.y end
             return wp.uiMapID, x, y, "Point sur la carte", ""
         end
     end

@@ -9,7 +9,8 @@ local M = NZR:Module("Respawn")
 local plain = NZR.plain
 
 local function DB() return NZR.db end
-local MAX_SAMPLES, MAX_ROWS, KEEP_ALIVE = 8, 6, 60
+local MAX_SAMPLES, MAX_ROWS, KEEP_ALIVE = 8, 8, 60
+local WIN_W, ROW_H = 200, 19
 
 local data                  -- NZRF_DB.respawnData = { npcs, active, watch }
 local aliveGUID, npcGuids = {}, {}
@@ -190,9 +191,9 @@ local function BuildLabel()
     label = CreateFrame("Frame", nil, UIParent)
     label:SetSize(1, 1)
     label:SetFrameStrata("HIGH")
-    label.name = label:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    label.name = label:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     label.name:SetPoint("BOTTOM", label, "CENTER", 0, 2)
-    label.time = label:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
+    label.time = label:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     label.time:SetPoint("TOP", label, "CENTER", 0, 0)
     for _, fs in ipairs({ label.name, label.time }) do fs:SetShadowColor(0, 0, 0, 1); fs:SetShadowOffset(1, -1) end
     label:Hide()
@@ -208,15 +209,20 @@ local function State(npc, e, now)
     if e.alive then
         st.text, st.r, st.g, st.b, st.pct = "vivant", 0.5, 0.86, 0.42, 1
     elseif not avg then
-        st.text, st.r, st.g, st.b, st.pct = "temps inconnu", 0.79, 0.73, 0.54, 0
+        st.text, st.r, st.g, st.b, st.pct = "?", 0.79, 0.73, 0.54, 0
+        st.long = "temps inconnu : appris à son retour"
     elseif el < avg then
         st.left = avg - el
-        st.text, st.r, st.g, st.b, st.pct = "revient dans " .. Clock(st.left), 1, 1, 1, el / avg
+        st.text, st.r, st.g, st.b, st.pct = Clock(st.left), 1, 1, 1, el / avg
+        st.long = "revient dans " .. Clock(st.left)
     elseif el < hi then
-        st.text, st.r, st.g, st.b, st.pct = "bientôt (≤ " .. Clock(hi - el) .. ")", 1, 0.82, 0, 1
+        st.text, st.r, st.g, st.b, st.pct = "bientôt", 1, 0.82, 0, 1
+        st.long = "bientôt (au plus tard " .. Clock(hi - el) .. ")"
     else
-        st.text, st.r, st.g, st.b, st.pct = "devrait être là", 1, 0.82, 0, 1
+        st.text, st.r, st.g, st.b, st.pct = "attendu", 1, 0.82, 0, 1
+        st.long = "devrait déjà être là"
     end
+    st.long = st.long or st.text
     return st
 end
 
@@ -248,6 +254,11 @@ end
 local function RowTooltip(row)
     GameTooltip:SetOwner(row, "ANCHOR_LEFT")
     GameTooltip:AddLine(row.nm or "Respawn", 1, 0.82, 0)
+    if row.e then
+        local st = State(row.npc, row.e, Now())
+        GameTooltip:AddLine(st.long, st.r, st.g, st.b)
+        GameTooltip:AddLine(Sub(row.npc, row.e, st), 0.7, 0.7, 0.7)
+    end
     local lo, avg, hi, n = Stats(row.npc, row.e)
     if n then GameTooltip:AddLine(("Rapide %s · moyen %s · lent %s"):format(Clock(lo), Clock(avg), Clock(hi)), 1, 1, 1) end
     GameTooltip:AddLine("Clic gauche : repère et flèche vers l'endroit", 0.8, 0.8, 0.8)
@@ -258,28 +269,24 @@ end
 
 local function MakeRow(i)
     local r = CreateFrame("Button", nil, win)
-    r:SetSize(232, 38)
-    r:SetPoint("TOPLEFT", win, "TOPLEFT", 9, -28 - (i - 1) * 40)
+    r:SetSize(WIN_W - 16, ROW_H - 1)
+    r:SetPoint("TOPLEFT", win, "TOPLEFT", 8, -25 - (i - 1) * ROW_H)
     r:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-    r.name = r:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    r.name:SetPoint("TOPLEFT", 0, -1)
-    r.name:SetJustifyH("LEFT")
     r.state = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     r.state:SetPoint("TOPRIGHT", 0, -2)
     r.state:SetJustifyH("RIGHT")
+    r.name = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    r.name:SetPoint("TOPLEFT", 0, -2)
     r.name:SetPoint("RIGHT", r.state, "LEFT", -6, 0)
+    r.name:SetJustifyH("LEFT")
     r.name:SetWordWrap(false)
     r.bg = r:CreateTexture(nil, "ARTWORK")
-    r.bg:SetPoint("TOPLEFT", 0, -16); r.bg:SetPoint("TOPRIGHT", 0, -16); r.bg:SetHeight(6)
+    r.bg:SetPoint("BOTTOMLEFT", 0, 1); r.bg:SetPoint("BOTTOMRIGHT", 0, 1); r.bg:SetHeight(3)
     r.bg:SetColorTexture(0.23, 0.19, 0.12, 0.9)
     r.bar = CreateFrame("StatusBar", nil, r)
     r.bar:SetPoint("TOPLEFT", r.bg); r.bar:SetPoint("BOTTOMRIGHT", r.bg)
     r.bar:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
     r.bar:SetMinMaxValues(0, 1)
-    r.sub = r:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    r.sub:SetPoint("TOPLEFT", 0, -25); r.sub:SetPoint("TOPRIGHT", 0, -25)
-    r.sub:SetJustifyH("LEFT")
-    r.sub:SetWordWrap(false)
     r.hl = r:CreateTexture(nil, "HIGHLIGHT")
     r.hl:SetAllPoints(); r.hl:SetColorTexture(1, 0.82, 0, 0.07)
     r:SetScript("OnEnter", RowTooltip)
@@ -327,9 +334,9 @@ local function AddTarget()
 end
 
 local function BuildWindow()
-    holder = NZR:Holder("respawn", "Respawn", 250, 110, { "TOPRIGHT", "TOPRIGHT", -230, -260 })
+    holder = NZR:Holder("respawn", "Respawn", WIN_W, 70, { "TOPRIGHT", "TOPRIGHT", -230, -260 })
     win = CreateFrame("Frame", "NZRF_Respawn", UIParent)
-    win:SetSize(250, 60)
+    win:SetSize(WIN_W, 50)
     win:SetPoint("TOPLEFT", holder, "TOPLEFT", 0, 0)
     win:SetFrameStrata("MEDIUM")
     local over = NZR:WowFrame(win, "Respawn", DB().meterAlpha or 0.95)
@@ -351,6 +358,7 @@ local function BuildWindow()
     close:SetSize(22, 22)
     close:SetPoint("TOPRIGHT", 1, 0)
     close:SetScript("OnClick", function() userHidden = true; win:Hide() end)
+    win.more = over:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     win:Hide()
 end
 
@@ -367,7 +375,7 @@ local function PinTooltip(p)
     local st = State(p.npc, e, Now())
     GameTooltip:SetOwner(p, "ANCHOR_RIGHT")
     GameTooltip:AddLine(p.nm or "Respawn", 1, 0.82, 0)
-    GameTooltip:AddLine(st.text, st.r, st.g, st.b)
+    GameTooltip:AddLine(st.long, st.r, st.g, st.b)
     GameTooltip:AddLine(Sub(p.npc, e, st), 0.7, 0.7, 0.7)
     GameTooltip:Show()
 end
@@ -518,11 +526,19 @@ Refresh = function()
             r.state:SetTextColor(it.st.r, it.st.g, it.st.b)
             r.bar:SetValue(it.st.pct or 0)
             if it.e.alive then r.bar:SetStatusBarColor(0.3, 0.6, 0.23) else r.bar:SetStatusBarColor(0.78, 0.63, 0.25) end
-            r.sub:SetText(Sub(it.npc, it.e, it.st))
             r:Show()
         end
         for i = shown + 1, #rows do rows[i]:Hide() end
-        win:SetHeight(32 + shown * 40)
+        local extra = #list - shown
+        if extra > 0 then
+            win.more:SetText(("+ %d autre%s"):format(extra, extra > 1 and "s" or ""))
+            win.more:SetPoint("TOPLEFT", win, "TOPLEFT", 8, -27 - shown * ROW_H)
+            win.more:Show()
+        else
+            win.more:Hide()
+        end
+        win:SetScale(DB().respawnScale or 1)
+        win:SetHeight(30 + shown * ROW_H + (extra > 0 and 14 or 0))
         win:Show()
     else
         win:Hide()
@@ -645,7 +661,7 @@ local function OnTooltip(tt, d)
     local e = data.active[npc]
     if e and not e.alive then
         local st = State(npc, e, Now())
-        tt:AddLine("|TInterface\\TargetingFrame\\UI-TargetingFrame-Skull:12|t Respawn : " .. st.text, 0.78, 0.63, 0.25)
+        tt:AddLine("|TInterface\\TargetingFrame\\UI-TargetingFrame-Skull:12|t Respawn : " .. st.long, 0.78, 0.63, 0.25)
         return
     end
     local _, avg, _, n = Stats(npc)
