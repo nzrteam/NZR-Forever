@@ -19,8 +19,8 @@ local lastCast = { t = 0 }
 ---------------------------------------------------------------------------
 local function Font(fs, size)
     local path = NZR.FontPath(DB().sctFont or "game", STANDARD_TEXT_FONT)
-    if not pcall(fs.SetFont, fs, path, size, "OUTLINE") then pcall(fs.SetFont, fs, STANDARD_TEXT_FONT, size, "OUTLINE") end
-    fs:SetShadowColor(0, 0, 0, 0.8); fs:SetShadowOffset(1, -1)
+    if not pcall(fs.SetFont, fs, path, size, "THICKOUTLINE") then pcall(fs.SetFont, fs, STANDARD_TEXT_FONT, size, "THICKOUTLINE") end
+    fs:SetShadowColor(0, 0, 0, 1); fs:SetShadowOffset(2, -2)
 end
 
 local function Get()
@@ -31,6 +31,9 @@ local function Get()
         f:SetSize(1, 1)
         f.icon = f:CreateTexture(nil, "OVERLAY")
         f.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        f.edge = f:CreateTexture(nil, "ARTWORK")
+        f.edge:SetPoint("TOPLEFT", f.icon, -1, 1); f.edge:SetPoint("BOTTOMRIGHT", f.icon, 1, -1)
+        f.edge:SetColorTexture(0, 0, 0, 0.9)
         f.text = f:CreateFontString(nil, "OVERLAY")
         f.text:SetPoint("LEFT", f.icon, "RIGHT", 4, 0)
     end
@@ -39,9 +42,9 @@ end
 
 -- zones : x, y de départ (par rapport au centre de l'écran), sens et longueur du trajet
 local AREAS = {
-    out = { x = 120, y = 30, dy = 150, dur = 1.6 },
-    inc = { x = -200, y = 20, dy = -150, dur = 1.6 },
-    note = { x = 0, y = 200, dy = 40, dur = 1.6 },
+    out = { x = 70, y = 70, dy = 130, dx = 40, dur = 1.5 },     -- au-dessus à droite du perso, monte en s'écartant
+    inc = { x = -150, y = 40, dy = -110, dx = -20, dur = 1.5 },  -- à gauche, descend
+    note = { x = -60, y = 220, dy = 30, dx = 0, dur = 1.8 },     -- au centre, en haut
 }
 local lastSpawn = { out = 0, inc = 0, note = 0 }
 local stagger = { out = 0, inc = 0, note = 0 }
@@ -50,14 +53,14 @@ local function Spawn(area, value, r, g, b, icon, crit)
     local a = AREAS[area]
     local f = Get()
     local scale = DB().sctSize or 1
-    local size = math.floor((crit and 26 or 18) * scale + 0.5)
+    local size = math.floor(((area == "note") and 26 or (crit and 30 or 22)) * scale + 0.5)
     Font(f.text, size)
     if not pcall(f.text.SetText, f.text, value) then f.text:SetText("") end
     f.text:SetTextColor(r, g, b)
     if icon then
-        f.icon:SetTexture(icon); f.icon:SetSize(size, size); f.icon:Show()
+        f.icon:SetTexture(icon); f.icon:SetSize(size, size); f.icon:Show(); f.edge:Show()
     else
-        f.icon:SetSize(1, size); f.icon:Hide()
+        f.icon:SetSize(1, size); f.icon:Hide(); f.edge:Hide()
     end
     f.icon:ClearAllPoints(); f.icon:SetPoint("LEFT", f, "LEFT", 0, 0)
     -- plusieurs coups d'affilée : on décale un peu pour ne pas les empiler
@@ -65,10 +68,10 @@ local function Spawn(area, value, r, g, b, icon, crit)
     if now - lastSpawn[area] < 0.25 then stagger[area] = (stagger[area] + 1) % 4 else stagger[area] = 0 end
     lastSpawn[area] = now
     f.area, f.t, f.crit = a, 0, crit
-    f.x0 = a.x + (area == "note" and 0 or stagger[area] * (area == "out" and 18 or -18))
-    f.y0 = a.y - stagger[area] * 14 * (a.dy > 0 and 1 or -1)
+    f.x0 = a.x + (area == "note" and 0 or stagger[area] * (area == "out" and 26 or -26))
+    f.y0 = a.y - stagger[area] * 18 * (a.dy > 0 and 1 or -1)
     f:ClearAllPoints(); f:SetPoint("LEFT", UIParent, "CENTER", f.x0, f.y0)
-    f:SetAlpha(1); f:SetScale(crit and 1.5 or 1); f:Show()
+    f:SetAlpha(0); f:SetScale(crit and 1.6 or 1); f:Show()
     table.insert(active, f)
     driver:Show()
 end
@@ -83,10 +86,12 @@ local function Animate(_, e)
             f:Hide(); table.remove(active, i); table.insert(pool, f)
         else
             -- coup critique : petit « pop » qui se résorbe
-            if f.crit then f:SetScale(1 + math.max(0, 0.5 - f.t * 2.5)) end
+            if f.crit then f:SetScale(1 + math.max(0, 0.6 - f.t * 3)) end
+            -- départ rapide puis ralenti (plus agréable à lire)
+            local ease = 1 - (1 - p) * (1 - p)
             f:ClearAllPoints()
-            f:SetPoint("LEFT", UIParent, "CENTER", f.x0, f.y0 + a.dy * p)
-            f:SetAlpha(p < 0.7 and 1 or (1 - (p - 0.7) / 0.3))
+            f:SetPoint("LEFT", UIParent, "CENTER", f.x0 + (a.dx or 0) * ease, f.y0 + a.dy * ease)
+            f:SetAlpha(f.t < 0.08 and f.t / 0.08 or (p < 0.75 and 1 or (1 - (p - 0.75) / 0.25)))
         end
     end
     if #active == 0 then driver:Hide() end
@@ -139,7 +144,7 @@ local function OnUnitCombat(unit, action, flag, amount, school)
         elseif action == "WOUND" then
             if DB().sctIn ~= false then
                 local ok, s = pcall(string.format, "-%s", Amount(amount))
-                Spawn("inc", ok and s or "", 1, 0.25, 0.2, nil, crit)
+                Spawn("inc", ok and s or "", 1, 0.2, 0.2, nil, crit)
             end
         elseif MISS[action] and DB().sctIn ~= false then
             Spawn("inc", MISS[action], 0.6, 0.8, 1)
@@ -154,7 +159,7 @@ local function OnUnitCombat(unit, action, flag, amount, school)
             local icon = (GetTime() - lastCast.t < 0.8 and lastCast.icon) or SWING_ICON
             local txt = Amount(amount)
             if plain(flag) and flag == "GLANCING" then txt = txt .. " (érafle)" end
-            Spawn("out", txt, crit and 1 or 1, crit and 0.82 or 1, crit and 0 or 1, icon, crit)
+            Spawn("out", txt, 1, crit and 0.85 or 1, crit and 0.1 or 1, icon, crit)
         elseif MISS[action] then
             Spawn("out", MISS[action], 0.8, 0.8, 0.8, SWING_ICON)
         end
@@ -164,13 +169,16 @@ end
 ---------------------------------------------------------------------------
 -- Cacher les chiffres du jeu (remis comme avant quand on coupe, et à la déconnexion)
 ---------------------------------------------------------------------------
-local CVARS = { "floatingCombatTextCombatDamage", "enableFloatingCombatText" }
+local CVARS = { "floatingCombatTextCombatDamage", "floatingCombatTextCombatDamage_v2",
+                "floatingCombatTextCombatHealing", "floatingCombatTextCombatHealing_v2", "enableFloatingCombatText" }
 local function HideBlizzard(hide)
     if not (GetCVar and SetCVar) then return end
     DB().sctSaved = DB().sctSaved or {}
     for _, c in ipairs(CVARS) do
         if hide then
-            if DB().sctSaved[c] == nil then DB().sctSaved[c] = GetCVar(c) end
+            local okG, cur = pcall(GetCVar, c)
+            if not okG or cur == nil then cur = false end
+            if cur and DB().sctSaved[c] == nil then DB().sctSaved[c] = cur end
             pcall(SetCVar, c, "0")
         elseif DB().sctSaved[c] ~= nil then
             pcall(SetCVar, c, DB().sctSaved[c]); DB().sctSaved[c] = nil
