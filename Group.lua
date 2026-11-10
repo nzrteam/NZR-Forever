@@ -12,6 +12,8 @@ local UF                                  -- outils partagés (Frames.lua)
 local buttons = {}                        -- tous les boutons créés
 local byUnit = {}                         -- unité -> { boutons }
 local headers = {}
+local fullNames = {}                      -- prénom -> nom complet déjà vu
+local nameTick
 local boxes = {}
 
 ---------------------------------------------------------------------------
@@ -282,6 +284,14 @@ local function UpdateName(b)
         if ok and v and plain(v) and v ~= "" then n = v end
     end
     n = n or UnitName(u) or ""
+    -- loin de toi, le jeu ne donne parfois que le prénom : on garde le nom complet déjà vu
+    if plain(n) and n ~= "" then
+        local key = (UnitName(u)) or n
+        if plain(key) then
+            fullNames[key] = (fullNames[key] and #fullNames[key] > #n) and fullNames[key] or n
+            n = fullNames[key]
+        end
+    end
     if plain(n) and DB().grpName == "first" then n = n:match("^(%S+)") or n end
     NZR.SafeText(b.name, n)
     if DB().grpNameColor == "class" then
@@ -575,6 +585,8 @@ function M:Init()
         end
         if changed then Remap() end
         UpdateRange()
+        nameTick = (nameTick or 0) + 1
+        if nameTick >= 8 then nameTick = 0; for _, b in ipairs(buttons) do if b.unit then pcall(UpdateName, b) end end end
     end)
 
     NZR.GroupRefresh = function()
