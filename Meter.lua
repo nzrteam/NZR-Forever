@@ -1131,7 +1131,9 @@ local function ShowMini(show)
         end)
         ar:SetScript("OnLeave", function() GameTooltip:Hide() end)
         mini.arrow = ar
-        mini:SetScript("OnClick", function()
+        mini:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+        mini:SetScript("OnClick", function(_, btn)
+            if btn == "RightButton" then NZR:OpenOptionsAt("meter") return end
             DB().meterMin = false
             mini:Hide()
             if win then win:Show(); Render() end
@@ -1139,7 +1141,8 @@ local function ShowMini(show)
         mini:SetScript("OnEnter", function(s)
             GameTooltip:SetOwner(s, "ANCHOR_RIGHT")
             GameTooltip:AddLine("DPS meter")
-            GameTooltip:AddLine("Clic : afficher le meter. Glisser : déplacer l'icône.", 1, 1, 1, true)
+            GameTooltip:AddLine("Clic : afficher le meter.", 1, 1, 1, true)
+            GameTooltip:AddLine("Clic droit : réglages du meter. Glisser : déplacer l'icône.", 0.8, 0.8, 0.8, true)
             GameTooltip:Show()
         end)
         mini:SetScript("OnLeave", function() GameTooltip:Hide() end)
