@@ -493,6 +493,7 @@ local function MakeHeader(kind, name, holder)
     box:SetFrameStrata("LOW")
     box:SetPoint("TOPLEFT", hdr, "TOPLEFT", -10, 28)
     box:SetPoint("BOTTOMRIGHT", hdr, "BOTTOMRIGHT", 10, -10)
+    box.nzrNoFont = true
     NZR:WowFrame(box, kind == "party" and "Groupe" or "Raid", DB().grpAlpha or 0.9)
     box:Hide()
     hdr:HookScript("OnShow", function() C_Timer.After(0.1, function() pcall(Remap) end) end)

@@ -145,6 +145,15 @@ local PAGES = {
       } },
     { id = "look", name = "Interface", desc = "L'interface du jeu en mieux : sorts et buffs, infobulles, minicarte, fenêtres, butin. Rien n'est changé tant que tu n'actives pas.",
       items = {
+        { t = "cycle", key = "uiFont", section = "Police", label = "Police des fenêtres NZR", desc = "Meter, guide, bénédictions, respawn, options, mode édition… Du jeu = comme avant.", r = true,
+          choices = function() return NZR.FONTS end, preview = function(k) return NZR.FontPath(k) end },
+        { t = "button", section = "Police", label = "La même partout", desc = "Met cette police aussi sur les cadres joueur, cible et groupe, les barres des monstres et le texte de combat.",
+          text = function() return "Appliquer" end,
+          click = function()
+              local k = NZR.db.uiFont or "game"
+              NZR.db.ufFont, NZR.db.npFont, NZR.db.sctFont = k, k, k
+              NZR:Print("police appliquée partout. Recharge pour tout voir (/reload).")
+          end },
         { t = "switch", section = "Sorts et buffs", key = "theme", label = "Barres d'action (sorts)", desc = "Coins arrondis discrets, bord fin, raccourcis lisibles, survol coloré.", r = true },
         { t = "switch", section = "Sorts et buffs", key = "auras", label = "Buffs et débuffs", desc = "Icônes arrondies, bord fin (rouge pour les débuffs), durée lisible.", r = true },
         { t = "choice", section = "Sorts et buffs", key = "meterTheme", label = "Teinte", r = true, desc = "La même que le meter. Jeu : se fond dans WoW. Noir : sobre. Violet : couleurs NZR.",
@@ -431,6 +440,7 @@ local function Cycle(parent, list, get, set, preview)
     box:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     function f:Refresh()
         local ch = list[index()]
+        t.nzrKeepFont = true
         t:SetFontObject("GameFontHighlight")
         if preview then
             local path = preview(ch[1])
@@ -614,6 +624,7 @@ local function Create()
     win:EnableMouse(true)
     win:SetClampedToScreen(true)
     tinsert(UISpecialFrames, "NZRF_Options")
+    NZR.UIFontRegister(win)
     if ButtonFrameTemplate_HidePortrait then pcall(ButtonFrameTemplate_HidePortrait, win) end
     if ButtonFrameTemplate_HideButtonBar then pcall(ButtonFrameTemplate_HideButtonBar, win) end
     local title = "NZR Forever"

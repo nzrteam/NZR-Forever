@@ -167,6 +167,7 @@ local function Create(unit, holderKey, default, mirror)
 
     -- même cadre que le DPS meter (fenêtre du jeu en réduit) : le nom dans la barre de titre
     local SCALE = 0.58                          -- assez petit pour que les pièces du jeu tiennent sans dépasser
+    p.nzrNoFont = true
     local over = NZR:WowFrame(p, nil, 0.9, SCALE)
     over:SetFrameLevel(p:GetFrameLevel() + 6)
     local barBox = over

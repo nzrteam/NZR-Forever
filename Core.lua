@@ -21,7 +21,7 @@ NZR.C = {
 }
 
 local defaults = {
-    theme = false, auras = false, tooltips = false, tooltipCursor = false, moveTooltip = false, moveBags = false, moveMap = false, moveWindows = true, squareMinimap = false, compass = false, paladin = false, questHL = false, unitFrames = false, plates = false, npText = "both", npColor = "game", ufPortrait = "round", ufText = "both", ufName = "full", ufColor = "green", ufShort = true, ufScale = 1, ufFont = "game", ufFontSize = 1, ufOutline = "shadow", ufHealthShade = 1, ufPowerColor = "game", ufPowerShade = 1, ufAuras = true, groupFrames = false, guide = false, guideAuto = true, sct = false, sctIn = true, sctOut = true, sctHeal = true, sctNotice = true, sctHideBlizz = true, sctSize = 1, sctOthers = false, sctPower = true, sctKill = true, sctXP = true, sctAuras = true, sctErrors = true, sctFont = "luckiest", respawn = false, respawnAuto = true, respawnMine = true, respawnQuest = true, respawnSound = false, respawnTip = true, respawnWaypoint = true, respawnMinimap = true, respawnMap = true, respawnScale = 1, meterShiftBars = false, reopenWindows = false, mmButtonsSave = false, meterShiftBuffs = true, meterShiftCD = true, grpPartyStyle = "big", grpColor = "class", grpNameColor = "default", grpName = "full", grpText = "auto", grpPower = true, grpRole = true, grpDebuffs = true, grpDebuffAll = false, grpBuffs = "mine", grpCellScale = 1, grpScale = 1, grpAlpha = 0.9, npFont = "game", npFontSize = 1, npOutline = "game", hlStyle = "ping", hlColor = "gold", hlSize = 1, hlObjects = true, hlNPCs = true, hlMobs = true, hlCombat = true, hlSound = false, blessGreater = true, blessSolo = true, blessLock = false, blessScale = 1, menuButton = true, tooltipOpaque = true, tooltipAlpha = 1, lootAll = true, lootAutoClose = true, lootKey = "E",
+    theme = false, auras = false, tooltips = false, tooltipCursor = false, moveTooltip = false, moveBags = false, moveMap = false, moveWindows = true, squareMinimap = false, compass = false, paladin = false, questHL = false, unitFrames = false, plates = false, npText = "both", npColor = "game", ufPortrait = "round", ufText = "both", ufName = "full", ufColor = "green", ufShort = true, ufScale = 1, ufFont = "game", ufFontSize = 1, ufOutline = "shadow", ufHealthShade = 1, ufPowerColor = "game", ufPowerShade = 1, ufAuras = true, groupFrames = false, guide = false, guideAuto = true, sct = false, sctIn = true, sctOut = true, sctHeal = true, sctNotice = true, sctHideBlizz = true, sctSize = 1, sctOthers = false, sctPower = true, sctKill = true, sctXP = true, sctAuras = true, sctErrors = true, uiFont = "game", sctFont = "luckiest", respawn = false, respawnAuto = true, respawnMine = true, respawnQuest = true, respawnSound = false, respawnTip = true, respawnWaypoint = true, respawnMinimap = true, respawnMap = true, respawnScale = 1, meterShiftBars = false, reopenWindows = false, mmButtonsSave = false, meterShiftBuffs = true, meterShiftCD = true, grpPartyStyle = "big", grpColor = "class", grpNameColor = "default", grpName = "full", grpText = "auto", grpPower = true, grpRole = true, grpDebuffs = true, grpDebuffAll = false, grpBuffs = "mine", grpCellScale = 1, grpScale = 1, grpAlpha = 0.9, npFont = "game", npFontSize = 1, npOutline = "game", hlStyle = "ping", hlColor = "gold", hlSize = 1, hlObjects = true, hlNPCs = true, hlMobs = true, hlCombat = true, hlSound = false, blessGreater = true, blessSolo = true, blessLock = false, blessScale = 1, menuButton = true, tooltipOpaque = true, tooltipAlpha = 1, lootAll = true, lootAutoClose = true, lootKey = "E",
     accent = "violet", font = "inter", damageFont = false,
     meter = true, meterMode = 1, meterOverall = false, meterW = 300, meterH = 180,
     scale = 1, opacity = 1,
@@ -218,7 +218,42 @@ end
 -- Cadre des fenêtres du jeu (même que le meter et les réglages) : fond de pierre,
 -- bord en métal avec barre de titre, titre doré. scale < 1 = même cadre en réduit
 -- (pour les petits éléments : coins plus petits, rien ne dépasse).
+-- Police des fenêtres NZR (option « Police des fenêtres NZR ») : on repasse sur
+-- les textes des fenêtres NZR en gardant leur taille. Les cadres joueur/groupe,
+-- barres des monstres et texte de combat ont leur propre choix (nzrNoFont).
+NZR.uiFontFrames = {}
+local fontDone = setmetatable({}, { __mode = "k" })
+local function FontWalk(f, path, depth)
+    if not f or f.nzrNoFont or depth > 12 then return end
+    for _, r in ipairs({ f:GetRegions() }) do
+        if not fontDone[r] and r.GetObjectType and r:GetObjectType() == "FontString" then
+            fontDone[r] = true
+            if not r.nzrKeepFont then
+                local ok, _, size, flags = pcall(r.GetFont, r)
+                if ok and size and size > 0 then pcall(r.SetFont, r, path, size, flags or "") end
+            end
+        end
+    end
+    for _, c in ipairs({ f:GetChildren() }) do FontWalk(c, path, depth + 1) end
+end
+local fontTicker
+function NZR.UIFontRegister(f)
+    if not f or not NZR.db or not NZR.db.uiFont or NZR.db.uiFont == "game" then return end
+    table.insert(NZR.uiFontFrames, f)
+    if not fontTicker then
+        local path = NZR.FontPath(NZR.db.uiFont)
+        local function run()
+            for _, w in ipairs(NZR.uiFontFrames) do
+                if w:IsVisible() then pcall(FontWalk, w, path, 0) end
+            end
+        end
+        fontTicker = C_Timer.NewTicker(2, run)
+        C_Timer.After(0.1, run)
+    end
+end
+
 function NZR:WowFrame(f, title, alpha, scale)
+    NZR.UIFontRegister(f)
     local host = f
     if scale and scale < 1 then
         host = CreateFrame("Frame", nil, f)
@@ -692,6 +727,11 @@ local function LoadSettings()
     if NZRF_DB.font == "classic" then
         NZR.FONT = STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF"
         NZR.FONT_BOLD = NZR.FONT
+    end
+    -- police des fenêtres NZR choisie dans les options : passe avant le reste
+    if NZRF_DB.uiFont and NZRF_DB.uiFont ~= "game" and NZR.FontPath then
+        local p = NZR.FontPath(NZRF_DB.uiFont)
+        if p then NZR.FONT, NZR.FONT_BOLD = p, p end
     end
     -- chiffres de dégâts flottants (lus par le jeu à l'entrée dans le monde)
     if NZRF_DB.damageFont then
