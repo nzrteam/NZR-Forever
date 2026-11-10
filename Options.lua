@@ -174,6 +174,8 @@ local PAGES = {
         { t = "switch", key = "sctNotice", section = "Texte de combat", label = "Entrée et sortie de combat", desc = "« +Combat » / « -Combat » au centre." },
         { t = "switch", key = "sctPower", section = "Texte de combat", label = "Gains de ressource", desc = "+Rage, +Énergie, +Mana… pour toutes les classes. La régénération normale n'est pas affichée, seulement les vrais gains." },
         { t = "switch", key = "sctKill", section = "Texte de combat", label = "Coup fatal", desc = "« Coup fatal ! » quand ta cible meurt juste après ton coup (en solo)." },
+        { t = "switch", key = "sctXP", section = "Texte de combat", label = "Expérience gagnée", desc = "« +49 XP » en violet au centre, avec le reste." },
+        { t = "switch", key = "sctHideXP", section = "Texte de combat", label = "Cacher le « PX » violet du jeu", desc = "Le jeu n'a pas d'option pour ça : NZR agrandit son texte flottant au point qu'il ne s'affiche plus (ça cache aussi ses autres textes flottants). Remis comme avant si tu coupes l'option ou NZR.", r = true },
         { t = "switch", key = "sctOthers", section = "Texte de combat", label = "En groupe : tous les coups sur ma cible", desc = "Le jeu ne dit pas qui frappe : en groupe, seuls tes coups seuls sont sûrs. Coche pour tout voir quand même." },
         { t = "switch", key = "sctHideBlizz", section = "Texte de combat", label = "Cacher les chiffres du jeu", desc = "Évite les doublons. Tes réglages du jeu reviennent quand tu coupes, à la déconnexion, ou si tu retires NZR.", r = true },
         { t = "cycle", key = "sctFont", section = "Texte de combat", label = "Police", desc = "Police des chiffres.",

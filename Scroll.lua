@@ -215,6 +215,39 @@ local function HideBlizzard(hide)
     end
 end
 
+-- texte d'expérience du jeu (« PX : 49 » violet) : pas de réglage à lui ; seule astuce,
+-- agrandir le texte flottant du jeu au point qu'il ne s'affiche plus (remis à la déconnexion)
+local XPCVARS = { "WorldTextScale_v2", "WorldTextScale" }
+local function HideBlizzardXP(hide)
+    if not (GetCVar and SetCVar) then return end
+    DB().sctSaved = DB().sctSaved or {}
+    for _, c in ipairs(XPCVARS) do
+        local okG, cur = pcall(GetCVar, c)
+        if okG and cur ~= nil then
+            if hide then
+                if DB().sctSaved[c] == nil and cur ~= "1000" then DB().sctSaved[c] = cur end
+                pcall(SetCVar, c, "1000")
+            elseif DB().sctSaved[c] ~= nil then
+                pcall(SetCVar, c, DB().sctSaved[c]); DB().sctSaved[c] = nil
+            elseif cur == "1000" then
+                pcall(SetCVar, c, "1")
+            end
+        end
+    end
+end
+
+-- gains d'expérience
+local xpLast, xpMax, xpLevel
+local function OnXP()
+    local okX, xp = pcall(UnitXP, "player"); local okM, mx = pcall(UnitXPMax, "player"); local okL, lvl = pcall(UnitLevel, "player")
+    if not (okX and okM and okL and plain(xp) and plain(mx) and plain(lvl)) then return end
+    if xpLast then
+        local gain = (lvl > xpLevel) and ((xpMax - xpLast) + xp) or (xp - xpLast)
+        if gain > 0 and DB().sctXP ~= false then Spawn("note", "+" .. gain .. " XP", 0.78, 0.5, 1) end
+    end
+    xpLast, xpMax, xpLevel = xp, mx, lvl
+end
+
 function NZR.ScrollTest()
     if not driver then return end
     local icons = { "Interface\\Icons\\Spell_Holy_SealOfMight", SWING_ICON, "Interface\\Icons\\Spell_Holy_HolyBolt" }
@@ -238,9 +271,11 @@ function M:Init()
     driver:Hide()
     if not DB().sct then
         HideBlizzard(false)             -- au cas où : on rend les réglages du jeu
+        HideBlizzardXP(false)
         return
     end
     if DB().sctHideBlizz ~= false then HideBlizzard(true) end
+    HideBlizzardXP(DB().sctHideXP ~= false)
     anchors.out = NZR:Holder("sctOut", "Texte : tes coups", 150, 34, { "CENTER", "CENTER", 140, 90 })
     anchors.inc = NZR:Holder("sctIn", "Texte : reçu", 150, 34, { "CENTER", "CENTER", -110, 60 })
     anchors.note = NZR:Holder("sctNote", "Texte : combat", 150, 34, { "CENTER", "CENTER", 0, 230 })
@@ -253,6 +288,8 @@ function M:Init()
     ev:RegisterEvent("PLAYER_REGEN_DISABLED")
     ev:RegisterEvent("PLAYER_REGEN_ENABLED")
     ev:RegisterEvent("PLAYER_LOGOUT")
+    ev:RegisterEvent("PLAYER_XP_UPDATE")
+    ev:RegisterEvent("PLAYER_ENTERING_WORLD")
     pcall(ev.RegisterUnitEvent, ev, "UNIT_SPELLCAST_SUCCEEDED", "player")
     ev:SetScript("OnEvent", function(_, e, unit, a, b, c, d)
         if e == "UNIT_COMBAT" then
@@ -281,7 +318,12 @@ function M:Init()
             if DB().sctNotice ~= false then Spawn("note", "+Combat", 1, 0.3, 0.3) end
         elseif e == "PLAYER_REGEN_ENABLED" then
             if DB().sctNotice ~= false then Spawn("note", "-Combat", 0.3, 1, 0.3) end
+        elseif e == "PLAYER_XP_UPDATE" then
+            pcall(OnXP)
+        elseif e == "PLAYER_ENTERING_WORLD" then
+            xpLast = nil; pcall(OnXP)
         elseif e == "PLAYER_LOGOUT" then
+            HideBlizzardXP(false)
             HideBlizzard(false)         -- tes réglages du jeu reviennent même si tu retires NZR
         end
     end)
