@@ -492,7 +492,7 @@ function NZR:Holder(key, label, w, h, default)
     hd.label:SetPoint("CENTER")
     hd.label:SetText(label)
     hd:SetScript("OnDragStart", hd.StartMoving)
-    hd:SetScript("OnDragStop", function(s) s:StopMovingOrSizing(); SaveHolder(s) end)
+    hd:SetScript("OnDragStop", function(s) s:StopMovingOrSizing(); SaveHolder(s); NZR.editMoved = true end)
     self:PlaceHolder(hd)
     self.holders[key] = hd
     self:ShowHolder(hd, false)
@@ -562,12 +562,24 @@ local function BuildBar()
     end)
     btn("Positions par défaut", 130, 170, function()
         for key, hd in pairs(NZR.holders) do NZRF_DB.pos[key] = nil; NZR:PlaceHolder(hd) end
+        NZR.editMoved = true
         NZR:Print("positions des blocs remises par défaut.")
     end)
-    btn("Terminer", 346, 110, function() NZR:SetUnlocked(false) end)
+    btn("Terminer", 346, 110, function() NZR:FinishEdit() end)
 end
 
 NZR.editHooks = NZR.editHooks or {}
+
+-- fin de l'édition : certains éléments ne lisent leur place qu'au chargement,
+-- on recharge donc l'interface si tu as bougé quelque chose
+function NZR:FinishEdit()
+    if InCombatLockdown() then self:Print("impossible en combat.") return end
+    self:SetUnlocked(false)
+    if self.editMoved then self.editMoved = nil; ReloadUI() end
+end
+function NZR:ToggleEdit()
+    if self.unlocked then self:FinishEdit() else self:SetUnlocked(true) end
+end
 
 function NZR:SetUnlocked(on)
     if InCombatLockdown() then
@@ -582,7 +594,8 @@ function NZR:SetUnlocked(on)
     if on and not editBar then BuildBar() end
     if editBar then editBar:SetShown(on and true or false) end
     if editGrid and not on then editGrid:Hide() end
-    self:Print(on and "mode édition : glisse les blocs dorés, puis « Terminer »."
+    if on then NZR.editMoved = nil end
+    self:Print(on and "mode édition : glisse les blocs dorés, puis « Terminer » (l'interface se recharge si tu as bougé quelque chose)."
                   or "mode édition terminé, positions enregistrées.")
 end
 
@@ -826,7 +839,7 @@ SlashCmdList.NZRF = function(msg)
     if cmd == "unlock" then
         NZR:SetUnlocked(true)
     elseif cmd == "lock" then
-        NZR:SetUnlocked(false)
+        NZR:FinishEdit()
     elseif cmd == "resetpos" then
         if InCombatLockdown() then return NZR:Print("impossible en combat.") end
         wipe(NZRF_DB.pos)
@@ -838,7 +851,7 @@ SlashCmdList.NZRF = function(msg)
     elseif cmd == "plaque" or cmd == "plate" then
         if NZR.InspectPlateText then NZR.InspectPlateText() else NZR:Print("active d'abord « Personnaliser ces barres » (Cadres), puis recharge.") end
     elseif cmd == "edit" or cmd == "edition" or cmd == "move" then
-        NZR:SetUnlocked(not NZR.unlocked)
+        NZR:ToggleEdit()
     elseif cmd == "guide" or cmd == "build" then
         if NZR.GuideToggle then NZR.GuideToggle() else NZR:Print("guide désactivé : /nzr > Pratique > Guide de progression.") end
     elseif cmd == "respawn" or cmd == "rsp" then
