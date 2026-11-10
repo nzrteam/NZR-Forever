@@ -26,21 +26,36 @@ local function SetupTooltip()
         NZR:Print("infobulle : ce client ne permet pas de la déplacer sans la casser, option ignorée.")
         return
     end
-    local function Place()
+    -- centre fixe : le milieu bas du bloc. L'infobulle reste accrochée au support
+    -- (coin bas-droit) ; on décale le support de la moitié de sa largeur.
+    local lastW = 0
+    local function Place(w)
         if InCombatLockdown() and cont:IsProtected() then return end
         if NZR.db.tooltipCursor or Editing() then return end
+        if w then lastW = w end
         cont:ClearAllPoints()
-        cont:SetPoint("BOTTOMRIGHT", hd, "BOTTOMRIGHT", 0, 0)
+        cont:SetPoint("BOTTOMRIGHT", hd, "BOTTOM", math.floor(lastW / 2 + 0.5), 0)
     end
+    local function Follow(tt)
+        local ok, w = pcall(tt.GetWidth, tt)
+        if ok and NZR.plain(w) and type(w) == "number" and w > 0 then
+            local okS, s1 = pcall(tt.GetEffectiveScale, tt)
+            local s2 = cont:GetEffectiveScale()
+            if okS and NZR.plain(s1) and s1 and s2 and s2 > 0 then w = w * s1 / s2 end
+            if math.abs(w - lastW) > 0.5 then Place(w) end
+        end
+    end
+    GameTooltip:HookScript("OnSizeChanged", Follow)
+    GameTooltip:HookScript("OnShow", Follow)
     Place()
-    hd:HookScript("OnDragStop", Place)
+    hd:HookScript("OnDragStop", function() Place() end)
     local ev = CreateFrame("Frame")
     ev:RegisterEvent("PLAYER_ENTERING_WORLD")
     ev:RegisterEvent("EDIT_MODE_LAYOUTS_UPDATED")
-    ev:SetScript("OnEvent", function() C_Timer.After(0.2, Place) end)
+    ev:SetScript("OnEvent", function() C_Timer.After(0.2, function() Place() end) end)
     -- en sortant du mode Édition, on remet l'infobulle à sa place
     if _G.EditModeManagerFrame then
-        _G.EditModeManagerFrame:HookScript("OnHide", function() C_Timer.After(0.3, Place) end)
+        _G.EditModeManagerFrame:HookScript("OnHide", function() C_Timer.After(0.3, function() Place() end) end)
     end
     -- Certains boutons (sorts au centre, menu des sceaux, buffs, barres)
     -- accrochent l'infobulle à eux-mêmes au lieu de la place par défaut : on la
@@ -69,16 +84,6 @@ local function SetupTooltip()
             cache[owner] = v
             return v
         end
-        -- placement par défaut du jeu : centré sur le bloc (milieu bas), quelle que soit la taille
-        if GameTooltip_SetDefaultAnchor then
-            hooksecurefunc("GameTooltip_SetDefaultAnchor", function(tt)
-                if tt ~= GameTooltip or Editing() or NZR.db.tooltipCursor then return end
-                pcall(function()
-                    tt:ClearAllPoints()
-                    tt:SetPoint("BOTTOM", hd, "BOTTOM", 0, 0)
-                end)
-            end)
-        end
         local busy
         hooksecurefunc(GameTooltip, "SetOwner", function(tt, owner, anchor)
             if busy or Editing() or anchor == "ANCHOR_NONE" or anchor == "ANCHOR_CURSOR"
@@ -88,7 +93,7 @@ local function SetupTooltip()
             pcall(function()
                 tt:SetOwner(owner, "ANCHOR_NONE")
                 tt:ClearAllPoints()
-                tt:SetPoint("BOTTOM", hd, "BOTTOM", 0, 0)
+                tt:SetPoint("BOTTOMRIGHT", cont, "BOTTOMRIGHT", 0, 0)
             end)
             busy = nil
         end)

@@ -272,6 +272,7 @@ end
 -- effets que TU poses sur ta cible (étourdissement, ralentissement…) : « [Marteau de la justice] »
 local function OnTargetAura(info)
     if DB().sctAuras == false or not info or info.isFullUpdate or not info.addedAuras then return end
+    local shown
     for _, a in ipairs(info.addedAuras) do
         local ok, name, src, harm, dur = pcall(function() return a.name, a.sourceUnit, a.isHarmful, a.duration end)
         if ok and plain(name) and plain(src) and plain(harm) and type(name) == "string" and harm
@@ -279,8 +280,15 @@ local function OnTargetAura(info)
             local d = plain(dur) and type(dur) == "number" and dur or 0
             if d > 0 and d <= 30 then
                 Spawn("out", "[" .. name .. "]", 1, 0.6, 0.2, (plain(a.icon) and a.icon) or nil)
+                shown = true; lastCast.shown = true
             end
         end
+    end
+    -- en combat le jeu peut cacher le nom de l'effet : on affiche alors le sort que tu viens
+    -- de lancer, si ta cible reçoit un effet dans la demi-seconde qui suit
+    if not shown and not lastCast.shown and lastCast.name and GetTime() - lastCast.t < 0.5 and #info.addedAuras > 0 then
+        lastCast.shown = true
+        Spawn("out", "[" .. lastCast.name .. "]", 1, 0.6, 0.2, lastCast.icon)
     end
 end
 
@@ -389,7 +397,11 @@ function M:Init()
         elseif e == "UNIT_SPELLCAST_SUCCEEDED" then
             local spellID = c
             local tex = spellID and C_Spell and C_Spell.GetSpellTexture and C_Spell.GetSpellTexture(spellID)
-            if tex then lastCast.t, lastCast.icon = GetTime(), tex end
+            if tex then
+                lastCast.t, lastCast.icon, lastCast.shown = GetTime(), tex, nil
+                local okN, nm = pcall(C_Spell.GetSpellName, spellID)
+                lastCast.name = okN and plain(nm) and nm or nil
+            end
         elseif e == "PLAYER_REGEN_DISABLED" then
             if DB().sctNotice ~= false then Spawn("note", "+Combat", 1, 0.3, 0.3) end
         elseif e == "PLAYER_REGEN_ENABLED" then

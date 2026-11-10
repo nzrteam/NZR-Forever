@@ -572,10 +572,41 @@ NZR.editHooks = NZR.editHooks or {}
 
 -- fin de l'édition : certains éléments ne lisent leur place qu'au chargement,
 -- on recharge donc l'interface si tu as bougé quelque chose
+-- empreinte de toutes les positions enregistrées (blocs, meter, barres, flèche…)
+local function Dump(v, out, depth)
+    if depth > 4 then return end
+    if type(v) == "table" then
+        local keys = {}
+        for k in pairs(v) do keys[#keys + 1] = tostring(k) end
+        table.sort(keys)
+        for _, k in ipairs(keys) do
+            local x = v[k]; if x == nil then x = v[tonumber(k)] end
+            out[#out + 1] = k .. "="; Dump(x, out, depth + 1); out[#out + 1] = ";"
+        end
+    elseif type(v) == "number" then out[#out + 1] = ("%.1f"):format(v)
+    else out[#out + 1] = tostring(v) end
+end
+local function PosSig()
+    local out = {}
+    local function scan(db)
+        if type(db) ~= "table" then return end
+        local keys = {}
+        for k in pairs(db) do if type(k) == "string" and (k:lower():find("pos") or k:lower():find("point")) then keys[#keys + 1] = k end end
+        table.sort(keys)
+        for _, k in ipairs(keys) do out[#out + 1] = k .. ":"; Dump(db[k], out, 0) end
+    end
+    scan(NZRF_DB)
+    scan(_G.ForeverCompassDB)
+    return table.concat(out)
+end
+NZR.EditPosSig = PosSig
+
 function NZR:FinishEdit()
     if InCombatLockdown() then self:Print("impossible en combat.") return end
     self:SetUnlocked(false)
-    if self.editMoved then self.editMoved = nil; ReloadUI() end
+    local moved = self.editMoved or (self.editSig and self.editSig ~= PosSig())
+    self.editMoved, self.editSig = nil, nil
+    if moved then ReloadUI() end
 end
 function NZR:ToggleEdit()
     if self.unlocked then self:FinishEdit() else self:SetUnlocked(true) end
@@ -594,7 +625,7 @@ function NZR:SetUnlocked(on)
     if on and not editBar then BuildBar() end
     if editBar then editBar:SetShown(on and true or false) end
     if editGrid and not on then editGrid:Hide() end
-    if on then NZR.editMoved = nil end
+    if on then NZR.editMoved = nil; NZR.editSig = NZR.EditPosSig and NZR.EditPosSig() end
     self:Print(on and "mode édition : glisse les blocs dorés, puis « Terminer » (l'interface se recharge si tu as bougé quelque chose)."
                   or "mode édition terminé, positions enregistrées.")
 end
