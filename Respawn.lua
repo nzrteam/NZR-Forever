@@ -292,8 +292,8 @@ end
 
 local function MakeRow(i)
     local r = CreateFrame("Button", nil, win)
-    r:SetSize(WIN_W - 16, ROW_H - 1)
-    r:SetPoint("TOPLEFT", win, "TOPLEFT", 8, -25 - (i - 1) * ROW_H)
+    r:SetSize(WIN_W - 24, ROW_H - 1)
+    r:SetPoint("TOPLEFT", win, "TOPLEFT", 12, -30 - (i - 1) * ROW_H)
     r:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     r.state = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     r.state:SetPoint("TOPRIGHT", 0, -2)
@@ -557,13 +557,13 @@ Refresh = function()
         local extra = #list - shown
         if extra > 0 then
             win.more:SetText(("+ %d autre%s"):format(extra, extra > 1 and "s" or ""))
-            win.more:SetPoint("TOPLEFT", win, "TOPLEFT", 8, -27 - shown * ROW_H)
+            win.more:SetPoint("TOPLEFT", win, "TOPLEFT", 12, -32 - shown * ROW_H)
             win.more:Show()
         else
             win.more:Hide()
         end
         win:SetScale(DB().respawnScale or 1)
-        win:SetHeight(30 + shown * ROW_H + (extra > 0 and 14 or 0))
+        win:SetHeight(math.max(66, 44 + shown * ROW_H + (extra > 0 and 14 or 0)))
         win:Show()
     else
         win:Hide()
