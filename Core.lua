@@ -21,7 +21,7 @@ NZR.C = {
 }
 
 local defaults = {
-    theme = false, auras = false, tooltips = false, tooltipCursor = false, moveTooltip = false, moveBags = false, moveMap = false, moveWindows = true, squareMinimap = false, compass = false, paladin = false, questHL = false, unitFrames = false, plates = false, npText = "both", npColor = "game", ufPortrait = "round", ufText = "both", ufName = "full", ufColor = "green", ufShort = true, ufScale = 1, ufFont = "game", ufFontSize = 1, ufOutline = "shadow", ufHealthShade = 1, ufPowerColor = "game", ufPowerShade = 1, ufAuras = true, groupFrames = false, guide = false, guideAuto = true, sct = false, sctIn = true, sctOut = true, sctHeal = true, sctNotice = true, sctHideBlizz = true, sctSize = 1, sctOthers = false, sctPower = true, sctKill = true, sctFont = "game", respawn = false, respawnAuto = true, respawnQuest = false, respawnSound = false, respawnTip = true, respawnWaypoint = true, respawnMinimap = true, respawnMap = true, meterShiftBars = false, reopenWindows = false, mmButtonsSave = false, meterShiftBuffs = true, meterShiftCD = true, grpPartyStyle = "big", grpColor = "class", grpNameColor = "default", grpName = "full", grpText = "auto", grpPower = true, grpRole = true, grpDebuffs = true, grpDebuffAll = false, grpBuffs = "mine", grpCellScale = 1, grpScale = 1, grpAlpha = 0.9, npFont = "game", npFontSize = 1, npOutline = "game", hlStyle = "ping", hlColor = "gold", hlSize = 1, hlObjects = true, hlNPCs = true, hlMobs = true, hlCombat = true, hlSound = false, blessGreater = true, blessSolo = true, blessLock = false, blessScale = 1, menuButton = true, tooltipOpaque = true, tooltipAlpha = 1, lootAll = true, lootAutoClose = true, lootKey = "E",
+    theme = false, auras = false, tooltips = false, tooltipCursor = false, moveTooltip = false, moveBags = false, moveMap = false, moveWindows = true, squareMinimap = false, compass = false, paladin = false, questHL = false, unitFrames = false, plates = false, npText = "both", npColor = "game", ufPortrait = "round", ufText = "both", ufName = "full", ufColor = "green", ufShort = true, ufScale = 1, ufFont = "game", ufFontSize = 1, ufOutline = "shadow", ufHealthShade = 1, ufPowerColor = "game", ufPowerShade = 1, ufAuras = true, groupFrames = false, guide = false, guideAuto = true, sct = false, sctIn = true, sctOut = true, sctHeal = true, sctNotice = true, sctHideBlizz = true, sctSize = 1, sctOthers = false, sctPower = true, sctKill = true, sctFont = "luckiest", respawn = false, respawnAuto = true, respawnQuest = false, respawnSound = false, respawnTip = true, respawnWaypoint = true, respawnMinimap = true, respawnMap = true, meterShiftBars = false, reopenWindows = false, mmButtonsSave = false, meterShiftBuffs = true, meterShiftCD = true, grpPartyStyle = "big", grpColor = "class", grpNameColor = "default", grpName = "full", grpText = "auto", grpPower = true, grpRole = true, grpDebuffs = true, grpDebuffAll = false, grpBuffs = "mine", grpCellScale = 1, grpScale = 1, grpAlpha = 0.9, npFont = "game", npFontSize = 1, npOutline = "game", hlStyle = "ping", hlColor = "gold", hlSize = 1, hlObjects = true, hlNPCs = true, hlMobs = true, hlCombat = true, hlSound = false, blessGreater = true, blessSolo = true, blessLock = false, blessScale = 1, menuButton = true, tooltipOpaque = true, tooltipAlpha = 1, lootAll = true, lootAutoClose = true, lootKey = "E",
     accent = "violet", font = "inter", damageFont = false,
     meter = true, meterMode = 1, meterOverall = false, meterW = 300, meterH = 180,
     scale = 1, opacity = 1,
@@ -646,6 +646,8 @@ local function LoadSettings()
     end
     NZR.db = NZRF_DB
     -- respawn : pas de son tant que tu ne l'as pas choisi
+    -- texte de combat : police épaisse façon « texte défilant » (si tu n'avais rien choisi)
+    if not NZRF_DB.sctFontV2 then NZRF_DB.sctFontV2 = true; if NZRF_DB.sctFont == "game" then NZRF_DB.sctFont = "luckiest" end end
     if not NZRF_DB.rspNoSound then NZRF_DB.rspNoSound = true; NZRF_DB.respawnSound = false end
     -- 1.1.0 : le look des sorts et des buffs devient facultatif (désactivé de base)
     if not NZRF_DB.v102 then
@@ -852,6 +854,8 @@ NZR.FONTS = {
     { "arial", "Arial Narrow", "Fonts\\ARIALN.TTF" },
     { "skurri", "Skurri", "Fonts\\SKURRI.TTF" },
     { "morpheus", "Morpheus", "Fonts\\MORPHEUS.TTF" },
+    { "luckiest", "Luckiest Guy (combat)", "Interface\\AddOns\\NZRForever\\Fonts\\LuckiestGuy-Regular.ttf" },
+    { "bangers", "Bangers", "Interface\\AddOns\\NZRForever\\Fonts\\Bangers-Regular.ttf" },
 }
 function NZR.FontPath(key, gameFont)
     for _, f in ipairs(NZR.FONTS) do
