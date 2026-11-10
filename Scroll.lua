@@ -421,6 +421,7 @@ local function OnTargetAura(info)
 end
 
 -- buffs / procs / debuffs gagnés : [Maîtrise du blocage]
+local auraSeen = {}       -- même buff qui revient plusieurs fois d'affilée : une seule fois
 local function OnAura(info)
     if DB().sctAuras == false or not info or info.isFullUpdate or not info.addedAuras then return end
     for _, a in ipairs(info.addedAuras) do
@@ -431,8 +432,16 @@ local function OnAura(info)
             local dur = plain(a.duration) and a.duration or 0
             if harm then
                 Spawn("note", "[" .. name .. "]", 1, 0.3, 0.3)
-            elseif help and dur > 0 and dur <= 120 then        -- procs et buffs courts (pas les bénédictions d'1 h)
-                Spawn("note", "[" .. name .. "]", 1, 0.82, 0.3)
+            elseif help then
+                -- par défaut tous les buffs (feu de camp, nourriture, bénédictions…) ;
+                -- option « procs seulement » : buffs courts (2 min ou moins)
+                local onlyProcs = DB().sctBuffs == "procs"
+                local now = GetTime()
+                if (not onlyProcs or (dur > 0 and dur <= 120)) and now - (auraSeen[name] or 0) > 5 then
+                    auraSeen[name] = now
+                    local icon = plain(a.icon) and a.icon or nil
+                    Spawn("note", "[" .. name .. "]", 1, 0.82, 0.3, icon)
+                end
             end
         end
     end
