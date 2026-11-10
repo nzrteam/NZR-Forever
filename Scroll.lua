@@ -76,7 +76,7 @@ local function Spawn(area, value, r, g, b, icon, crit)
     lastSpawn[area] = now
     f.area, f.t, f.crit = a, 0, crit
     f.x0 = a.x + (area == "note" and 0 or stagger[area] * (area == "out" and 26 or -26))
-    f.y0 = a.y - stagger[area] * 18 * (a.dy > 0 and 1 or -1)
+    f.y0 = a.y - stagger[area] * (area == "note" and 30 or 18) * (a.dy > 0 and 1 or -1)
     f:ClearAllPoints(); f:SetPoint("LEFT", UIParent, "CENTER", f.x0, f.y0)
     f:SetAlpha(0); f:SetScale(crit and 1.6 or 1); f:Show()
     table.insert(active, f)
@@ -236,14 +236,48 @@ local function HideBlizzardXP(hide)
     end
 end
 
--- gains d'expérience
-local xpLast, xpMax, xpLevel
+-- gains d'expérience : la barre du jeu, et sinon le message du chat de combat
+local xpLast, xpMax, xpLevel, xpShown, killShown = nil, nil, nil, 0, 0
+local function ShowXP(gain)
+    if gain and gain > 0 and DB().sctXP ~= false and GetTime() - xpShown > 0.8 then
+        xpShown = GetTime()
+        Spawn("note", "+" .. gain .. " XP", 0.78, 0.5, 1)
+    end
+end
+local function OnXPMessage(msg)
+    if type(msg) ~= "string" or not plain(msg) then return end
+    local name = msg:match("^(.-) meurt") or msg:match("^(.-) dies")
+    local num = name and msg:sub(#name + 1):match("(%d+)") or msg:match("(%d+)")
+    if name and DB().sctKill ~= false and GetTime() - killShown > 1.5 then
+        killShown = GetTime()
+        Spawn("note", name .. " tué", 1, 0.82, 0, "Interface\\TargetingFrame\\UI-TargetingFrame-Skull")
+    end
+    ShowXP(tonumber(num))
+end
+
+-- buffs / procs / debuffs gagnés : [Maîtrise du blocage]
+local function OnAura(info)
+    if DB().sctAuras == false or not info or info.isFullUpdate or not info.addedAuras then return end
+    for _, a in ipairs(info.addedAuras) do
+        local okN, name = pcall(function() return a.name end)
+        if okN and plain(name) and type(name) == "string" and name ~= "" then
+            local help = plain(a.isHelpful) and a.isHelpful
+            local harm = plain(a.isHarmful) and a.isHarmful
+            local dur = plain(a.duration) and a.duration or 0
+            if harm then
+                Spawn("note", "[" .. name .. "]", 1, 0.3, 0.3)
+            elseif help and dur > 0 and dur <= 120 then        -- procs et buffs courts (pas les bénédictions d'1 h)
+                Spawn("note", "[" .. name .. "]", 1, 0.82, 0.3)
+            end
+        end
+    end
+end
 local function OnXP()
     local okX, xp = pcall(UnitXP, "player"); local okM, mx = pcall(UnitXPMax, "player"); local okL, lvl = pcall(UnitLevel, "player")
     if not (okX and okM and okL and plain(xp) and plain(mx) and plain(lvl)) then return end
     if xpLast then
         local gain = (lvl > xpLevel) and ((xpMax - xpLast) + xp) or (xp - xpLast)
-        if gain > 0 and DB().sctXP ~= false then Spawn("note", "+" .. gain .. " XP", 0.78, 0.5, 1) end
+        ShowXP(gain)
     end
     xpLast, xpMax, xpLevel = xp, mx, lvl
 end
@@ -275,7 +309,7 @@ function M:Init()
         return
     end
     if DB().sctHideBlizz ~= false then HideBlizzard(true) end
-    HideBlizzardXP(DB().sctHideXP ~= false)
+    HideBlizzardXP(false)               -- l'astuce ne marche pas sur Forever : on rend le réglage
     anchors.out = NZR:Holder("sctOut", "Texte : tes coups", 150, 34, { "CENTER", "CENTER", 140, 90 })
     anchors.inc = NZR:Holder("sctIn", "Texte : reçu", 150, 34, { "CENTER", "CENTER", -110, 60 })
     anchors.note = NZR:Holder("sctNote", "Texte : combat", 150, 34, { "CENTER", "CENTER", 0, 230 })
@@ -289,6 +323,8 @@ function M:Init()
     ev:RegisterEvent("PLAYER_REGEN_ENABLED")
     ev:RegisterEvent("PLAYER_LOGOUT")
     ev:RegisterEvent("PLAYER_XP_UPDATE")
+    ev:RegisterEvent("CHAT_MSG_COMBAT_XP_GAIN")
+    pcall(ev.RegisterUnitEvent, ev, "UNIT_AURA", "player")
     ev:RegisterEvent("PLAYER_ENTERING_WORLD")
     pcall(ev.RegisterUnitEvent, ev, "UNIT_SPELLCAST_SUCCEEDED", "player")
     ev:SetScript("OnEvent", function(_, e, unit, a, b, c, d)
@@ -307,6 +343,7 @@ function M:Init()
                 targetDead = true
                 if DB().sctKill ~= false and GetTime() - lastHit.t < 1.5 and (not IsInGroup() or DB().sctOthers) then
                     local okN, n = pcall(UnitName, "target")
+                    killShown = GetTime()
                     Spawn("note", "Coup fatal ! " .. ((okN and plain(n) and n) or ""), 1, 0.82, 0, "Interface\\TargetingFrame\\UI-TargetingFrame-Skull")
                 end
             end
@@ -318,6 +355,10 @@ function M:Init()
             if DB().sctNotice ~= false then Spawn("note", "+Combat", 1, 0.3, 0.3) end
         elseif e == "PLAYER_REGEN_ENABLED" then
             if DB().sctNotice ~= false then Spawn("note", "-Combat", 0.3, 1, 0.3) end
+        elseif e == "CHAT_MSG_COMBAT_XP_GAIN" then
+            pcall(OnXPMessage, unit)
+        elseif e == "UNIT_AURA" then
+            if unit == "player" then pcall(OnAura, a) end
         elseif e == "PLAYER_XP_UPDATE" then
             pcall(OnXP)
         elseif e == "PLAYER_ENTERING_WORLD" then
