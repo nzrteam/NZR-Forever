@@ -271,9 +271,10 @@ end
 
 -- effets que TU poses sur ta cible (étourdissement, ralentissement…) : « [Marteau de la justice] »
 local function OnTargetAura(info)
-    if DB().sctAuras == false or not info or info.isFullUpdate or not info.addedAuras then return end
+    if DB().sctAuras == false then return end
     local shown
-    for _, a in ipairs(info.addedAuras) do
+    local added = info and type(info.addedAuras) == "table" and info.addedAuras or {}
+    for _, a in ipairs(added) do
         local ok, name, src, harm, dur = pcall(function() return a.name, a.sourceUnit, a.isHarmful, a.duration end)
         if ok and plain(name) and plain(src) and plain(harm) and type(name) == "string" and harm
            and (src == "player" or src == "pet") then
@@ -286,7 +287,9 @@ local function OnTargetAura(info)
     end
     -- en combat le jeu peut cacher le nom de l'effet : on affiche alors le sort que tu viens
     -- de lancer, si ta cible reçoit un effet dans la demi-seconde qui suit
-    if not shown and not lastCast.shown and lastCast.name and GetTime() - lastCast.t < 0.5 and #info.addedAuras > 0 then
+    -- (en combat le jeu peut même ne rien détailler : toute mise à jour des effets de ta cible compte)
+    local changed = #added > 0 or not info or info.isFullUpdate
+    if not shown and not lastCast.shown and lastCast.name and GetTime() - lastCast.t < 0.6 and changed then
         lastCast.shown = true
         Spawn("out", "[" .. lastCast.name .. "]", 1, 0.6, 0.2, lastCast.icon)
     end

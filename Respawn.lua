@@ -442,25 +442,29 @@ local function AddTarget()
     end
 end
 
--- petit carré « + » à part (comme l'icône du DPS) : suivre ta cible, afficher la fenêtre
-local function BuildButton()
+-- icône (comme celle du guide) quand la fenêtre est réduite ou qu'aucun monstre n'est suivi
+local launcher
+local forceOpen      -- tu as rouvert la fenêtre à la main (même vide)
+local function BuildLauncher()
     local b = CreateFrame("Button", "NZRF_RespawnButton", UIParent)
-    b:SetSize(22, 22)
+    b:SetSize(30, 30)
     b:SetFrameStrata("MEDIUM")
-    b:SetMovable(true); b:SetClampedToScreen(true)
+    b:SetClampedToScreen(true); b:SetMovable(true)
     if b.SetDontSavePosition then b:SetDontSavePosition(true) end
-    b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     b:RegisterForDrag("LeftButton")
-    local edge = b:CreateTexture(nil, "BACKGROUND")
-    edge:SetAllPoints(); edge:SetColorTexture(0.78, 0.6, 0.2, 1)
-    local inner = b:CreateTexture(nil, "BORDER")
-    inner:SetPoint("TOPLEFT", 1, -1); inner:SetPoint("BOTTOMRIGHT", -1, 1); inner:SetColorTexture(0.08, 0.06, 0.03, 0.95)
-    local plus = b:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    plus:SetPoint("CENTER", 0, 1); plus:SetText("+")
+    b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    local ic = b:CreateTexture(nil, "ARTWORK")
+    ic:SetPoint("TOPLEFT", 4, -4); ic:SetPoint("BOTTOMRIGHT", -4, 4)
+    ic:SetTexture("Interface\\Icons\\INV_Misc_PocketWatch_01")
+    ic:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    local ring = b:CreateTexture(nil, "OVERLAY")
+    ring:SetAllPoints(); ring:SetTexture("Interface\\AddOns\\NZRForever\\Media\\uf\\ring_square")
     local hl = b:CreateTexture(nil, "HIGHLIGHT")
-    hl:SetPoint("TOPLEFT", 1, -1); hl:SetPoint("BOTTOMRIGHT", -1, 1); hl:SetColorTexture(1, 0.82, 0, 0.25)
-    local p = NZRF_DB.pos.respawnBtn
-    if p then b:SetPoint(p[1], UIParent, p[2], p[3], p[4]) else b:SetPoint("TOPRIGHT", win, "TOPLEFT", -4, 0) end
+    hl:SetPoint("TOPLEFT", 4, -4); hl:SetPoint("BOTTOMRIGHT", -4, 4); hl:SetColorTexture(1, 0.82, 0, 0.25)
+    b.count = b:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+    b.count:SetPoint("BOTTOMRIGHT", -3, 3)
+    local p = NZRF_DB.pos.respawnIcon
+    if p then b:SetPoint(p[1], UIParent, p[2], p[3], p[4]) else b:SetPoint("TOPRIGHT", holder, "TOPRIGHT", 0, 0) end
     b:SetScript("OnDragStart", function(self) self:StartMoving() end)
     b:SetScript("OnDragStop", function(self)
         self:StopMovingOrSizing()
@@ -468,30 +472,24 @@ local function BuildButton()
         if l and t then
             self:ClearAllPoints()
             self:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", l, t)
-            NZRF_DB.pos.respawnBtn = { "TOPLEFT", "BOTTOMLEFT", l, t }
+            NZRF_DB.pos.respawnIcon = { "TOPLEFT", "BOTTOMLEFT", l, t }
         end
     end)
     b:SetScript("OnClick", function(_, btn)
-        if btn == "RightButton" then
-            userHidden = win:IsShown() and true or nil
-            if userHidden then win:Hide() end
-            pcall(Refresh)
-        else
-            AddTarget()
-            userHidden = nil
-            pcall(Refresh)
-        end
+        if btn == "RightButton" then NZR:ToggleOptions(true) return end
+        userHidden, forceOpen = nil, true
+        pcall(Refresh)
     end)
     b:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Respawn", 1, 0.82, 0)
-        GameTooltip:AddLine("Clic : suivre (ou ne plus suivre) ta cible", 1, 1, 1)
-        GameTooltip:AddLine("Clic droit : afficher / cacher la fenêtre", 1, 1, 1)
-        GameTooltip:AddLine("Glisser : déplacer", 0.7, 0.7, 0.7)
+        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+        GameTooltip:AddLine("Respawn")
+        GameTooltip:AddLine("Clic : ouvrir la fenêtre des temps de respawn.", 1, 1, 1, true)
+        GameTooltip:AddLine("Clic droit : réglages NZR Forever. Glisser : déplacer.", 0.8, 0.8, 0.8, true)
         GameTooltip:Show()
     end)
     b:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    return b
+    b:Hide()
+    launcher = b
 end
 
 local function BuildWindow()
@@ -529,13 +527,34 @@ local function BuildWindow()
     end)
     Anchor()
     local over = NZR:WowFrame(win, "Respawn", DB().meterAlpha or 0.95, 0.7)
-    local close = CreateFrame("Button", nil, over, "UIPanelCloseButton")
-    close:SetSize(18, 18)
-    close:SetPoint("TOPRIGHT", 0, 0)
-    close:SetScript("OnClick", function()
-        userHidden = true; win:Hide()
-        NZR:Print("fenêtre Respawn cachée : elle revient au prochain monstre suivi, ou avec /nzr respawn voir.")
+    local add = CreateFrame("Button", nil, over)
+    add:SetSize(14, 14)
+    add:SetPoint("TOPLEFT", 6, -3)
+    add:SetNormalTexture("Interface\\Buttons\\UI-PlusButton-Up")
+    add:SetPushedTexture("Interface\\Buttons\\UI-PlusButton-Down")
+    add:SetHighlightTexture("Interface\\Buttons\\UI-PlusButton-Hilight", "ADD")
+    add:SetScript("OnClick", function() AddTarget(); pcall(Refresh) end)
+    add:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+        GameTooltip:AddLine("Suivre ma cible", 1, 0.82, 0)
+        GameTooltip:AddLine("Ajoute (ou retire) le monstre ciblé. Aussi : /nzr respawn", 1, 1, 1, true)
+        GameTooltip:Show()
     end)
+    add:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    -- petit trait « – » : réduire la fenêtre en icône
+    local mini = CreateFrame("Button", nil, over)
+    mini:SetSize(14, 14)
+    mini:SetPoint("TOPRIGHT", -6, -3)
+    mini:SetNormalTexture("Interface\\Buttons\\UI-MinusButton-Up")
+    mini:SetPushedTexture("Interface\\Buttons\\UI-MinusButton-Down")
+    mini:SetHighlightTexture("Interface\\Buttons\\UI-PlusButton-Hilight", "ADD")
+    mini:SetScript("OnClick", function() userHidden, forceOpen = true, nil; pcall(Refresh) end)
+    mini:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+        GameTooltip:AddLine("Réduire en icône", 1, 0.82, 0)
+        GameTooltip:Show()
+    end)
+    mini:SetScript("OnLeave", function() GameTooltip:Hide() end)
     win.more = over:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     win.empty = over:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     win.empty:SetPoint("TOPLEFT", PAD, -30)
@@ -702,8 +721,8 @@ Refresh = function()
     -- fenêtre
     local editing = NZR.editing
     for _, tex in pairs(portraits) do tex:Hide() end
-    -- toujours affichée quand l'option est active (même vide), sauf si tu l'as fermée
-    local want = not userHidden and not editing
+    -- fenêtre : quand un monstre est suivi (ou rouverte à la main) ; sinon l'icône
+    local want = not userHidden and not editing and (#list > 0 or forceOpen)
     if want then
         local shown = math.min(#list, MAX_ROWS)
         for i = 1, shown do
@@ -727,7 +746,7 @@ Refresh = function()
         local extra = #list - shown
         if #list == 0 then
             win.empty:Show()
-            win.hint:SetText("Tue un monstre, ou cible-le et clique sur le carré +")
+            win.hint:SetText("Tue un monstre, ou cible-le et clique sur +")
         else
             win.empty:Hide()
             win.hint:SetText("Clic : flèche  ·  Clic droit : retirer")
@@ -748,6 +767,12 @@ Refresh = function()
         win:Show()
     else
         win:Hide()
+    end
+    if launcher then
+        launcher:SetShown(not want and not editing)
+        local n = 0
+        for _, it in ipairs(list) do if not it.e.alive then n = n + 1 end end
+        launcher.count:SetText(n > 0 and n or "")
     end
 
     -- repère dans le monde : le prochain à revenir sur ta carte
@@ -863,7 +888,6 @@ local function SeenDead(unit)
     local n, oldK, oldT = 0, nil, math.huge
     for k, x in pairs(data.active) do n = n + 1; if x.t < oldT then oldK, oldT = k, x.t end end
     if n > 40 and oldK then data.active[oldK] = nil end
-    userHidden = nil
     Wake()
 end
 
@@ -936,7 +960,7 @@ function NZR.RespawnCmd(arg)
         NZR:Print("temps de respawn oubliés.")
         Refresh()
     elseif arg == "voir" or arg == "show" then
-        userHidden = nil; Wake()
+        userHidden, forceOpen = nil, true; Wake()
     else
         AddTarget()
     end
@@ -957,7 +981,7 @@ function M:Init()
         if type(k) == "number" then data.active[k] = nil; if e.guid then e.npc = k; data.active[e.guid] = e end end
     end
     BuildWindow()
-    BuildButton()
+    BuildLauncher()
     BuildLabel()
 
     local ev = CreateFrame("Frame")
