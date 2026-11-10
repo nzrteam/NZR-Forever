@@ -10,7 +10,9 @@ local plain = NZR.plain
 local function DB() return NZR.db end
 
 local SWING_ICON = "Interface\\Icons\\INV_Sword_04"
-local pool, active = {}, {}
+-- deux réserves : une ligne qui a affiché un chiffre caché par le jeu (« secret ») ne
+-- donne plus sa largeur ensuite ; on ne la réutilise donc que pour d'autres chiffres cachés
+local pools, active = { plain = {}, secret = {} }, {}
 local driver
 local lastCast = { t = 0 }
 
@@ -23,8 +25,8 @@ local function Font(fs, size)
     fs:SetShadowColor(0, 0, 0, 1); fs:SetShadowOffset(2, -2)
 end
 
-local function Get()
-    local f = table.remove(pool)
+local function Get(kind)
+    local f = table.remove(pools[kind])
     if not f then
         f = CreateFrame("Frame", nil, UIParent)
         f:SetFrameStrata("HIGH")
@@ -60,7 +62,9 @@ local function SpawnNow(area, value, r, g, b, icon, crit)
         local hx, hy = hd:GetCenter(); local cx, cy = UIParent:GetCenter()
         a.x, a.y = hx - cx - (area == "note" and 0 or 0), hy - cy
     end
-    local f = Get()
+    local secret = not plain(value)
+    local f = Get(secret and "secret" or "plain")
+    f.kind = secret and "secret" or "plain"
     local scale = DB().sctSize or 1
     local size = math.floor(((area == "note") and 26 or (crit and 30 or 22)) * scale + 0.5)
     Font(f.text, size)
@@ -75,6 +79,7 @@ local function SpawnNow(area, value, r, g, b, icon, crit)
     -- largeur du contenu (icône + texte) : le tout est centré sur ton bloc
     local okW, tw = pcall(f.text.GetStringWidth, f.text)
     tw = (okW and plain(tw) and type(tw) == "number") and tw or 0
+    if secret or tw == 0 then tw = size * 1.8 end            -- chiffre caché : largeur estimée (~3 chiffres)
     f.iconW = icon and (size + 4) or 0
     f.half = (f.iconW + tw) / 2
     -- plusieurs coups d'affilée : on décale un peu pour ne pas les empiler
@@ -111,7 +116,7 @@ local function Animate(_, e)
         local a = f.area
         local p = f.t / a.dur
         if p >= 1 then
-            f:Hide(); table.remove(active, i); table.insert(pool, f)
+            f:Hide(); table.remove(active, i); table.insert(pools[f.kind or "plain"], f)
         else
             -- coup critique : petit « pop » qui se résorbe
             if f.crit then f:SetScale(1 + math.max(0, 0.6 - f.t * 3)) end
