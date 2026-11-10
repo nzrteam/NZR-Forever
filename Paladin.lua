@@ -423,16 +423,26 @@ local function UpdateButtons()
     local inCombat = InCombatLockdown()
     for i = 1, (bar.count or 0) do
         local b = buttons[i]
-        local missing, minLeft, target = ClassStatus(b.class, b.blessing)
-        b.missing = missing
         local r, g, bl = ClassColor(b.class)
         b.name:SetText(ClassName(b.class)); b.name:SetTextColor(r, g, bl)
+        -- en combat, le jeu cache les buffs des autres : on garde le dernier état connu
+        -- (sinon tout passe à « sans » alors que la bénédiction est bien là)
+        local missing, minLeft, target
+        if inCombat and b.lastState then
+            missing, minLeft, target = b.lastState.missing, b.lastState.minLeft, b.lastState.target
+            if minLeft then minLeft = minLeft - (GetTime() - b.lastState.at) end
+        else
+            missing, minLeft, target = ClassStatus(b.class, b.blessing)
+            b.lastState = { missing = missing, minLeft = minLeft, target = target, at = GetTime(), cls = b.class }
+        end
+        if b.lastState and b.lastState.cls ~= b.class then b.lastState = nil end
+        b.missing = missing
         local total = #(roster[b.class] or {})
         if #missing > 0 then
             b.state:SetText(("|cffff5050%d / %d sans|r"):format(#missing, total))
             b.icon:SetDesaturated(true)
         else
-            b.state:SetText(minLeft and ("|cff80ff80%s|r"):format(FormatTime(minLeft)) or "|cff80ff80ok|r")
+            b.state:SetText(minLeft and minLeft > 0 and ("|cff80ff80%s|r"):format(FormatTime(minLeft)) or "|cff80ff80ok|r")
             b.icon:SetDesaturated(false)
         end
         if not inCombat and target then

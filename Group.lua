@@ -335,8 +335,11 @@ local function Fill(list, u, filters, stopAfterFirst)
             if n >= #list then break end
             local ok, a = pcall(C_UnitAuras.GetAuraDataByIndex, u, i, filter)
             if not ok or not a then break end
+            -- en combat l'identifiant peut être « secret » : on ne compare que s'il est lisible
             local dup = false
-            for j = 1, n do if list[j].id == a.auraInstanceID then dup = true end end
+            if plain(a.auraInstanceID) then
+                for j = 1, n do if plain(list[j].id) and list[j].id == a.auraInstanceID then dup = true end end
+            end
             if not dup then
                 n = n + 1
                 SetIcon(list[n], u, a)
