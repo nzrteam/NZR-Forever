@@ -52,6 +52,25 @@ local function UnitNPC(unit)
     if npc then return npc, guid end
 end
 
+-- Heure d'apparition d'un monstre, lue dans son identifiant (GUID) : les 23 derniers
+-- bits du « spawn UID » comptent les secondes dans un cycle de 2^23 s (~97 jours).
+-- Sur Forever c'est lisible en monde ouvert (pas en donjon). Renvoie une heure serveur.
+local CYCLE = 8388608      -- 2^23
+local function SpawnTime(guid)
+    if type(guid) ~= "string" or not plain(guid) or not bit then return end
+    local typ, _, _, _, _, _, uid = strsplit("-", guid)
+    if (typ ~= "Creature" and typ ~= "Vehicle") or not uid or #uid < 6 then return end
+    local raw = tonumber(uid:sub(-6), 16)
+    if not raw then return end
+    local inCycle = bit.band(raw, CYCLE - 1)
+    local now = GetServerTime and GetServerTime() or time()
+    local t = now - (now % CYCLE) + inCycle
+    if t > now + 5 then t = t - CYCLE end
+    if now - t < 0 or now - t > 30 * 86400 then return end   -- incohérent : on n'en tient pas compte
+    return t
+end
+NZR.RespawnSpawnTime = SpawnTime
+
 local function SafeName(unit)
     local ok, n = pcall(UnitName, unit)
     if ok and plain(n) and n ~= "" then return n end
@@ -234,6 +253,42 @@ local function PlayerSpot()
     if x then return map, x, y end
 end
 
+-- Vrais points d'apparition, lus dans la base de Questie si elle est installée
+-- (NpcDB.spawns : { [zone] = { {x, y}, ... } } en 0-100). On garde ceux de ta carte.
+local function QuestieSpawns(npc, map)
+    if not (_G.NpcDB and _G.NpcDB.spawns and _G.QuestieLoader) then return end
+    local okZ, ZoneDB = pcall(_G.QuestieLoader.ImportModule, _G.QuestieLoader, "ZoneDB")
+    if not okZ or not ZoneDB or not ZoneDB.GetUiMapIdByAreaId then return end
+    local okS, sp = pcall(_G.NpcDB.spawns, npc)
+    if not okS or type(sp) ~= "table" then return end
+    local out
+    for area, list in pairs(sp) do
+        local okM, m = pcall(ZoneDB.GetUiMapIdByAreaId, ZoneDB, area)
+        if okM and m == map and type(list) == "table" then
+            for _, pt in ipairs(list) do
+                if type(pt) == "table" and pt[1] and pt[2] and pt[1] >= 0 then
+                    out = out or {}
+                    out[#out + 1] = { pt[1] / 100, pt[2] / 100 }
+                end
+            end
+        end
+    end
+    return out
+end
+-- le point d'apparition de la base le plus proche (moins de ~80 m), sinon rien
+local function SnapToSpawn(npc, map, x, y)
+    local pts = map and QuestieSpawns(npc, map)
+    if not pts then return end
+    local w, h = MapSize(map)
+    local best, bd
+    for _, p in ipairs(pts) do
+        local dx, dy = (p[1] - x) * (w or 1000), (p[2] - y) * (h or 1000)
+        local d = math.sqrt(dx * dx + dy * dy)
+        if not bd or d < bd then best, bd = p, d end
+    end
+    if best and bd <= 80 then return best[1], best[2] end
+end
+
 -- écart en mètres entre toi et le point (est, sud)
 local function Offset(e)
     if not e.map then return end
@@ -367,6 +422,10 @@ local function RowTooltip(row)
     end
     local lo, avg, hi, n = Stats(row.npc, row.e)
     if n then GameTooltip:AddLine(("Rapide %s · moyen %s · lent %s"):format(Clock(lo), Clock(avg), Clock(hi)), 1, 1, 1) end
+    if row.e and not row.e.test then
+        if row.e.exact then GameTooltip:AddLine("Point d'apparition exact (base Questie)", 0.5, 0.86, 0.42)
+        else GameTooltip:AddLine("Point estimé (là où tu étais)", 0.7, 0.7, 0.7) end
+    end
     GameTooltip:AddLine("Clic gauche : repère et flèche vers l'endroit", 0.8, 0.8, 0.8)
     GameTooltip:AddLine("Clic droit : retirer ce chrono", 0.8, 0.8, 0.8)
     GameTooltip:AddLine("Maj + clic droit : oublier ce monstre", 0.8, 0.8, 0.8)
@@ -880,30 +939,42 @@ local function SeenAlive(unit)
     npcGuids[npc][guid] = t
     if DB().respawnQuest ~= false and questGUID[guid] == nil then questGUID[guid] = UnitIsQuest(unit) end
     -- réapparition d'un monstre qu'on attendait ? (le plus proche de ceux de ce type)
-    -- un monstre qui vient de réapparaître : pleine vie et pas en combat
-    local okH, hp = pcall(UnitHealth, unit); local okM, mx = pcall(UnitHealthMax, unit)
-    local full = okH and okM and plain(hp) and plain(mx) and mx > 0 and hp >= mx
-    if not full or Bool(UnitAffectingCombat, unit) then return end
-    local near = Near(unit, 4)
-    if near == false then return end          -- trop loin de toi pour savoir d'où il vient
+    local born = SpawnTime(guid)                 -- son heure d'apparition, si le jeu la laisse lire
     local best, bestK, bestD
     local now = Now()
-    for k, e in pairs(data.active) do
-        if e.npc == npc and not e.alive and not e.test and guid ~= e.guid and not (e.before and e.before[guid])
-           and now - e.t >= (e.common and 30 or 10) then
-            local de, ds = Offset(e)
-            local d = de and math.sqrt(de * de + ds * ds) or 0
-            if d <= (e.common and (near and 20 or 25) or 90) and (not bestD or d < bestD) then best, bestK, bestD = e, k, d end
+    if born then
+        -- méthode sûre : il est apparu APRÈS la mort qu'on a vue → c'est sa réapparition
+        for k, e in pairs(data.active) do
+            if e.npc == npc and not e.alive and not e.test and guid ~= e.guid and born > e.t + 2 then
+                local de, ds = Offset(e)
+                local d = de and math.sqrt(de * de + ds * ds) or 0
+                if d <= (e.common and 60 or 120) and (not bestD or d < bestD) then best, bestK, bestD = e, k, d end
+            end
+        end
+    else
+        -- sans heure d'apparition : pleine vie, hors combat, tout près de toi et du point
+        local okH, hp = pcall(UnitHealth, unit); local okM, mx = pcall(UnitHealthMax, unit)
+        local full = okH and okM and plain(hp) and plain(mx) and mx > 0 and hp >= mx
+        if not full or Bool(UnitAffectingCombat, unit) then return end
+        local near = Near(unit, 4)
+        if near == false then return end
+        for k, e in pairs(data.active) do
+            if e.npc == npc and not e.alive and not e.test and guid ~= e.guid and not (e.before and e.before[guid])
+               and now - e.t >= (e.common and 30 or 10) then
+                local de, ds = Offset(e)
+                local d = de and math.sqrt(de * de + ds * ds) or 0
+                if d <= (e.common and (near and 20 or 25) or 90) and (not bestD or d < bestD) then best, bestK, bestD = e, k, d end
+            end
         end
     end
     if best then
-        local el = now - best.t
+        local el = (born and born - best.t) or (now - best.t)     -- avec l'heure d'apparition : temps exact
         local rec = data.npcs[npc] or { s = {} }
         data.npcs[npc] = rec
         rec.n = rec.n or best.n
         -- relevé trop différent de ce qu'on sait déjà (moins de la moitié) : sans doute un autre
         local _, med, _, n = Stats(npc)
-        local plausible = not (med and n and n >= 2 and el < med * 0.5)
+        local plausible = born or not (med and n and n >= 2 and el < med * 0.5)
         if el <= 3600 and plausible then
             AddSpotSample(npc, best, el)
             table.insert(rec.s, el)
@@ -926,6 +997,12 @@ local function SeenDead(unit)
     local map, x, y
     local fp = idlePos[guid] or firstPos[guid]
     if fp then map, x, y = fp[1], fp[2], fp[3] else map, x, y = PlayerSpot() end
+    -- le vrai point d'apparition (base Questie) le plus proche, si on le connaît
+    local exact = false
+    if map and x then
+        local sx, sy = SnapToSpawn(npc, map, x, y)
+        if sx then x, y, exact = sx, sy, true end
+    end
     firstPos[guid], idlePos[guid] = nil, nil
     local before = {}
     for g in pairs(npcGuids[npc] or {}) do if g ~= guid then before[g] = true end end
@@ -940,7 +1017,8 @@ local function SeenDead(unit)
     local okT, ctype = pcall(UnitCreatureType, unit)
     local okF, fam = pcall(UnitCreatureFamily, unit)
     data.active[guid] = { npc = npc, t = Now(), guid = guid, map = map, x = x, y = y, zone = zone, before = before, n = nm, common = common or nil,
-                          ctype = okT and plain(ctype) and ctype or nil, fam = okF and plain(fam) and fam or nil }
+                          ctype = okT and plain(ctype) and ctype or nil, fam = okF and plain(fam) and fam or nil,
+                          exact = exact or nil }
     TakePortrait(guid, unit)
     -- pas plus de 40 chronos : on oublie les plus vieux
     local n, oldK, oldT = 0, nil, math.huge
@@ -986,6 +1064,10 @@ local function OnTooltip(tt, d)
         local st = State(npc, e, Now())
         tt:AddLine("|TInterface\\TargetingFrame\\UI-TargetingFrame-Skull:12|t Respawn : " .. st.long, 0.78, 0.63, 0.25)
         return
+    end
+    if DB().respawnAge ~= false then
+        local born = SpawnTime(guid)
+        if born then tt:AddLine("En vie depuis " .. Clock(Now() - born), 0.6, 0.6, 0.6) end
     end
     local _, avg, _, n = Stats(npc)
     if avg then

@@ -233,6 +233,7 @@ local PAGES = {
         { t = "switch", key = "respawnMinimap", section = "Temps de respawn", label = "Point sur la minicarte", desc = "Une tête de mort dorée à l'endroit ; survol = temps restant." },
         { t = "switch", key = "respawnMap", section = "Temps de respawn", label = "Point sur la grande carte", desc = "Avec le compte à rebours écrit dessous." },
         { t = "switch", key = "respawnTip", section = "Temps de respawn", label = "Ligne dans l'infobulle", desc = "« Respawn ≈ 5:30 » quand ta souris passe sur un monstre déjà chronométré." },
+        { t = "switch", key = "respawnAge", section = "Temps de respawn", label = "Âge du monstre dans l'infobulle", desc = "« En vie depuis 3:12 » : le jeu garde l'heure d'apparition de chaque monstre (monde ouvert). C'est aussi ce qui permet à NZR de reconnaître une vraie réapparition et son temps exact." },
         { t = "switch", key = "respawnSound", section = "Temps de respawn", label = "Son quand il revient", desc = "Désactivé de base. Le message doré s'affiche toujours au moment prévu, le son est en plus." },
         { t = "button", section = "Temps de respawn", label = "Essayer", desc = "Un faux monstre « revient » dans 20 secondes là où tu es : fenêtre, repère, minicarte et son.",
           text = function() return "Essayer" end,
