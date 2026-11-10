@@ -270,7 +270,20 @@ local function OnXPMessage(msg)
 end
 
 -- effets que TU poses sur ta cible (étourdissement, ralentissement…) : « [Marteau de la justice] »
+-- diagnostic : /nzr diag combat (écrit dans le chat ce que le jeu envoie)
+local function Dbg(...) if NZR.sctDebug then NZR:Print("|cffaaaaaa[diag]|r " .. table.concat({ ... }, " ")) end end
+local function Show(v) if v == nil then return "rien" end if not plain(v) then return "SECRET" end return tostring(v) end
+
 local function OnTargetAura(info)
+    if NZR.sctDebug then
+        local added = info and type(info.addedAuras) == "table" and info.addedAuras or nil
+        local a1 = added and added[1]
+        local okA, nm, src = false, nil, nil
+        if a1 then okA, nm, src = pcall(function() return a1.name, a1.sourceUnit end) end
+        Dbg("effet cible : complet=" .. Show(info and info.isFullUpdate), "ajouts=" .. (added and #added or 0),
+            "nom=" .. (a1 and (okA and Show(nm) or "ERREUR") or "-"), "source=" .. (a1 and (okA and Show(src) or "ERREUR") or "-"),
+            "dernier sort=" .. Show(lastCast.name), ("il y a %.1fs"):format(GetTime() - lastCast.t))
+    end
     if DB().sctAuras == false then return end
     local shown
     local added = info and type(info.addedAuras) == "table" and info.addedAuras or {}
@@ -399,6 +412,7 @@ function M:Init()
             end
         elseif e == "UNIT_SPELLCAST_SUCCEEDED" then
             -- arguments de l'évènement : unité, n° du lancer, n° du sort
+            Dbg("sort lancé : id=" .. Show(b), "(" .. Show(unit) .. ")")
             local spellID = plain(b) and b or nil
             local okT, tex = false, nil
             if spellID and C_Spell and C_Spell.GetSpellTexture then okT, tex = pcall(C_Spell.GetSpellTexture, spellID) end
