@@ -29,12 +29,39 @@ local function SetupTooltip()
     -- centre fixe : le milieu bas du bloc. L'infobulle reste accrochée au support
     -- (coin bas-droit) ; on décale le support de la moitié de sa largeur.
     local lastW = 0
+    -- correction mesurée : le jeu peut accrocher l'infobulle au support avec un petit
+    -- décalage à lui ; on mesure où elle tombe vraiment et on rattrape l'écart
+    local corr = { x = 0, y = 0 }
     local function Place(w)
         if InCombatLockdown() and cont:IsProtected() then return end
         if NZR.db.tooltipCursor or Editing() then return end
         if w then lastW = w end
         cont:ClearAllPoints()
-        cont:SetPoint("BOTTOMRIGHT", hd, "BOTTOM", math.floor(lastW / 2 + 0.5), 0)
+        cont:SetPoint("BOTTOMRIGHT", hd, "BOTTOM", math.floor(lastW / 2 + corr.x + 0.5), math.floor(corr.y + 0.5))
+    end
+    local P = NZR.plain
+    local function Measure()
+        local tt = GameTooltip
+        if not tt:IsShown() or NZR.db.tooltipCursor or Editing() then return end
+        local okP, _, rel = pcall(tt.GetPoint, tt, 1)
+        if not okP or rel ~= cont then return end                  -- accrochée ailleurs (souris…) : rien à corriger
+        local ok, l, b, w = pcall(function() return tt:GetLeft(), tt:GetBottom(), tt:GetWidth() end)
+        if not ok or not (l and b and w and P(l) and P(b) and P(w)) then return end
+        local hl, hb, hw = hd:GetLeft(), hd:GetBottom(), hd:GetWidth()
+        if not (hl and hb and hw) then return end
+        local ts, hs, cs = tt:GetEffectiveScale(), hd:GetEffectiveScale(), cont:GetEffectiveScale()
+        -- collée au bord de l'écran (le jeu la retient) : l'écart ne vient pas de l'accroche
+        local us = UIParent:GetEffectiveScale()
+        local sw, sh = UIParent:GetWidth() * us, UIParent:GetHeight() * us
+        local okH, th = pcall(tt.GetHeight, tt)
+        if l * ts <= 2 or (l + w) * ts >= sw - 2 or b * ts <= 2 or (okH and P(th) and (b + th) * ts >= sh - 2) then return end
+        local dx = ((hl + hw / 2) * hs - (l + w / 2) * ts) / cs     -- centre du bloc − centre de l'infobulle
+        local dy = (hb * hs - b * ts) / cs                         -- bas du bloc − bas de l'infobulle
+        if math.abs(dx) > 1 or math.abs(dy) > 1 then
+            corr.x = math.max(-300, math.min(300, corr.x + dx))
+            corr.y = math.max(-300, math.min(300, corr.y + dy))
+            Place()
+        end
     end
     local function Follow(tt)
         local ok, w = pcall(tt.GetWidth, tt)
@@ -44,6 +71,7 @@ local function SetupTooltip()
             if okS and NZR.plain(s1) and s1 and s2 and s2 > 0 then w = w * s1 / s2 end
             if math.abs(w - lastW) > 0.5 then Place(w) end
         end
+        C_Timer.After(0, Measure)
     end
     GameTooltip:HookScript("OnSizeChanged", Follow)
     GameTooltip:HookScript("OnShow", Follow)

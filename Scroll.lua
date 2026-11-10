@@ -44,7 +44,7 @@ end
 local AREAS = {
     out = { x = 70, y = 70, dy = 130, dx = 40, dur = 1.5 },     -- au-dessus à droite du perso, monte en s'écartant
     inc = { x = -150, y = 40, dy = -110, dx = -20, dur = 1.5 },  -- à gauche, descend
-    note = { x = -60, y = 220, dy = 90, dx = 0, dur = 2.2 },     -- au centre, en haut : un message à la fois, ils montent l'un après l'autre
+    note = { x = 0, y = 220, dy = 90, dx = 0, dur = 2.2 },     -- au centre, en haut : un message à la fois, ils montent l'un après l'autre
 }
 local lastSpawn = { out = 0, inc = 0, note = 0 }
 local stagger = { out = 0, inc = 0, note = 0 }
@@ -72,6 +72,10 @@ local function SpawnNow(area, value, r, g, b, icon, crit)
         f.icon:SetSize(1, size); f.icon:Hide(); f.edge:Hide()
     end
     f.icon:ClearAllPoints(); f.icon:SetPoint("LEFT", f, "LEFT", 0, 0)
+    -- largeur du contenu (icône + texte) : le tout est centré sur ton bloc
+    local okW, tw = pcall(f.text.GetStringWidth, f.text)
+    tw = (okW and plain(tw) and type(tw) == "number") and tw or 0
+    f.half = ((icon and (size + 4) or 0) + tw) / 2
     -- plusieurs coups d'affilée : on décale un peu pour ne pas les empiler
     local now = GetTime()
     if now - lastSpawn[area] < 0.25 then stagger[area] = (stagger[area] + 1) % 4 else stagger[area] = 0 end
@@ -80,8 +84,10 @@ local function SpawnNow(area, value, r, g, b, icon, crit)
     f.x0 = a.x + (area == "note" and 0 or stagger[area] * (area == "out" and 26 or -26))
     if area == "note" then stagger.note = 0 end
     f.y0 = a.y - stagger[area] * 18 * (a.dy > 0 and 1 or -1)
-    f:ClearAllPoints(); f:SetPoint("LEFT", UIParent, "CENTER", f.x0, f.y0)
-    f:SetAlpha(0); f:SetScale(crit and 1.6 or 1); f:Show()
+    f:SetScale(crit and 1.6 or 1)
+    local sc = f:GetScale()
+    f:ClearAllPoints(); f:SetPoint("LEFT", UIParent, "CENTER", f.x0 / sc - f.half, f.y0 / sc)
+    f:SetAlpha(0); f:Show()
     table.insert(active, f)
     driver:Show()
 end
@@ -110,8 +116,10 @@ local function Animate(_, e)
             if f.crit then f:SetScale(1 + math.max(0, 0.6 - f.t * 3)) end
             -- départ rapide puis ralenti (plus agréable à lire)
             local ease = 1 - (1 - p) * (1 - p)
+            -- position en coordonnées d'écran, ramenée à l'échelle du texte (le « pop » ne décale plus)
+            local sc = f:GetScale()
             f:ClearAllPoints()
-            f:SetPoint("LEFT", UIParent, "CENTER", f.x0 + (a.dx or 0) * ease, f.y0 + a.dy * ease)
+            f:SetPoint("LEFT", UIParent, "CENTER", (f.x0 + (a.dx or 0) * ease) / sc - (f.half or 0), (f.y0 + a.dy * ease) / sc)
             f:SetAlpha(f.t < 0.08 and f.t / 0.08 or (p < 0.75 and 1 or (1 - (p - 0.75) / 0.25)))
         end
     end
@@ -468,9 +476,9 @@ function M:Init()
         pcall(UIErrorsFrame.SetShadowColor, UIErrorsFrame, 0, 0, 0, 1)
         pcall(UIErrorsFrame.SetShadowOffset, UIErrorsFrame, 1, -1)
     end
-    anchors.out = NZR:Holder("sctOut", "Texte : tes coups", 150, 34, { "CENTER", "CENTER", 140, 90 })
-    anchors.inc = NZR:Holder("sctIn", "Texte : reçu", 150, 34, { "CENTER", "CENTER", -110, 60 })
-    anchors.note = NZR:Holder("sctNote", "Texte : combat", 150, 34, { "CENTER", "CENTER", 0, 230 })
+    anchors.out = NZR:Holder("sctOut", "Texte : Tes coups", 150, 34, { "CENTER", "CENTER", 140, 90 })
+    anchors.inc = NZR:Holder("sctIn", "Texte : Reçu", 150, 34, { "CENTER", "CENTER", -110, 60 })
+    anchors.note = NZR:Holder("sctNote", "Texte : Combat", 150, 34, { "CENTER", "CENTER", 0, 230 })
 
     local ev = CreateFrame("Frame")
     ev:RegisterEvent("UNIT_COMBAT")
@@ -515,11 +523,11 @@ function M:Init()
     start:SetFontString(txt); start:SetPushedTextOffset(1, -1)
     local sub = start:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     sub:SetPoint("TOP", start, "BOTTOM", 0, -2)
-    sub:SetText("NZR : voir mes coups en groupe")
+    sub:SetText("NZR Forever : Pour une synchronisation optimale")
     sub:SetTextColor(0.85, 0.85, 0.85)
     start:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-        GameTooltip:AddLine("Voir mes coups en groupe", 1, 0.82, 0)
+        GameTooltip:AddLine("Synchronisation optimale", 1, 0.82, 0)
         GameTooltip:AddLine("En groupe, le jeu ne dit pas qui frappe. Avec ce clic, il envoie le journal de combat (« Mes actions ») et NZR reconnaît tes coups.", 1, 1, 1, true)
         GameTooltip:AddLine("Le clic ouvre l'onglet Journal de combat du chat et revient au tien. Une fois par connexion. Clic droit : cacher.", 0.7, 0.7, 0.7, true)
         GameTooltip:Show()

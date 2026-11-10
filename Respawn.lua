@@ -374,20 +374,20 @@ local function State(npc, e, now)
     local el = now - e.t
     local st = { elapsed = el, n = n, lo = lo, avg = avg, hi = hi }
     if e.alive then
-        st.text, st.r, st.g, st.b, st.pct = "vivant", 0.5, 0.86, 0.42, 1
+        st.text, st.r, st.g, st.b, st.pct = "Vivant", 0.5, 0.86, 0.42, 1
     elseif not avg then
         st.text, st.r, st.g, st.b, st.pct = "?", 0.79, 0.73, 0.54, 0
-        st.long = "temps inconnu : appris à son retour"
+        st.long = "Temps inconnu : appris à son retour"
     elseif el < avg then
         st.left = avg - el
         st.text, st.r, st.g, st.b, st.pct = Clock(st.left), 1, 1, 1, el / avg
-        st.long = "revient dans " .. Clock(st.left)
+        st.long = "Revient dans " .. Clock(st.left)
     elseif el < hi then
-        st.text, st.r, st.g, st.b, st.pct = "bientôt", 1, 0.82, 0, 1
-        st.long = "bientôt (au plus tard " .. Clock(hi - el) .. ")"
+        st.text, st.r, st.g, st.b, st.pct = "Bientôt", 1, 0.82, 0, 1
+        st.long = "Bientôt (au plus tard " .. Clock(hi - el) .. ")"
     else
-        st.text, st.r, st.g, st.b, st.pct = "attendu", 1, 0.82, 0, 1
-        st.long = "devrait déjà être là"
+        st.text, st.r, st.g, st.b, st.pct = "Attendu", 1, 0.82, 0, 1
+        st.long = "Devrait déjà être là"
     end
     st.long = st.long or st.text
     return st
@@ -395,11 +395,11 @@ end
 
 local function Sub(npc, e, st)
     if e.alive then
-        if st.n then return ("rapide %s · moyen %s · lent %s (%d relevé%s)"):format(Clock(st.lo), Clock(st.avg), Clock(st.hi), st.n, st.n > 1 and "s" or "") end
-        return "réapparu"
+        if st.n then return ("Rapide %s · Moyen %s · Lent %s (%d relevé%s)"):format(Clock(st.lo), Clock(st.avg), Clock(st.hi), st.n, st.n > 1 and "s" or "") end
+        return "Réapparu"
     end
-    local s = "mort il y a " .. Clock(st.elapsed)
-    if not st.n then return s .. " · en apprentissage…" end
+    local s = "Mort il y a " .. Clock(st.elapsed)
+    if not st.n then return s .. " · En apprentissage…" end
     return s .. (e.zone and (" · " .. e.zone) or "")
 end
 
@@ -841,7 +841,7 @@ local function UpdateWorldMap(list)
                     p:SetPoint("CENTER", canvas, "TOPLEFT", e.x * W * cs, -e.y * H * cs)
                     p.npc, p.nm = it.npc, it.nm
                     p.icon:SetVertexColor(1, 0.82, 0)
-                    p.text:SetText(it.st.left and Clock(it.st.left) or (it.st.avg and "bientôt" or "?"))
+                    p.text:SetText(it.st.left and Clock(it.st.left) or (it.st.avg and "Bientôt" or "?"))
                     p:Show()
                 end
             end
@@ -963,7 +963,7 @@ Refresh = function()
             label:ClearAllPoints()
             label:SetPoint("BOTTOM", st, "TOP", 0, 14)
             label.name:SetText((data.npcs[e.npc or 0] and data.npcs[e.npc or 0].n) or e.n or "")
-            label.time:SetText(s.left and Clock(s.left) or (s.avg and "maintenant" or "?"))
+            label.time:SetText(s.left and Clock(s.left) or (s.avg and "Maintenant" or "?"))
             label:Show()
         else
             label:Hide()
@@ -1131,7 +1131,7 @@ local function OnTooltip(tt, d)
     if avg then
         tt:AddLine(("Respawn ≈ %s (%d relevé%s)"):format(Clock(avg), n, n > 1 and "s" or ""), 0.78, 0.63, 0.25)
     elseif data.watch[npc] then
-        tt:AddLine("Respawn : suivi, temps pas encore connu", 0.6, 0.55, 0.4)
+        tt:AddLine("Respawn : Suivi, temps pas encore connu", 0.6, 0.55, 0.4)
     end
 end
 

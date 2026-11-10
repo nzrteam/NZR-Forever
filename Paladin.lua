@@ -439,10 +439,10 @@ local function UpdateButtons()
         b.missing = missing
         local total = #(roster[b.class] or {})
         if #missing > 0 then
-            b.state:SetText(("|cffff5050%d / %d sans|r"):format(#missing, total))
+            b.state:SetText(("|cffff5050Sans : %d / %d|r"):format(#missing, total))
             b.icon:SetDesaturated(true)
         else
-            b.state:SetText(minLeft and minLeft > 0 and ("|cff80ff80%s|r"):format(FormatTime(minLeft)) or "|cff80ff80ok|r")
+            b.state:SetText(minLeft and minLeft > 0 and ("|cff80ff80%s|r"):format(FormatTime(minLeft)) or "|cff80ff80OK|r")
             b.icon:SetDesaturated(false)
         end
         if not inCombat and target then
@@ -640,7 +640,7 @@ local function BuildGrid()
         kn:ClearAllPoints(); kn:SetPoint("TOPLEFT", nm, "BOTTOMLEFT", 0, -3)
         local list = {}
         for _, b in ipairs(BLESS) do if paladins[pal].known[b.key] then list[#list + 1] = b.short end end
-        kn:SetText(#list > 0 and table.concat(list, ", ") or (paladins[pal].me and "aucune connue" or "sans NZR Forever ?"))
+        kn:SetText(#list > 0 and table.concat(list, ", ") or (paladins[pal].me and "Aucune connue" or "Sans NZR Forever ?"))
         kn:SetWidth(140); kn:SetJustifyH("LEFT")
         for i, cls in ipairs(classes) do
             local c = Cell()

@@ -66,8 +66,16 @@ function NZR.SafeText(fs, v)
     if not pcall(fs.SetText, fs, v) then fs:SetText("") end
 end
 
+local UPPER = { ["é"] = "É", ["è"] = "È", ["ê"] = "Ê", ["à"] = "À", ["â"] = "Â", ["ç"] = "Ç", ["ô"] = "Ô", ["î"] = "Î", ["û"] = "Û" }
+function NZR.Cap(s)
+    if type(s) ~= "string" or s == "" then return s end
+    for low, up in pairs(UPPER) do
+        if s:sub(1, #low) == low then return up .. s:sub(#low + 1) end
+    end
+    return (s:gsub("^%l", string.upper))
+end
 function NZR:Print(msg)
-    print("|cff9b6bf2NZR|r " .. msg)
+    print("|cff9b6bf2NZR|r " .. NZR.Cap(tostring(msg)))
 end
 
 ---------------------------------------------------------------------------

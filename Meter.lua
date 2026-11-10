@@ -906,10 +906,10 @@ Render = function()
         win.empty:SetText("En attente de combat…")
     end
     if shown == "bars" and view ~= "bars" then
-        win.note:SetText("vue Barres (erreur, voir /nzr erreurs)")
+        win.note:SetText("Vue Barres (erreur, voir /nzr erreurs)")
         win.note:Show()
     elseif shown ~= "bars" and win.partial then
-        win.note:SetText("noms cachés par le jeu : détails partiels pour les autres")
+        win.note:SetText("Noms cachés par le jeu : détails partiels pour les autres")
         win.note:Show()
     else
         win.note:Hide()
@@ -1448,7 +1448,7 @@ local function CreateWindow()
     win.empty:SetText("En attente de combat…")
     win.note = NZR:Text(win.body, 10, C.dim, "RIGHT")
     win.note:SetPoint("BOTTOMRIGHT", -4, 2)
-    win.note:SetText("vue Barres pendant le combat")
+    win.note:SetText("Vue Barres pendant le combat")
 
     -- pied : total du groupe
     local foot = CreateFrame("Frame", nil, win)
