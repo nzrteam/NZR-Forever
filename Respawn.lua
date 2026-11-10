@@ -10,7 +10,7 @@ local plain = NZR.plain
 
 local function DB() return NZR.db end
 local MAX_SAMPLES, MAX_ROWS, KEEP_ALIVE = 8, 8, 60
-local WIN_W, ROW_H = 200, 19
+local WIN_W, ROW_H, PAD = 214, 20, 14
 
 local data                  -- NZRF_DB.respawnData = { npcs, active, watch }
 local aliveGUID, npcGuids = {}, {}
@@ -54,6 +54,50 @@ end
 local function SafeName(unit)
     local ok, n = pcall(UnitName, unit)
     if ok and plain(n) and n ~= "" then return n end
+end
+
+-- icône d'un monstre : son portrait (pris quand il meurt sous tes yeux), sinon son type
+local portraits = {}            -- [clé du chrono] = texture portrait (session en cours)
+local portraitHost
+local FAMILY = {
+    ["araignée"] = "Spider", spider = "Spider", ["loup"] = "Wolf", wolf = "Wolf", ["ours"] = "Bear", bear = "Bear",
+    ["sanglier"] = "Boar", boar = "Boar", ["félin"] = "Cat", cat = "Cat", ["raptor"] = "Raptor",
+    ["crabe"] = "Crab", crab = "Crab", ["gorille"] = "Gorilla", gorilla = "Gorilla", ["chauve-souris"] = "Bat", bat = "Bat",
+    ["chouette"] = "Owl", owl = "Owl", ["oiseau charognard"] = "Vulture", ["carrion bird"] = "Vulture",
+    ["hyène"] = "Hyena", hyena = "Hyena", ["crocilisque"] = "Crocolisk", crocolisk = "Crocolisk",
+    ["scorpide"] = "Scorpid", scorpid = "Scorpid", ["tortue"] = "Turtle", turtle = "Turtle",
+    ["haut-trotteur"] = "TallStrider", ["tallstrider"] = "TallStrider", ["serpent des vents"] = "WindSerpent", ["wind serpent"] = "WindSerpent",
+}
+local TYPE = {
+    ["humanoïde"] = "INV_Misc_Head_Human_01", humanoid = "INV_Misc_Head_Human_01",
+    ["bête"] = "Ability_Hunter_Pet_Wolf", beast = "Ability_Hunter_Pet_Wolf",
+    ["démon"] = "Spell_Shadow_SummonFelHunter", demon = "Spell_Shadow_SummonFelHunter",
+    ["draconien"] = "INV_Misc_Head_Dragon_01", dragonkin = "INV_Misc_Head_Dragon_01",
+    ["élémentaire"] = "Spell_Nature_EarthElemental_Totem", elemental = "Spell_Nature_EarthElemental_Totem",
+    ["mort-vivant"] = "Spell_Shadow_RaiseDead", undead = "Spell_Shadow_RaiseDead",
+    ["mécanique"] = "INV_Misc_Gear_01", mechanical = "INV_Misc_Gear_01",
+    ["géant"] = "Ability_Warrior_Rampage", giant = "Ability_Warrior_Rampage",
+}
+local function TypeIcon(e)
+    local fam = e.fam and FAMILY[e.fam:lower()]
+    if fam then return "Interface\\Icons\\Ability_Hunter_Pet_" .. fam end
+    local t = e.ctype and TYPE[e.ctype:lower()]
+    if t then return "Interface\\Icons\\" .. t end
+    return "Interface\\TargetingFrame\\UI-TargetingFrame-Skull"
+end
+local function TakePortrait(key, unit)
+    if not SetPortraitTexture then return end
+    portraitHost = portraitHost or CreateFrame("Frame", nil, UIParent)
+    local tex = portraits[key] or portraitHost:CreateTexture(nil, "ARTWORK")
+    if pcall(SetPortraitTexture, tex, unit) then
+        tex:SetTexCoord(0.12, 0.88, 0.12, 0.88)
+        tex:Hide()
+        portraits[key] = tex
+    end
+end
+local function DropPortrait(key)
+    local tex = portraits[key]
+    if tex then tex:Hide(); tex:SetParent(portraitHost); portraits[key] = nil end
 end
 
 local function Bool(fn, ...)
@@ -292,22 +336,31 @@ end
 
 local function MakeRow(i)
     local r = CreateFrame("Button", nil, win)
-    r:SetSize(WIN_W - 20, ROW_H - 1)
-    r:SetPoint("TOPLEFT", win, "TOPLEFT", 10, -25 - (i - 1) * ROW_H)
+    r:SetSize(WIN_W - PAD * 2, ROW_H - 1)
+    r:SetPoint("TOPLEFT", win, "TOPLEFT", PAD, -27 - (i - 1) * ROW_H)
     r:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     r:RegisterForDrag("LeftButton")
     r:SetScript("OnDragStart", function() local f = win:GetScript("OnDragStart"); if f then f(win) end end)
     r:SetScript("OnDragStop", function() local f = win:GetScript("OnDragStop"); if f then f(win) end end)
+    r.slot = CreateFrame("Frame", nil, r)
+    r.slot:SetSize(15, 15)
+    r.slot:SetPoint("TOPLEFT", 0, -1)
+    r.edge = r.slot:CreateTexture(nil, "BACKGROUND")
+    r.edge:SetPoint("TOPLEFT", -1, 1); r.edge:SetPoint("BOTTOMRIGHT", 1, -1)
+    r.edge:SetColorTexture(0.55, 0.43, 0.18, 1)
+    r.icon = r.slot:CreateTexture(nil, "ARTWORK")
+    r.icon:SetAllPoints()
+    r.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     r.state = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    r.state:SetPoint("TOPRIGHT", 0, -2)
+    r.state:SetPoint("TOPRIGHT", 0, -3)
     r.state:SetJustifyH("RIGHT")
     r.name = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    r.name:SetPoint("TOPLEFT", 0, -2)
+    r.name:SetPoint("TOPLEFT", r.slot, "TOPRIGHT", 5, -2)
     r.name:SetPoint("RIGHT", r.state, "LEFT", -6, 0)
     r.name:SetJustifyH("LEFT")
     r.name:SetWordWrap(false)
     r.bg = r:CreateTexture(nil, "ARTWORK")
-    r.bg:SetPoint("BOTTOMLEFT", 0, 1); r.bg:SetPoint("BOTTOMRIGHT", 0, 1); r.bg:SetHeight(3)
+    r.bg:SetPoint("BOTTOMLEFT", r.slot, "BOTTOMRIGHT", 5, -2); r.bg:SetPoint("BOTTOMRIGHT", 0, 1); r.bg:SetHeight(3)
     r.bg:SetColorTexture(0.23, 0.19, 0.12, 0.9)
     r.bar = CreateFrame("StatusBar", nil, r)
     r.bar:SetPoint("TOPLEFT", r.bg); r.bar:SetPoint("BOTTOMRIGHT", r.bg)
@@ -556,6 +609,7 @@ local function Prune(now)
             Alert(npc, e)
         end
     end
+    for k in pairs(portraits) do if not data.active[k] then DropPortrait(k) end end
     if ourWP and not (data.active[ourWP.npc] and not data.active[ourWP.npc].alive) then ClearWaypoint() end
 end
 
@@ -571,6 +625,7 @@ Refresh = function()
 
     -- fenêtre
     local editing = NZR.editing
+    for _, tex in pairs(portraits) do tex:Hide() end
     local want = #list > 0 and not userHidden and not editing
     if want then
         local shown = math.min(#list, MAX_ROWS)
@@ -578,6 +633,13 @@ Refresh = function()
             local it, r = list[i], rows[i] or MakeRow(i)
             r.npc, r.e, r.nm = it.npc, it.e, it.nm
             r.name:SetText(it.nm)
+            local por = portraits[it.npc]
+            if por then
+                por:SetParent(r.slot); por:ClearAllPoints(); por:SetAllPoints(r.slot); por:SetDrawLayer("OVERLAY"); por:Show()
+                r.icon:Hide(); r.por = por
+            else
+                r.icon:SetTexture(TypeIcon(it.e)); r.icon:Show(); r.por = nil
+            end
             r.state:SetText(it.st.text)
             r.state:SetTextColor(it.st.r, it.st.g, it.st.b)
             r.bar:SetValue(it.st.pct or 0)
@@ -588,14 +650,14 @@ Refresh = function()
         local extra = #list - shown
         if extra > 0 then
             win.more:SetText(("+ %d autre%s"):format(extra, extra > 1 and "s" or ""))
-            win.more:SetPoint("TOPLEFT", win, "TOPLEFT", 10, -27 - shown * ROW_H)
+            win.more:SetPoint("TOPLEFT", win, "TOPLEFT", PAD, -29 - shown * ROW_H)
             win.more:Show()
         else
             win.more:Hide()
         end
         local sc = DB().respawnScale or 1
         if win:GetScale() ~= sc then win:SetScale(sc); win.Anchor() end
-        win:SetHeight(math.max(68, 36 + shown * ROW_H + (extra > 0 and 14 or 0)))
+        win:SetHeight(math.max(70, 40 + shown * ROW_H + (extra > 0 and 14 or 0)))
         win:Show()
     else
         win:Hide()
@@ -694,7 +756,11 @@ local function SeenDead(unit)
         local ok, info = pcall(C_Map.GetMapInfo, map)
         zone = ok and info and plain(info.name) and info.name or nil
     end
-    data.active[guid] = { npc = npc, t = Now(), guid = guid, map = map, x = x, y = y, zone = zone, before = before, n = nm, common = common or nil }
+    local okT, ctype = pcall(UnitCreatureType, unit)
+    local okF, fam = pcall(UnitCreatureFamily, unit)
+    data.active[guid] = { npc = npc, t = Now(), guid = guid, map = map, x = x, y = y, zone = zone, before = before, n = nm, common = common or nil,
+                          ctype = okT and plain(ctype) and ctype or nil, fam = okF and plain(fam) and fam or nil }
+    TakePortrait(guid, unit)
     -- pas plus de 40 chronos : on oublie les plus vieux
     local n, oldK, oldT = 0, nil, math.huge
     for k, x in pairs(data.active) do n = n + 1; if x.t < oldT then oldK, oldT = k, x.t end end
