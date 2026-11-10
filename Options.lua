@@ -165,7 +165,7 @@ local PAGES = {
         { t = "switch", key = "squareMinimap", section = "Minicarte", label = "Minicarte carrée", desc = "Carte carrée avec le bord des infobulles du jeu ; boutons et nom de zone inchangés. Molette = zoom.", r = true },
         { t = "switch", key = "mmButtonsSave", section = "Minicarte", label = "Retenir la place des boutons d'addons", desc = "Les petits boutons ronds autour de la minicarte (Questie…) restent où tu les as glissés, même après un /reload.", r = true },
         { t = "switch", key = "moveWindows", section = "Fenêtres et sacs", label = "Toutes les fenêtres du jeu déplaçables", desc = "Personnage, carte, sorts, talents, collections, PNJ, quêtes… Glisse par la barre de titre ; clic droit dessus = place d'origine.", r = true },
-        { t = "switch", key = "moveBags", section = "Fenêtres et sacs", label = "Sacs déplaçables", desc = "Toute la pile de sacs suit l'endroit choisi.", r = true },
+        { t = "switch", key = "moveBags", section = "Fenêtres et sacs", label = "Sacs déplaçables", desc = "Toute la pile de sacs du jeu suit l'endroit choisi. Sans effet avec un addon de sacs (Baganator, Bagnon…) : place-les avec ses propres réglages.", r = true },
         { t = "switch", key = "reopenWindows", section = "Fenêtres et sacs", label = "Rouvrir les fenêtres après /reload", desc = "Les fenêtres NZR ouvertes avant un rechargement (réglages sur le même onglet, guide, bénédictions) se rouvrent toutes seules." },
         { t = "button", section = "Fenêtres et sacs", label = "Placer l'infobulle et les sacs", desc = "Fait apparaître des blocs à glisser. Reclique ou tape /nzr lock pour finir.",
           text = function() return NZR.unlocked and "Terminer" or "Placer" end,

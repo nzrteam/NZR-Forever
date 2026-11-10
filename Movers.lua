@@ -145,6 +145,17 @@ end
 ---------------------------------------------------------------------------
 local BAG_DEFAULT = { "BOTTOMRIGHT", "BOTTOMRIGHT", -60, 110 }
 
+local BAG_ADDONS = { "Baganator", "Bagnon", "AdiBags", "ArkInventory", "BetterBags", "OneBag3", "Combuctor", "ElvUI" }
+function NZR.BagAddon()
+    for _, n in ipairs(BAG_ADDONS) do
+        local ok, loaded = pcall(function()
+            if C_AddOns and C_AddOns.IsAddOnLoaded then return C_AddOns.IsAddOnLoaded(n) end
+            return IsAddOnLoaded and IsAddOnLoaded(n)
+        end)
+        if ok and loaded then return n end
+    end
+end
+
 local function SetupBags()
     local hd = NZR:Holder("bags", "Sacs", 340, 360, BAG_DEFAULT)
     hd.preview = function()                         -- mode édition : entoure les sacs s'ils sont ouverts
@@ -394,6 +405,8 @@ function M:Init()
     if NZR.db.tooltipOpaque ~= false then pcall(SetupOpaqueTooltips) end
     if NZR.db.lootAll or NZR.db.lootAutoClose ~= false then pcall(SetupLoot) end
     if NZR.db.moveTooltip or NZR.db.tooltipCursor then pcall(SetupTooltip) end
-    if NZR.db.moveBags then pcall(SetupBags) end
+    -- un addon de sacs (Baganator, Bagnon…) remplace ceux du jeu et se déplace lui-même :
+    -- NZR n'y touche pas (sinon le bloc « Sacs » ne correspond à rien)
+    if NZR.db.moveBags and not NZR.BagAddon() then pcall(SetupBags) end
     if NZR.db.moveWindows or NZR.db.moveMap then pcall(SetupWindows) end
 end
