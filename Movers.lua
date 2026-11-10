@@ -69,6 +69,16 @@ local function SetupTooltip()
             cache[owner] = v
             return v
         end
+        -- placement par défaut du jeu : centré sur le bloc (milieu bas), quelle que soit la taille
+        if GameTooltip_SetDefaultAnchor then
+            hooksecurefunc("GameTooltip_SetDefaultAnchor", function(tt)
+                if tt ~= GameTooltip or Editing() or NZR.db.tooltipCursor then return end
+                pcall(function()
+                    tt:ClearAllPoints()
+                    tt:SetPoint("BOTTOM", hd, "BOTTOM", 0, 0)
+                end)
+            end)
+        end
         local busy
         hooksecurefunc(GameTooltip, "SetOwner", function(tt, owner, anchor)
             if busy or Editing() or anchor == "ANCHOR_NONE" or anchor == "ANCHOR_CURSOR"
@@ -78,7 +88,7 @@ local function SetupTooltip()
             pcall(function()
                 tt:SetOwner(owner, "ANCHOR_NONE")
                 tt:ClearAllPoints()
-                tt:SetPoint("BOTTOMRIGHT", cont, "BOTTOMRIGHT", 0, 0)
+                tt:SetPoint("BOTTOM", hd, "BOTTOM", 0, 0)
             end)
             busy = nil
         end)
