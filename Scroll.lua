@@ -75,7 +75,8 @@ local function SpawnNow(area, value, r, g, b, icon, crit)
     -- largeur du contenu (icône + texte) : le tout est centré sur ton bloc
     local okW, tw = pcall(f.text.GetStringWidth, f.text)
     tw = (okW and plain(tw) and type(tw) == "number") and tw or 0
-    f.half = ((icon and (size + 4) or 0) + tw) / 2
+    f.iconW = icon and (size + 4) or 0
+    f.half = (f.iconW + tw) / 2
     -- plusieurs coups d'affilée : on décale un peu pour ne pas les empiler
     local now = GetTime()
     if now - lastSpawn[area] < 0.25 then stagger[area] = (stagger[area] + 1) % 4 else stagger[area] = 0 end
@@ -116,6 +117,9 @@ local function Animate(_, e)
             if f.crit then f:SetScale(1 + math.max(0, 0.6 - f.t * 3)) end
             -- départ rapide puis ralenti (plus agréable à lire)
             local ease = 1 - (1 - p) * (1 - p)
+            -- largeur remesurée à chaque image : le jeu peut la donner un peu en retard
+            local okW, tw = pcall(f.text.GetStringWidth, f.text)
+            if okW and plain(tw) and type(tw) == "number" and tw > 0 then f.half = ((f.iconW or 0) + tw) / 2 end
             -- position en coordonnées d'écran, ramenée à l'échelle du texte (le « pop » ne décale plus)
             local sc = f:GetScale()
             f:ClearAllPoints()
