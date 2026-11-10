@@ -555,13 +555,10 @@ local function BuildWindow()
     end)
     Anchor()
     local over, ttl = NZR:WowFrame(win, "Respawn", DB().meterAlpha or 0.95, 0.9)
-    -- bande invisible à la hauteur exacte du titre : les boutons s'y centrent
-    local band = CreateFrame("Frame", nil, over)
-    band:SetPoint("TOP", ttl, "TOP", 0, 0); band:SetPoint("BOTTOM", ttl, "BOTTOM", 0, 0)
-    band:SetPoint("LEFT", over, "LEFT", 0, 0); band:SetPoint("RIGHT", over, "RIGHT", 0, 0)
+    if ttl then ttl:SetFontObject("GameFontNormal") end        -- titre lisible
     local add = CreateFrame("Button", nil, over)
-    add:SetSize(18, 18)
-    add:SetPoint("LEFT", band, "LEFT", 14, 0)           -- même hauteur que le titre
+    add:SetSize(16, 16)
+    add:SetPoint("TOPLEFT", over, "TOPLEFT", 12, -3)    -- dans le bandeau du titre (cadre à 90 %)           -- même hauteur que le titre
     add:SetNormalTexture("Interface\\Buttons\\UI-PlusButton-Up")
     add:SetPushedTexture("Interface\\Buttons\\UI-PlusButton-Down")
     add:SetHighlightTexture("Interface\\Buttons\\UI-PlusButton-Hilight", "ADD")
@@ -599,8 +596,8 @@ local function BuildWindow()
     add:SetScript("OnLeave", function() GameTooltip:Hide() end)
     -- petit trait « – » : réduire la fenêtre en icône
     local mini = CreateFrame("Button", nil, over)
-    mini:SetSize(18, 18)
-    mini:SetPoint("RIGHT", band, "RIGHT", -14, 0)
+    mini:SetSize(16, 16)
+    mini:SetPoint("TOPRIGHT", over, "TOPRIGHT", -12, -3)
     mini:SetNormalTexture("Interface\\Buttons\\UI-MinusButton-Up")
     mini:SetPushedTexture("Interface\\Buttons\\UI-MinusButton-Down")
     mini:SetHighlightTexture("Interface\\Buttons\\UI-PlusButton-Hilight", "ADD")
