@@ -886,16 +886,17 @@ local function CreateButton()
     end)
     btn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     btn:SetScript("OnClick", function(_, b)
-        if b == "RightButton" then NZR:ToggleOptions(true) else NZR.GuideToggle() end
+        if b == "RightButton" then NZR:OpenOptionsAt("quest", "Guide de progression") else NZR.GuideToggle() end
     end)
     btn:SetScript("OnEnter", function(s)
         GameTooltip:SetOwner(s, "ANCHOR_LEFT")
         GameTooltip:AddLine("Guide de progression")
         GameTooltip:AddLine("Clic : talents à suivre et zones de leveling selon ton niveau.", 1, 1, 1, true)
-        GameTooltip:AddLine("Clic droit : réglages NZR Forever. Glisser : déplacer.", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("Clic droit : réglages du guide. Glisser : déplacer.", 0.8, 0.8, 0.8, true)
         GameTooltip:Show()
     end)
     btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    if DB().guideIcon == false then btn:Hide() end
 end
 
 function M:Init()

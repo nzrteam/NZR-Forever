@@ -21,7 +21,7 @@ NZR.C = {
 }
 
 local defaults = {
-    theme = false, auras = false, tooltips = false, tooltipCursor = false, moveTooltip = false, moveBags = false, moveMap = false, moveWindows = true, squareMinimap = false, compass = false, paladin = false, questHL = false, unitFrames = false, plates = false, npText = "both", npColor = "game", ufPortrait = "round", ufText = "both", ufName = "full", ufColor = "green", ufShort = true, ufScale = 1, ufFont = "game", ufFontSize = 1, ufOutline = "shadow", ufHealthShade = 1, ufPowerColor = "game", ufPowerShade = 1, ufAuras = true, groupFrames = false, guide = false, guideAuto = true, sct = false, sctIn = true, sctOut = true, sctHeal = true, sctNotice = true, sctHideBlizz = true, sctSize = 1, sctOthers = false, sctPower = true, sctKill = true, sctXP = true, sctHideXP = true, sctAuras = true, sctErrors = true, sctAround = true, sctStartBtn = true, uiFont = "game", sctFont = "luckiest", respawn = false, respawnAuto = true, respawnMine = false, respawnQuest = true, respawnSound = false, respawnTip = true, respawnWaypoint = true, respawnMinimap = true, respawnMap = true, respawnScale = 1, respawnAge = true, meterShiftBars = false, reopenWindows = false, mmButtonsSave = false, meterShiftBuffs = true, meterShiftCD = true, grpPartyStyle = "big", grpColor = "class", grpNameColor = "default", grpName = "full", grpText = "auto", grpPower = true, grpRole = true, grpDebuffs = true, grpDebuffAll = false, grpBuffs = "mine", grpCellScale = 1, grpScale = 1, grpAlpha = 0.9, npFont = "game", npFontSize = 1, npOutline = "game", hlStyle = "ping", hlColor = "gold", hlSize = 1, hlObjects = true, hlNPCs = true, hlMobs = true, hlCombat = true, hlSound = false, blessGreater = true, blessSolo = true, blessLock = false, blessScale = 1, menuButton = true, tooltipOpaque = true, tooltipAlpha = 1, lootAll = true, lootAutoClose = true, lootKey = "E",
+    theme = false, auras = false, tooltips = false, tooltipCursor = false, moveTooltip = false, moveBags = false, moveMap = false, moveWindows = true, squareMinimap = false, compass = false, paladin = false, questHL = false, unitFrames = false, plates = false, npText = "both", npColor = "game", ufPortrait = "round", ufText = "both", ufName = "full", ufColor = "green", ufShort = true, ufScale = 1, ufFont = "game", ufFontSize = 1, ufOutline = "shadow", ufHealthShade = 1, ufPowerColor = "game", ufPowerShade = 1, ufAuras = true, groupFrames = false, guide = false, guideAuto = true, sct = false, sctIn = true, sctOut = true, sctHeal = true, sctNotice = true, sctHideBlizz = true, sctSize = 1, sctOthers = false, sctPower = true, sctKill = true, sctXP = true, sctHideXP = true, sctAuras = true, sctErrors = true, sctAround = true, sctStartBtn = true, uiFont = "game", sctFont = "luckiest", respawn = false, respawnAuto = true, respawnMine = false, respawnQuest = true, respawnSound = false, respawnTip = true, respawnWaypoint = true, respawnMinimap = true, respawnMap = true, respawnScale = 1, nzrIcon = true, guideIcon = true, respawnIcon = true, respawnAge = true, meterShiftBars = false, reopenWindows = false, mmButtonsSave = false, meterShiftBuffs = true, meterShiftCD = true, grpPartyStyle = "big", grpColor = "class", grpNameColor = "default", grpName = "full", grpText = "auto", grpPower = true, grpRole = true, grpDebuffs = true, grpDebuffAll = false, grpBuffs = "mine", grpCellScale = 1, grpScale = 1, grpAlpha = 0.9, npFont = "game", npFontSize = 1, npOutline = "game", hlStyle = "ping", hlColor = "gold", hlSize = 1, hlObjects = true, hlNPCs = true, hlMobs = true, hlCombat = true, hlSound = false, blessGreater = true, blessSolo = true, blessLock = false, blessScale = 1, menuButton = true, tooltipOpaque = true, tooltipAlpha = 1, lootAll = true, lootAutoClose = true, lootKey = "E",
     accent = "violet", font = "inter", damageFont = false,
     meter = true, meterMode = 1, meterOverall = false, meterW = 300, meterH = 180,
     scale = 1, opacity = 1,
@@ -858,8 +858,61 @@ loader:SetScript("OnEvent", function(_, ev, arg1)
     end
     NZR:ApplyScale()
     NZR:ApplyOpacity()
+    pcall(NZR.BuildMainIcon, NZR)
     NZR:Print("v" .. NZR.version .. " chargé. Réglages : |cffffffff/nzr|r, clic droit sur le meter ou Échap > NZR Forever.")
 end)
+
+---------------------------------------------------------------------------
+-- Icône NZR Forever : accès rapide aux réglages (style des icônes du guide)
+---------------------------------------------------------------------------
+function NZR:BuildMainIcon()
+    if self.mainIcon or NZR.db.nzrIcon == false then return end
+    local b = CreateFrame("Button", "NZRF_MainIcon", UIParent)
+    b:SetSize(30, 30)
+    b:SetFrameStrata("MEDIUM")
+    b:SetClampedToScreen(true); b:SetMovable(true)
+    if b.SetDontSavePosition then b:SetDontSavePosition(true) end
+    b:RegisterForDrag("LeftButton")
+    b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    -- fond sombre + « NZR » doré façon titre WoW, dans l'anneau doré
+    local bg = b:CreateTexture(nil, "BACKGROUND")
+    bg:SetPoint("TOPLEFT", 4, -4); bg:SetPoint("BOTTOMRIGHT", -4, 4)
+    bg:SetTexture("Interface\\Icons\\INV_Misc_Gem_Variety_02")
+    bg:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    bg:SetVertexColor(0.35, 0.22, 0.6)
+    local shade = b:CreateTexture(nil, "BORDER")
+    shade:SetPoint("TOPLEFT", 4, -4); shade:SetPoint("BOTTOMRIGHT", -4, 4); shade:SetColorTexture(0.05, 0.03, 0.08, 0.55)
+    local t = b:CreateFontString(nil, "OVERLAY")
+    if not pcall(t.SetFont, t, "Fonts\\MORPHEUS.TTF", 11, "OUTLINE") then t:SetFontObject("GameFontNormalSmall") end
+    t:SetPoint("CENTER", 0, 0); t:SetText("NZR"); t:SetTextColor(1, 0.82, 0)
+    local ring = b:CreateTexture(nil, "OVERLAY")
+    ring:SetAllPoints(); ring:SetTexture("Interface\\AddOns\\NZRForever\\Media\\uf\\ring_square")
+    local hl = b:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetPoint("TOPLEFT", 4, -4); hl:SetPoint("BOTTOMRIGHT", -4, 4); hl:SetColorTexture(1, 0.82, 0, 0.25)
+    local p = NZR.db.mainIconPos
+    if p then b:SetPoint(p[1], UIParent, p[2], p[3], p[4])
+    elseif Minimap then b:SetPoint("TOPRIGHT", Minimap, "TOPLEFT", -2, -2)
+    else b:SetPoint("TOPRIGHT", -220, -200) end
+    b:SetScript("OnDragStart", b.StartMoving)
+    b:SetScript("OnDragStop", function(s)
+        s:StopMovingOrSizing()
+        local a, _, r, x, y = s:GetPoint()
+        NZR.db.mainIconPos = { a, r, x, y }
+    end)
+    b:SetScript("OnClick", function(_, btn)
+        if btn == "RightButton" then NZR:ToggleEdit() else NZR:ToggleOptions() end
+    end)
+    b:SetScript("OnEnter", function(s)
+        GameTooltip:SetOwner(s, "ANCHOR_LEFT")
+        GameTooltip:AddLine("NZR Forever")
+        GameTooltip:AddLine("Clic : ouvrir ou fermer les réglages.", 1, 1, 1, true)
+        GameTooltip:AddLine("Clic droit : mode édition (placer l'interface).", 1, 1, 1, true)
+        GameTooltip:AddLine("Glisser : déplacer.", 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    self.mainIcon = b
+end
 
 ---------------------------------------------------------------------------
 -- Commandes

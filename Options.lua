@@ -194,6 +194,9 @@ local PAGES = {
         { t = "cycle", key = "sctFont", section = "Texte de combat", label = "Police", desc = "Police des chiffres.",
           choices = function() return NZR.FONTS end, preview = function(k) return NZR.FontPath(k) end },
         { t = "slider", key = "sctSize", section = "Texte de combat", label = "Taille du texte", desc = "100 % = taille normale.", min = 0.6, max = 2, step = 0.05 },
+        { t = "switch", key = "nzrIcon", section = "Icônes", label = "Icône NZR Forever", desc = "Petite icône dorée « NZR » près de la minicarte : clic = réglages, clic droit = mode édition. Glisser pour la placer.", r = true },
+        { t = "switch", key = "guideIcon", section = "Icônes", label = "Icône du guide de progression", desc = "Le livre du guide (si le module est activé). Clic droit dessus : réglages du guide. Sans l'icône : /nzr guide.", r = true },
+        { t = "switch", key = "respawnIcon", section = "Icônes", label = "Icône du respawn", desc = "La montre qui remplace la fenêtre Respawn quand elle est réduite ou vide (si le module est activé). Clic droit : réglages du respawn. Sans l'icône : /nzr respawn voir." },
         { t = "switch", key = "menuButton", section = "Menu Échap", label = "Bouton « NZR Forever » dans le menu Échap", desc = "Tout en haut du menu, pour ouvrir ces réglages. Sinon : /nzr." },
       } },
     { id = "quest", name = "Quêtes", desc = "Pour progresser : guide des talents et des zones, flèche vers ta quête, surbrillance de ce qu'il faut ramasser ou tuer, temps de respawn des monstres.",
@@ -588,7 +591,9 @@ local function BuildPage(content, page, idx)
         end
     end
     holder.Select = Select
+    holder.sectionNames = {}
     for s, g in ipairs(groups) do
+        holder.sectionNames[s] = g.name
         local sc = BuildSection(holder, g.name, g.items, "NZRF_OptionsScroll" .. idx .. "_" .. s)
         holder.sections[s] = sc
         for _, c in ipairs(sc.controls) do table.insert(holder.controls, c) end
@@ -727,6 +732,23 @@ function NZR:ToggleOptions(show, pageId)
         if win:IsShown() and win.wantPage then win.Show(win.wantPage); win.wantPage = nil end
     end
     win:SetShown(show)
+end
+
+-- ouvre les options sur un onglet et une catégorie précis (clic droit sur une icône de module)
+function NZR:OpenOptionsAt(pageId, sectionName)
+    NZR:ToggleOptions(true, pageId)
+    if not (win and win.Show) then return end
+    for i, page in ipairs(PAGES) do
+        if page.id == pageId then
+            win.Show(i)
+            local pg = win.pages[i]
+            if pg and pg.sectionNames and sectionName then
+                for j, n in ipairs(pg.sectionNames) do
+                    if n == sectionName then pcall(pg.Select, j) end
+                end
+            end
+        end
+    end
 end
 
 -- état de la fenêtre (onglet + catégorie), pour la rouvrir après un /reload

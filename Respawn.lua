@@ -577,7 +577,7 @@ local function BuildLauncher()
         end
     end)
     b:SetScript("OnClick", function(_, btn)
-        if btn == "RightButton" then NZR:ToggleOptions(true) return end
+        if btn == "RightButton" then NZR:OpenOptionsAt("quest", "Temps de respawn") return end
         userHidden, forceOpen = nil, true
         pcall(Refresh)
     end)
@@ -585,7 +585,7 @@ local function BuildLauncher()
         GameTooltip:SetOwner(self, "ANCHOR_LEFT")
         GameTooltip:AddLine("Respawn")
         GameTooltip:AddLine("Clic : ouvrir la fenêtre des temps de respawn.", 1, 1, 1, true)
-        GameTooltip:AddLine("Clic droit : réglages NZR Forever. Glisser : déplacer.", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("Clic droit : réglages du respawn. Glisser : déplacer.", 0.8, 0.8, 0.8, true)
         GameTooltip:Show()
     end)
     b:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -950,7 +950,7 @@ Refresh = function()
     end
     if win.add then pcall(win.add.Sync, win.add) end
     if launcher then
-        launcher:SetShown(not want and not editing)
+        launcher:SetShown(not want and not editing and DB().respawnIcon ~= false)
         local n = 0
         for _, it in ipairs(list) do if not it.e.alive then n = n + 1 end end
         launcher.count:SetText(n > 0 and n or "")
