@@ -44,13 +44,15 @@ end
 local AREAS = {
     out = { x = 70, y = 70, dy = 130, dx = 40, dur = 1.5 },     -- au-dessus à droite du perso, monte en s'écartant
     inc = { x = -150, y = 40, dy = -110, dx = -20, dur = 1.5 },  -- à gauche, descend
-    note = { x = -60, y = 220, dy = 30, dx = 0, dur = 1.8 },     -- au centre, en haut
+    note = { x = -60, y = 220, dy = 90, dx = 0, dur = 2.2 },     -- au centre, en haut : un message à la fois, ils montent l'un après l'autre
 }
 local lastSpawn = { out = 0, inc = 0, note = 0 }
 local stagger = { out = 0, inc = 0, note = 0 }
 
 local anchors = {}
-local function Spawn(area, value, r, g, b, icon, crit)
+local Spawn
+local noteNext = 0
+local function SpawnNow(area, value, r, g, b, icon, crit)
     local a = AREAS[area]
     -- point de départ = bloc placé en mode édition (sinon la place par défaut)
     local hd = anchors[area]
@@ -76,11 +78,23 @@ local function Spawn(area, value, r, g, b, icon, crit)
     lastSpawn[area] = now
     f.area, f.t, f.crit = a, 0, crit
     f.x0 = a.x + (area == "note" and 0 or stagger[area] * (area == "out" and 26 or -26))
-    f.y0 = a.y - stagger[area] * (area == "note" and 30 or 18) * (a.dy > 0 and 1 or -1)
+    if area == "note" then stagger.note = 0 end
+    f.y0 = a.y - stagger[area] * 18 * (a.dy > 0 and 1 or -1)
     f:ClearAllPoints(); f:SetPoint("LEFT", UIParent, "CENTER", f.x0, f.y0)
     f:SetAlpha(0); f:SetScale(crit and 1.6 or 1); f:Show()
     table.insert(active, f)
     driver:Show()
+end
+
+-- messages du centre : espacés d'une demi-seconde pour ne jamais se chevaucher
+Spawn = function(area, value, r, g, b, icon, crit)
+    if area ~= "note" then return SpawnNow(area, value, r, g, b, icon, crit) end
+    local now = GetTime()
+    local at = math.max(now, noteNext)
+    if at - now > 3 then return end                 -- trop en retard : on laisse tomber
+    noteNext = at + 0.5
+    if at <= now then return SpawnNow(area, value, r, g, b, icon, crit) end
+    C_Timer.After(at - now, function() SpawnNow(area, value, r, g, b, icon, crit) end)
 end
 
 local function Animate(_, e)
@@ -255,6 +269,21 @@ local function OnXPMessage(msg)
     ShowXP(tonumber(num))
 end
 
+-- effets que TU poses sur ta cible (étourdissement, ralentissement…) : « [Marteau de la justice] »
+local function OnTargetAura(info)
+    if DB().sctAuras == false or not info or info.isFullUpdate or not info.addedAuras then return end
+    for _, a in ipairs(info.addedAuras) do
+        local ok, name, src, harm, dur = pcall(function() return a.name, a.sourceUnit, a.isHarmful, a.duration end)
+        if ok and plain(name) and plain(src) and plain(harm) and type(name) == "string" and harm
+           and (src == "player" or src == "pet") then
+            local d = plain(dur) and type(dur) == "number" and dur or 0
+            if d > 0 and d <= 30 then
+                Spawn("out", "[" .. name .. "]", 1, 0.6, 0.2, (plain(a.icon) and a.icon) or nil)
+            end
+        end
+    end
+end
+
 -- buffs / procs / debuffs gagnés : [Maîtrise du blocage]
 local function OnAura(info)
     if DB().sctAuras == false or not info or info.isFullUpdate or not info.addedAuras then return end
@@ -334,7 +363,7 @@ function M:Init()
     ev:RegisterEvent("PLAYER_LOGOUT")
     ev:RegisterEvent("PLAYER_XP_UPDATE")
     ev:RegisterEvent("CHAT_MSG_COMBAT_XP_GAIN")
-    pcall(ev.RegisterUnitEvent, ev, "UNIT_AURA", "player")
+    pcall(ev.RegisterUnitEvent, ev, "UNIT_AURA", "player", "target")
     ev:RegisterEvent("PLAYER_ENTERING_WORLD")
     pcall(ev.RegisterUnitEvent, ev, "UNIT_SPELLCAST_SUCCEEDED", "player")
     ev:SetScript("OnEvent", function(_, e, unit, a, b, c, d)
@@ -368,7 +397,8 @@ function M:Init()
         elseif e == "CHAT_MSG_COMBAT_XP_GAIN" then
             pcall(OnXPMessage, unit)
         elseif e == "UNIT_AURA" then
-            if unit == "player" then pcall(OnAura, a) end
+            if unit == "player" then pcall(OnAura, a)
+            elseif unit == "target" then pcall(OnTargetAura, a) end
         elseif e == "PLAYER_XP_UPDATE" then
             pcall(OnXP)
         elseif e == "PLAYER_ENTERING_WORLD" then
