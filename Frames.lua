@@ -419,7 +419,7 @@ local function UpdateInfo(f)
     f.tag:SetText(tag)
     SetPortraitTexture(f.portrait, u)
     -- portrait du jeu = image ronde : en carré on zoome un peu pour cacher les coins vides
-    if f.squarePortrait then f.portrait:SetTexCoord(0.05, 0.95, 0.05, 0.95) end
+    if f.squarePortrait then f.portrait:SetTexCoord(0.085, 0.915, 0.085, 0.915) end
 end
 
 ---------------------------------------------------------------------------
