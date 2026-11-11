@@ -2,7 +2,7 @@
 local ADDON, NZR = ...
 _G.NZRF = NZR
 
-NZR.version = "1.0.4"
+NZR.version = "1.0.5"
 NZR.TEX  = "Interface\\Buttons\\WHITE8x8"
 NZR.FONT      = "Interface\\AddOns\\NZRForever\\Fonts\\Inter-Medium.ttf"
 NZR.FONT_BOLD = "Interface\\AddOns\\NZRForever\\Fonts\\Inter-SemiBold.ttf"

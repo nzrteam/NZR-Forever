@@ -1,4 +1,4 @@
-# NZR Forever 1.0.4 (WoW Forever)
+# NZR Forever 1.0.5 (WoW Forever)
 
 Le DPS meter NZR et quelques petits plus, sans dénaturer le jeu.
 
@@ -7,7 +7,15 @@ Le DPS meter NZR et quelques petits plus, sans dénaturer le jeu.
 2. Relance complètement le jeu.
 
 ## Réglages
-Bouton **NZR Forever** dans le menu Échap, `/nzr`, ou clic droit sur le meter.
+Bouton **NZR Forever** dans le menu Échap, l'icône dorée NZR près de la minicarte, `/nzr`, ou clic droit sur le meter.
+L'onglet **Accueil** montre chaque module avec sa case oui/non et un bouton « Régler » ; la **recherche** en haut à droite trouve n'importe quel réglage. Les réglages fins sont repliés sous « Plus de réglages », et ceux d'un module coupé sont grisés.
+
+## Nouveau en 1.0.5
+- **Texte de combat** : polices façon SBT, icône de l'arme, XP gagnée, monstre tué, buffs et procs, étourdissements, début et fin de combat avec icône, tes coups visibles en groupe (bouton « Jouer »), messages rouges du jeu dans la même police.
+- **Temps de respawn (Alpha)** : chrono des monstres tués ou de quête, repère dans le monde, minicarte et grande carte, heure d'apparition exacte.
+- **Minicarte** : boutons d'addons libres (carrés ou ronds), éléments déplacés à la souris (lune, calendrier, nom de zone, la carte elle-même) avec Annuler et Par défaut (onglet Édition), option pour cacher la lune.
+- **Interface** : police au choix pour toutes les fenêtres NZR, icônes NZR / guide / respawn (clic droit = réglages du module), infobulle bien centrée, rechargement en fin de mode Édition.
+- Onglet **Paladin** renommé **Classe**.
 - **DPS meter** : Détaillé / Tableau / Barres, infos sous le nom, barre de vie de la cible, teinte Jeu, Noir ou Violet, opacité, colonnes, tri.
 - **Sorts et buffs** (désactivés de base) : look NZR des barres d'action, des buffs et des infobulles.
 - **Cadres** (désactivé de base) : cadres joueur et cible au style du jeu mais plus lisibles : portrait rond ou carré, texte au choix (valeurs, %, les deux), barre de vie verte ou couleur de classe.
