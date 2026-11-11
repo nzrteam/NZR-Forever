@@ -269,23 +269,66 @@ local function FreeExtra(name)
     local s = f:GetEffectiveScale() / UIParent:GetEffectiveScale()
     local target = f
     if f:IsObjectType("Texture") then
-        -- une image : une poignée invisible à sa place, l'image la suit
+        -- une image : une poignée invisible à sa place ; l'image et les petites images posées
+        -- au même endroit (contour, fond…) la suivent ensemble, en gardant leur écart
+        local parent = f:GetParent()
+        local fl, ft = f:GetLeft(), f:GetTop()
         local w, h = f:GetSize()
+        local fr, fb = fl + w, ft - h
+        local group = { { tex = f, dx = 0, dy = 0, w = w, h = h } }
+        for _, r in ipairs({ parent:GetRegions() }) do
+            if r ~= f and r:IsObjectType("Texture") and r:GetDrawLayer() ~= "HIGHLIGHT" and not r.nzrFree and not TooBig(r) then
+                local okV, vis = pcall(r.IsShown, r)
+                local l, t = r:GetLeft(), r:GetTop()
+                if okV and vis and l then
+                    local rw, rh = r:GetSize()
+                    -- se chevauchent nettement
+                    local ix = math.min(fr, l + rw) - math.max(fl, l)
+                    local iy = math.min(ft, t) - math.max(fb, t - rh)
+                    if ix > 0 and iy > 0 and ix * iy >= 0.25 * math.min(w * h, rw * rh) then
+                        r.nzrFree = true
+                        table.insert(group, { tex = r, dx = l - fl, dy = t - ft, w = rw, h = rh })
+                        local rid = FrameId(r)
+                        if rid and NZR.db.mmFreeExtra and rid ~= name then
+                            NZR.db.mmFreeExtra[rid] = nil
+                            if NZR.db.mmFreePos then NZR.db.mmFreePos[rid] = nil end
+                        end
+                    end
+                end
+            end
+        end
+        -- la poignée couvre tout le groupe
+        local gl, gt, gr, gb = 0, 0, w, -h
+        for _, m in ipairs(group) do
+            gl = math.min(gl, m.dx); gt = math.max(gt, m.dy)
+            gr = math.max(gr, m.dx + m.w); gb = math.min(gb, m.dy - m.h)
+        end
         local hd = CreateFrame("Frame", nil, UIParent)
-        hd:SetSize(w * s, h * s)
+        hd:SetSize((gr - gl) * s, (gt - gb) * s)
         hd:SetFrameStrata("MEDIUM")
         local function Stick()
-            f.nzrLock = true
-            f:ClearAllPoints(); f:SetPoint("TOPLEFT", hd, "TOPLEFT"); f:SetPoint("BOTTOMRIGHT", hd, "BOTTOMRIGHT")
-            f.nzrLock = nil
+            for _, m in ipairs(group) do
+                local t = m.tex
+                t.nzrLock = true
+                t:ClearAllPoints()
+                t:SetPoint("TOPLEFT", hd, "TOPLEFT", m.dx - gl, m.dy - gt)
+                t:SetSize(m.w, m.h)
+                t.nzrLock = nil
+            end
         end
-        hooksecurefunc(f, "SetPoint", function() if not f.nzrLock then Stick() end end)
-        if f.SetAllPoints then hooksecurefunc(f, "SetAllPoints", function() if not f.nzrLock then Stick() end end) end
-        target = hd
+        for _, m in ipairs(group) do
+            local t = m.tex
+            hooksecurefunc(t, "SetPoint", function() if not t.nzrLock then Stick() end end)
+            if t.SetAllPoints then hooksecurefunc(t, "SetAllPoints", function() if not t.nzrLock then Stick() end end) end
+        end
         if not (NZR.db.mmFreePos and NZR.db.mmFreePos[name]) and cx then
             NZR.db.mmFreePos = NZR.db.mmFreePos or {}
-            NZR.db.mmFreePos[name] = { cx * s, cy * s }
+            local gcx = (fl + gl + (gr - gl) / 2) * s
+            local gcy = (ft + gt - (gt - gb) / 2) * s
+            NZR.db.mmFreePos[name] = { gcx, gcy }
         end
+        hd:ClearAllPoints()
+        hd:SetPoint("CENTER", UIParent, "BOTTOMLEFT", (cx or 0) * s, (cy or 0) * s)
         DragFree(name, hd)
         Stick()
         return
