@@ -1021,6 +1021,8 @@ SlashCmdList.NZRF = function(msg)
         NZR:ToggleEdit()
     elseif cmd == "guide" or cmd == "build" then
         if NZR.GuideToggle then NZR.GuideToggle() else NZR:Print("guide désactivé : /nzr > Pratique > Guide de progression.") end
+    elseif cmd == "diag" and (arg == "minicarte" or arg == "mm") then
+        if NZR.MinimapDiag then NZR.MinimapDiag() end
     elseif cmd == "diag" and arg == "combat" then
         NZR.sctDebug = not NZR.sctDebug
         NZR:Print("diagnostic du texte de combat " .. (NZR.sctDebug and "activé : stun un monstre, puis envoie une capture du chat. Refais /nzr diag combat pour l'arrêter." or "arrêté."))

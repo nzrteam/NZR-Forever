@@ -609,6 +609,32 @@ function NZR.MinimapLabel(id)
     return (id:gsub("^MinimapCluster%.", ""):gsub("Minimap", "Minicarte "):gsub("Button$", ""))
 end
 
+-- diagnostic : ce que NZR voit dans chaque élément choisi à la main (/nzr diag minicarte)
+function NZR.MinimapDiag()
+    local n = 0
+    for id in pairs(NZR.db.mmFreeExtra or {}) do
+        n = n + 1
+        local o = Resolve(id)
+        NZR:Print(("%s : %s"):format(id, o and (o.nzrFree and "libre" or "trouvé, pas libre") or "INTROUVABLE"))
+        if o and o.GetRegions then
+            local icon = FindIcon(o)
+            for i, r in ipairs({ o:GetRegions() }) do
+                if r:IsObjectType("Texture") then
+                    local okK, key = pcall(function() return r:GetParentKey() end)
+                    local w, h = r:GetSize()
+                    NZR:Print(("  image %d %s : %s %s %dx%d %s%s"):format(i, okK and key or "-", tostring(r:GetTexture()), tostring(r:GetAtlas()),
+                        w or 0, h or 0, r:GetDrawLayer(), r == icon and "  <- icône" or ""))
+                end
+            end
+            for i, c in ipairs({ o:GetChildren() }) do
+                local w, h = c:GetSize()
+                NZR:Print(("  cadre %d %s %dx%d (%d images)"):format(i, tostring(c:GetName()), w or 0, h or 0, select("#", c:GetRegions())))
+            end
+        end
+    end
+    if n == 0 then NZR:Print("Aucun élément choisi à la main. Réglages, onglet Édition, « Choisir un élément ».") end
+end
+
 -- liste de tout ce qui est libre ou a une place enregistrée
 function NZR.MinimapFreedList()
     local seen, list = {}, {}
