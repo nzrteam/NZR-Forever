@@ -130,6 +130,7 @@ local function FindIcon(b)
     return best
 end
 
+local DragFree
 local function SavePos(name, b)
     local x, y = b:GetCenter()
     if not x then return end
@@ -144,6 +145,72 @@ local function Place(name, b)
     b:ClearAllPoints()
     b:SetPoint("CENTER", UIParent, "BOTTOMLEFT", p[1], p[2])
     b.nzrLock = nil
+end
+
+
+-- glisser un bouton libre : l'infobulle se cache pendant le glissé (on voit les voisins),
+-- et le bouton s'aligne tout seul sur les autres s'il passe à moins de 8 px de leur ligne
+local freed = {}
+local dragging
+if GameTooltip then
+    hooksecurefunc(GameTooltip, "Show", function(t) if dragging then t:Hide() end end)
+end
+local function Snap(name, b)
+    local x, y = b:GetCenter()
+    if not x then return end
+    local bx, by, dx, dy = x, y, 8, 8
+    for n, o in pairs(freed) do
+        if n ~= name and o:IsShown() then
+            local ox, oy = o:GetCenter()
+            if ox then
+                if math.abs(ox - x) < dx then dx, bx = math.abs(ox - x), ox end
+                if math.abs(oy - y) < dy then dy, by = math.abs(oy - y), oy end
+            end
+        end
+    end
+    b:ClearAllPoints()
+    b:SetPoint("CENTER", UIParent, "BOTTOMLEFT", bx, by)
+end
+DragFree = function(name, b)
+    freed[name] = b
+    b:SetMovable(true); b:SetClampedToScreen(true)
+    b:RegisterForDrag("LeftButton")
+    b:SetScript("OnDragStart", function(self)
+        self.nzrDrag = true; dragging = true
+        GameTooltip:Hide()
+        self:StartMoving()
+    end)
+    b:SetScript("OnDragStop", function(self)
+        self:StopMovingOrSizing()
+        self.nzrLock = true; Snap(name, self); self.nzrLock = nil
+        self.nzrDrag = nil; dragging = nil
+        SavePos(name, self); Place(name, self)
+    end)
+    -- l'addon (ou le jeu) qui le replace : on le remet à sa place
+    if not b.nzrHooked then
+        b.nzrHooked = true
+        hooksecurefunc(b, "SetPoint", function(self)
+            if self.nzrLock or self.nzrDrag then return end
+            Place(name, self)
+        end)
+    end
+    Place(name, b)
+end
+
+-- la lune / le soleil (heure et calendrier du jeu) : déplaçable, mais garde son look rond
+local function FreeGameTime()
+    local g = _G.GameTimeFrame
+    if not g or g.nzrFree or InCombatLockdown() then return end
+    g.nzrFree = true
+    local cx, cy = g:GetCenter()
+    local s = g:GetEffectiveScale() / UIParent:GetEffectiveScale()
+    pcall(g.SetParent, g, UIParent)
+    g:SetFrameStrata("MEDIUM")
+    if not (NZR.db.mmFreePos and NZR.db.mmFreePos.GameTimeFrame) and cx then
+        NZR.db.mmFreePos = NZR.db.mmFreePos or {}
+        NZR.db.mmFreePos.GameTimeFrame = { cx * s / g:GetScale(), cy * s / g:GetScale() }
+    end
+    DragFree("GameTimeFrame", g)
 end
 
 local function FreeButton(name, b)
@@ -188,24 +255,13 @@ local function FreeButton(name, b)
     local hl = b:GetHighlightTexture()
     if hl then hl:ClearAllPoints(); hl:SetPoint("TOPLEFT", 4, -4); hl:SetPoint("BOTTOMRIGHT", -4, 4); hl:SetColorTexture(1, 0.82, 0, 0.25) end
     -- glisser : librement, n'importe où ; la place est retenue
-    b:SetMovable(true); b:SetClampedToScreen(true)
-    b:RegisterForDrag("LeftButton")
-    b:SetScript("OnDragStart", function(self) self.nzrDrag = true; self:StartMoving() end)
-    b:SetScript("OnDragStop", function(self)
-        self:StopMovingOrSizing(); self.nzrDrag = nil
-        SavePos(name, self); Place(name, self)
-    end)
-    -- l'addon (ou LibDBIcon) qui le replace sur le bord de la carte : on le remet à sa place
-    hooksecurefunc(b, "SetPoint", function(self)
-        if self.nzrLock or self.nzrDrag then return end
-        Place(name, self)
-    end)
-    Place(name, b)
+    DragFree(name, b)
 end
 
 local function FreeAll()
     if InCombatLockdown() then return end
     for name, b in pairs(AllAddonButtons()) do pcall(FreeButton, name, b) end
+    pcall(FreeGameTime)
 end
 
 local function SetupFreeButtons()
