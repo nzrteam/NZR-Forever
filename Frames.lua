@@ -247,7 +247,7 @@ local function Create(unit, holderKey, default, mirror)
 
     -- niveau : petite boîte au même bord doré, chiffre centré
     local lv = CreateFrame("Frame", nil, pf)
-    local LW, LH = 24, 24                      -- carré
+    local LW, LH = 26, 26                      -- carré
     lv:SetSize(LW, LH)
     lv:SetFrameLevel(pf:GetFrameLevel() + 4)
     if mirror then lv:SetPoint("CENTER", pf, "BOTTOMRIGHT", -4, 4) else lv:SetPoint("CENTER", pf, "BOTTOMLEFT", 4, 4) end
@@ -263,7 +263,7 @@ local function Create(unit, holderKey, default, mirror)
     f.level = lvTop:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     f.level:SetPoint("CENTER", lv, "CENTER", 0, 0)
     f.level:SetJustifyH("CENTER"); f.level:SetJustifyV("MIDDLE")
-    f.level.nzrSize = 12
+    f.level.nzrSize = 11
     NZR.FramesFont(f.level)
 
     -- élite / rare : petit mot doré sous le nom
