@@ -216,62 +216,136 @@ end
 
 
 -- n'importe quel élément de la minicarte : souris dessus + /nzr libre (la lune, un bouton
--- sans nom connu…) ; il garde son look et devient libre de se placer, retenu après /reload
+-- sans nom…) ; il garde son look et devient libre de se placer, retenu après /reload.
+-- Un cadre se déplace tel quel ; une simple image (texture) suit une poignée invisible NZR.
 local SKIP = { UIParent = true, Minimap = true, MinimapCluster = true, MinimapBackdrop = true, WorldFrame = true }
-local FreeExtraResolve
+local MAX_SIZE = 80            -- plus grand = un conteneur (la carte elle-même), jamais libéré
+
+local function NameOf(o)
+    local ok, n = pcall(o.GetName, o)
+    return ok and type(n) == "string" and n or nil
+end
+-- identifiant retrouvable après /reload : nom, sinon Parent.clé, sinon Parent#n (n-ième cadre)
+-- ou Parent#rn (n-ième image)
+local FrameId
+FrameId = function(o)
+    local n = NameOf(o)
+    if n then return n end
+    local p = o.GetParent and o:GetParent()
+    if not p then return end
+    local pid = FrameId(p)
+    if not pid then return end
+    local okK, key = pcall(function() return o:GetParentKey() end)
+    if okK and type(key) == "string" then return pid .. "." .. key end
+    local isTex = o.IsObjectType and o:IsObjectType("Texture")
+    local list = isTex and { p:GetRegions() } or { p:GetChildren() }
+    for i, c in ipairs(list) do if c == o then return pid .. (isTex and "#r" or "#") .. i end end
+end
+local Resolve
+Resolve = function(id)
+    if _G[id] then return _G[id] end
+    local pid, sep, rest = id:match("^(.+)([%.#])([^%.#]+)$")
+    if not pid then return end
+    local p = Resolve(pid)
+    if not p then return end
+    if sep == "." then return p[rest] end
+    local ri = rest:match("^r(%d+)$")
+    if ri then return (select(tonumber(ri), p:GetRegions())) end
+    return (select(tonumber(rest), p:GetChildren()))
+end
+NZR.MinimapResolve = Resolve
+
+local function TooBig(o)
+    local w, h = o:GetSize()
+    return not w or w > MAX_SIZE or h > MAX_SIZE or w < 4
+end
+
 local function FreeExtra(name)
-    local f = FreeExtraResolve and FreeExtraResolve(name) or _G[name]
-    if not f or f.nzrFree or InCombatLockdown() then return end
+    if SKIP[name] then return end
+    local f = Resolve(name)
+    if not f or f.nzrFree or InCombatLockdown() or TooBig(f) then return end
     f.nzrFree = true
     local cx, cy = f:GetCenter()
     local s = f:GetEffectiveScale() / UIParent:GetEffectiveScale()
+    local target = f
+    if f:IsObjectType("Texture") then
+        -- une image : une poignée invisible à sa place, l'image la suit
+        local w, h = f:GetSize()
+        local hd = CreateFrame("Frame", nil, UIParent)
+        hd:SetSize(w * s, h * s)
+        hd:SetFrameStrata("MEDIUM")
+        local function Stick()
+            f.nzrLock = true
+            f:ClearAllPoints(); f:SetPoint("TOPLEFT", hd, "TOPLEFT"); f:SetPoint("BOTTOMRIGHT", hd, "BOTTOMRIGHT")
+            f.nzrLock = nil
+        end
+        hooksecurefunc(f, "SetPoint", function() if not f.nzrLock then Stick() end end)
+        if f.SetAllPoints then hooksecurefunc(f, "SetAllPoints", function() if not f.nzrLock then Stick() end end) end
+        target = hd
+        if not (NZR.db.mmFreePos and NZR.db.mmFreePos[name]) and cx then
+            NZR.db.mmFreePos = NZR.db.mmFreePos or {}
+            NZR.db.mmFreePos[name] = { cx * s, cy * s }
+        end
+        DragFree(name, hd)
+        Stick()
+        return
+    end
     pcall(f.SetParent, f, UIParent)
     f:SetFrameStrata("MEDIUM")
     if not (NZR.db.mmFreePos and NZR.db.mmFreePos[name]) and cx then
         NZR.db.mmFreePos = NZR.db.mmFreePos or {}
         NZR.db.mmFreePos[name] = { cx * s / f:GetScale(), cy * s / f:GetScale() }
     end
-    DragFree(name, f)
+    DragFree(name, target)
 end
--- nom « retrouvable » d'un cadre : son nom, sinon Parent.clé (cadres du jeu sans nom)
-local function FrameId(f)
-    local ok, n = pcall(f.GetName, f)
-    if ok and type(n) == "string" then return n end
-    local p = f.GetParent and f:GetParent()
-    local okK, key = pcall(function() return f:GetParentKey() end)
-    local pn = p and select(2, pcall(p.GetName, p))
-    if okK and type(key) == "string" and type(pn) == "string" then return pn .. "." .. key end
-end
-local function Resolve(id)
-    if _G[id] then return _G[id] end
-    local pn, key = id:match("^(.-)%.([^%.]+)$")
-    local p = pn and _G[pn]
-    return p and p[key]
-end
-NZR.MinimapResolve = Resolve
-FreeExtraResolve = Resolve
 
--- le plus petit cadre visible sous la souris autour de la minicarte (même s'il ignore la souris)
+-- la souris est-elle sur cet élément ? (calcul à la main : marche même s'il ignore la souris)
+local function Over(o)
+    local l, r, b, t = o:GetLeft(), o:GetRight(), o:GetBottom(), o:GetTop()
+    if not l then return false end
+    local x, y = GetCursorPosition()
+    local sc = o:GetEffectiveScale()
+    x, y = x / sc, y / sc
+    return x >= l and x <= r and y >= b and y <= t
+end
+
+-- le plus petit élément visible (cadre ou image) sous la souris, autour de la minicarte
 local function PickUnderMouse()
     local best, area
+    local function consider(o)
+        local okV, vis = pcall(o.IsVisible, o)
+        if not (okV and vis) or o.nzrSkip then return end
+        local okA, alpha = pcall(o.GetEffectiveAlpha or o.GetAlpha, o)
+        if okA and alpha and alpha < 0.05 then return end
+        if TooBig(o) or not Over(o) then return end
+        local id = FrameId(o)
+        if not id or SKIP[id] or id:find("NZRF") then return end
+        local w, h = o:GetSize()
+        if not area or w * h < area then best, area = id, w * h end
+    end
     local function walk(f, depth)
-        if depth > 4 or not f or not f.GetChildren then return end
+        if depth > 5 or not f or f.nzrSkip then return end
+        for _, r in ipairs({ f:GetRegions() }) do
+            if r:IsObjectType("Texture") and r:GetDrawLayer() ~= "HIGHLIGHT" then pcall(consider, r) end
+        end
         for _, c in ipairs({ f:GetChildren() }) do
             local okV, vis = pcall(c.IsVisible, c)
-            if okV and vis then
-                local okM, over = pcall(c.IsMouseOver, c)
-                local w, h = c:GetSize()
-                local id = FrameId(c)
-                if okM and over and w and w > 4 and id and not SKIP[id] and not id:find("^NZRF") then
-                    local a = w * h
-                    if not area or a < area then best, area = id, a end
-                end
-                walk(c, depth + 1)
-            end
+            if okV and vis then pcall(consider, c); walk(c, depth + 1) end
         end
     end
     for _, root in ipairs({ _G.MinimapCluster, Minimap, _G.MinimapBackdrop }) do walk(root, 1) end
     return best
+end
+
+-- anciens essais : jamais de gros conteneur (la carte elle-même) dans la liste
+local function CleanExtra()
+    for id in pairs(NZR.db.mmFreeExtra or {}) do
+        local o = Resolve(id)
+        if SKIP[id] or id:find("Container") or (o and TooBig(o)) then
+            NZR.db.mmFreeExtra[id] = nil
+            if NZR.db.mmFreePos then NZR.db.mmFreePos[id] = nil end
+        end
+    end
 end
 
 function NZR.MinimapFreeUnderMouse()
@@ -285,12 +359,12 @@ function NZR.MinimapFreeUnderMouse()
     if NZR.db.mmFreeExtra[name] then
         NZR.db.mmFreeExtra[name] = nil
         if NZR.db.mmFreePos then NZR.db.mmFreePos[name] = nil end
-        NZR:Print("« " .. name .. " » remis à sa place d'origine après /reload.")
+        NZR:Print("Remis à sa place d'origine après /reload.")
         return
     end
     NZR.db.mmFreeExtra[name] = true
     FreeExtra(name)
-    NZR:Print("« " .. name .. " » est libre : glisse-le où tu veux. Refais /nzr libre dessus pour l'annuler.")
+    NZR:Print("Libéré : glisse-le où tu veux. Refais /nzr libre dessus pour l'annuler. |cff808080(" .. name .. ")|r")
 end
 
 local function FreeButton(name, b)
@@ -342,6 +416,7 @@ local function FreeAll()
     if InCombatLockdown() then return end
     for name, b in pairs(AllAddonButtons()) do pcall(FreeButton, name, b) end
     pcall(FreeGameTime)
+    pcall(CleanExtra)
     for n in pairs(NZR.db.mmFreeExtra or {}) do pcall(FreeExtra, n) end
 end
 
@@ -395,6 +470,7 @@ function M:Init()
 
     -- bord des infobulles du jeu autour de la carte
     local ns = CreateFrame("Frame", nil, mm, "NineSlicePanelTemplate")
+    ns.nzrSkip = true
     ns:SetPoint("TOPLEFT", -4, 4)
     ns:SetPoint("BOTTOMRIGHT", 4, -4)
     ns:SetFrameLevel(mm:GetFrameLevel() + 1)
