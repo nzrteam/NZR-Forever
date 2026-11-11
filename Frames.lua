@@ -210,10 +210,14 @@ local function Create(unit, holderKey, default, mirror)
 
     -- portrait rond ou carré, cerclé d'or
     local pf = CreateFrame("Frame", nil, f)
-    pf:SetSize(PORT, PORT)
-    pf:SetFrameLevel(p:GetFrameLevel() + 3)
-    if mirror then pf:SetPoint("RIGHT", f, "RIGHT", 0, 0) else pf:SetPoint("LEFT", f, "LEFT", 0, 0) end
     local square = DB().ufPortrait == "square"
+    -- carré : même hauteur que le panneau doré et bien aligné dessus (haut et bas)
+    local PS = square and (PORT + 5) or PORT
+    pf:SetSize(PS, PS)
+    pf:SetFrameLevel(p:GetFrameLevel() + 3)
+    local dx = square and (mirror and 2 or -2) or 0
+    local dy = square and 1 or 0
+    if mirror then pf:SetPoint("RIGHT", f, "RIGHT", dx, dy) else pf:SetPoint("LEFT", f, "LEFT", dx, dy) end
     f.portrait = pf:CreateTexture(nil, "ARTWORK")
     f.portrait:SetPoint("TOPLEFT", 5, -5); f.portrait:SetPoint("BOTTOMRIGHT", -5, 5)
     local mask = pf:CreateMaskTexture()
@@ -226,15 +230,16 @@ local function Create(unit, holderKey, default, mirror)
         local nsH = CreateFrame("Frame", nil, pf)
         nsH:SetScale(0.5)
         nsH:SetPoint("TOPLEFT", pf, "TOPLEFT", 0, 0)
-        nsH:SetSize(PORT / 0.5, PORT / 0.5)
+        nsH:SetSize(PS / 0.5, PS / 0.5)
         local ns = CreateFrame("Frame", nil, nsH, "NineSlicePanelTemplate")
         ns:SetAllPoints()
         if not (NineSliceUtil and pcall(NineSliceUtil.ApplyLayoutByName, ns, "Dialog")) then ns:Hide() end
         if ns.Center then ns.Center:Hide() end
         ns:SetFrameLevel(pf:GetFrameLevel() + 1)
         f.portrait:ClearAllPoints()
-        f.portrait:SetPoint("TOPLEFT", 4, -4); f.portrait:SetPoint("BOTTOMRIGHT", -4, 4)
+        f.portrait:SetPoint("TOPLEFT", 5, -5); f.portrait:SetPoint("BOTTOMRIGHT", -5, 5)
         mask:SetAllPoints(f.portrait)
+        f.squarePortrait = true
     else
         local ring = pf:CreateTexture(nil, "OVERLAY")
         ring:SetAllPoints(); ring:SetTexture(MEDIA .. "ring_round")
@@ -242,21 +247,24 @@ local function Create(unit, holderKey, default, mirror)
 
     -- niveau : petite boîte au même bord doré, chiffre centré
     local lv = CreateFrame("Frame", nil, pf)
-    lv:SetSize(24, 20)
+    local LW, LH = 30, 22
+    lv:SetSize(LW, LH)
     lv:SetFrameLevel(pf:GetFrameLevel() + 4)
     if mirror then lv:SetPoint("CENTER", pf, "BOTTOMRIGHT", -4, 4) else lv:SetPoint("CENTER", pf, "BOTTOMLEFT", 4, 4) end
     local lvbg = lv:CreateTexture(nil, "BACKGROUND")
     lvbg:SetPoint("TOPLEFT", 2, -2); lvbg:SetPoint("BOTTOMRIGHT", -2, 2); lvbg:SetColorTexture(0.05, 0.04, 0.03, 0.95)
     local lvH = CreateFrame("Frame", nil, lv)
-    lvH:SetScale(0.5); lvH:SetPoint("TOPLEFT", lv, "TOPLEFT", 0, 0); lvH:SetSize(24 / 0.5, 20 / 0.5)
+    lvH:SetScale(0.5); lvH:SetPoint("TOPLEFT", lv, "TOPLEFT", 0, 0); lvH:SetSize(LW / 0.5, LH / 0.5)
     local lvns = CreateFrame("Frame", nil, lvH, "NineSlicePanelTemplate")
     lvns:SetAllPoints()
     if not (NineSliceUtil and pcall(NineSliceUtil.ApplyLayoutByName, lvns, "Dialog")) then lvns:Hide() end
     if lvns.Center then lvns.Center:Hide() end
     local lvTop = CreateFrame("Frame", nil, lv); lvTop:SetAllPoints(); lvTop:SetFrameLevel(lv:GetFrameLevel() + 3)
-    f.level = lvTop:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    f.level:SetPoint("TOPLEFT", 0, 0); f.level:SetPoint("BOTTOMRIGHT", 0, 0)
+    f.level = lvTop:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    f.level:SetPoint("TOPLEFT", 0, 0); f.level:SetPoint("BOTTOMRIGHT", 0, 1)
     f.level:SetJustifyH("CENTER"); f.level:SetJustifyV("MIDDLE")
+    f.level.nzrSize = 13
+    NZR.FramesFont(f.level)
 
     -- élite / rare : petit mot doré sous le nom
     f.tag = p:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -410,6 +418,8 @@ local function UpdateInfo(f)
     end
     f.tag:SetText(tag)
     SetPortraitTexture(f.portrait, u)
+    -- portrait du jeu = image ronde : en carré on zoome un peu pour cacher les coins vides
+    if f.squarePortrait then f.portrait:SetTexCoord(0.12, 0.88, 0.12, 0.88) end
 end
 
 ---------------------------------------------------------------------------
@@ -444,34 +454,65 @@ local function AuraButton(parent)
     return b
 end
 
+-- toutes les auras de l'unité : liste complète d'un coup quand le jeu le permet ; sinon
+-- par index sans s'arrêter au premier trou (une aura cachée ou secrète ne coupe plus la liste)
+local function ListAuras(u, filter)
+    local out = {}
+    if C_UnitAuras.GetUnitAuras then
+        local ok, list = pcall(C_UnitAuras.GetUnitAuras, u, filter, 40)
+        if ok and type(list) == "table" then
+            for _, a in ipairs(list) do out[#out + 1] = a end
+            return out
+        end
+    end
+    local holes = 0
+    for i = 1, 40 do
+        local ok, a = pcall(C_UnitAuras.GetAuraDataByIndex, u, i, filter)
+        if ok and a then
+            a.nzrIndex = i
+            out[#out + 1] = a
+            holes = 0
+        else
+            holes = holes + 1
+            if holes >= 3 then break end
+        end
+    end
+    return out
+end
+
+local function PaintAura(b, a, u, harmful)
+    -- bord rouge pour les débuffs, comme le jeu
+    if harmful then b.edge:SetColorTexture(0.8, 0.1, 0.1, 1) else b.edge:SetColorTexture(0, 0, 0, 1) end
+    b.auraID = a.auraInstanceID
+    pcall(b.icon.SetTexture, b.icon, a.icon)
+    -- nombre de charges (peut être secret : passé tel quel)
+    b.count:SetText("")
+    do
+        local okc, s = pcall(string.format, "%d", a.applications)
+        if okc and not (NZR.plain(a.applications) and a.applications <= 1) then NZR.SafeText(b.count, s) end
+    end
+    -- temps restant
+    b.cd:Hide()
+    local done = false
+    if C_UnitAuras.GetAuraDuration and b.cd.SetCooldownFromDurationObject and a.auraInstanceID then
+        local okd, d = pcall(C_UnitAuras.GetAuraDuration, u, a.auraInstanceID)
+        if okd and d and pcall(b.cd.SetCooldownFromDurationObject, b.cd, d) then b.cd:Show(); done = true end
+    end
+    if not done and NZR.plain(a.duration) and NZR.plain(a.expirationTime) and a.duration > 0 then
+        b.cd:SetCooldown(a.expirationTime - a.duration, a.duration); b.cd:Show()
+    end
+end
+
 local function FillAuras(f, list, filter, harmful)
     local u, n = f.unit, 0
-    for i = 1, 40 do
+    for _, a in ipairs(ListAuras(u, filter)) do
         if n >= AURA_MAX then break end
-        local ok, a = pcall(C_UnitAuras.GetAuraDataByIndex, u, i, filter)
-        if not ok or not a then break end
+        local i = a.nzrIndex
         n = n + 1
         local b = list[n] or AuraButton(f.auraBox); list[n] = b
-        b.unit, b.index, b.harmful, b.auraID = u, i, harmful, a.auraInstanceID
-        pcall(b.icon.SetTexture, b.icon, a.icon)
-        -- nombre de charges (peut être secret : passé tel quel)
-        b.count:SetText("")
-        if a.applications ~= nil then
-            local okc, s = pcall(string.format, "%d", a.applications)
-            if okc and not (NZR.plain(a.applications) and a.applications <= 1) then NZR.SafeText(b.count, s) end
-        end
-        -- temps restant
-        b.cd:Hide()
-        local done = false
-        if C_UnitAuras.GetAuraDuration and b.cd.SetCooldownFromDurationObject and a.auraInstanceID then
-            local okd, d = pcall(C_UnitAuras.GetAuraDuration, u, a.auraInstanceID)
-            if okd and d and pcall(b.cd.SetCooldownFromDurationObject, b.cd, d) then b.cd:Show(); done = true end
-        end
-        if not done and NZR.plain(a.duration) and NZR.plain(a.expirationTime) and a.duration > 0 then
-            b.cd:SetCooldown(a.expirationTime - a.duration, a.duration); b.cd:Show()
-        end
-        -- bord rouge pour les débuffs, comme le jeu
-        if harmful then b.edge:SetColorTexture(0.8, 0.1, 0.1, 1) else b.edge:SetColorTexture(0, 0, 0, 1) end
+        b.unit, b.index, b.harmful = u, i, harmful
+        -- chaque aura dans sa propre protection : une valeur secrète (combat) ne vide plus toute la liste
+        pcall(PaintAura, b, a, u, harmful)
         b:Show()
     end
     for i = n + 1, #list do list[i]:Hide(); list[i].auraID = nil end
