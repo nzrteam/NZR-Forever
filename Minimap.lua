@@ -100,7 +100,7 @@ local function IsDecor(r)
     local okK, key = pcall(function() return r:GetParentKey() end)
     if okK and type(key) == "string" then
         local k = key:lower()
-        if k:find("border") or k:find("background") or k:find("ring") or k:find("highlight") or k:find("mask") then return true end
+        if k:find("border") or k:find("ring") or k:find("highlight") or k:find("mask") or k:find("glow") then return true end
     end
     local okT, tex = pcall(r.GetTexture, r)
     local okA, atlas = pcall(r.GetAtlas, r)
@@ -139,6 +139,7 @@ end
 -- look carré NZR : on efface le rond (bord, fond), icône recadrée en carré, anneau doré
 local function Skin(b)
     if b.nzrRing then return end
+    if not FindIcon(b) then return end      -- pas d'icône trouvée : on garde son look d'origine
     -- look : on efface le rond (bord, fond), icône recadrée en carré, anneau doré NZR
     local icon = FindIcon(b)
     local pushed = b.GetPushedTexture and b:GetPushedTexture()
@@ -328,9 +329,37 @@ Resolve = function(id)
 end
 NZR.MinimapResolve = Resolve
 
+local function HoldsMinimap(o)
+    local f = Minimap
+    while f do
+        if f == o then return true end
+        f = f.GetParent and f:GetParent()
+    end
+end
 local function TooBig(o)
     local w, h = o:GetSize()
-    return not w or w > MAX_SIZE or h > MAX_SIZE or w < 4
+    if not w or w < 4 or h < 4 then return true end
+    if HoldsMinimap(o) then return true end                 -- la carte ou un de ses conteneurs
+    if o.IsObjectType and o:IsObjectType("Texture") then return w > MAX_SIZE or h > MAX_SIZE end
+    return w > 260 or h > 120                               -- barre de zone, horloge… oui ; gros blocs non
+end
+-- un cadre qui ne dessine rien (zone de clic invisible) n'est pas un « élément »
+local function DrawsSomething(o)
+    if o.IsObjectType and o:IsObjectType("Texture") then return true end
+    for _, r in ipairs({ o:GetRegions() }) do
+        local okS, sh = pcall(r.IsShown, r)
+        local okA, a = pcall(r.GetAlpha, r)
+        if okS and sh and okA and a and a > 0.05 then
+            if r:IsObjectType("FontString") then return true end
+            local okT, tex = pcall(r.GetTexture, r)
+            local okL, atl = pcall(r.GetAtlas, r)
+            if (okT and tex) or (okL and atl) then return true end
+        end
+    end
+    for _, c in ipairs({ o:GetChildren() }) do
+        local okV, v = pcall(c.IsShown, c)
+        if okV and v and DrawsSomething(c) then return true end
+    end
 end
 
 local function FreeExtra(name)
@@ -412,7 +441,7 @@ local function FreeExtra(name)
         NZR.db.mmFreePos = NZR.db.mmFreePos or {}
         NZR.db.mmFreePos[name] = { cx * s / f:GetScale(), cy * s / f:GetScale() }
     end
-    if NZR.db.mmShape ~= "round" then f:SetSize(30, 30); Skin(f) end
+    if NZR.db.mmShape ~= "round" and FindIcon(f) then f:SetSize(30, 30); Skin(f) end
     DragFree(name, target)
 end
 
@@ -435,6 +464,7 @@ local function PickUnderMouse()
         local okA, alpha = pcall(o.GetEffectiveAlpha or o.GetAlpha, o)
         if okA and alpha and alpha < 0.05 then return end
         if TooBig(o) or not Over(o) then return end
+        if not o:IsObjectType("Texture") and not DrawsSomething(o) then return end
         -- une image dans un petit cadre : on prend le cadre entier (icône + contour + fond)
         if o:IsObjectType("Texture") then
             local p = o:GetParent()
@@ -614,7 +644,7 @@ local function FreeButton(name, b)
         NZR.db.mmFreePos = NZR.db.mmFreePos or {}
         NZR.db.mmFreePos[name] = { cx * s, cy * s }
     end
-    if NZR.db.mmShape ~= "round" then b:SetSize(30, 30); Skin(b) end
+    if NZR.db.mmShape ~= "round" and FindIcon(b) then b:SetSize(30, 30); Skin(b) end
     -- glisser : librement, n'importe où ; la place est retenue
     DragFree(name, b)
 end
@@ -721,6 +751,13 @@ function M:Init()
         C_Timer.After(1, Insets)
         if EditModeManagerFrame then EditModeManagerFrame:HookScript("OnShow", function() C_Timer.After(0.1, Insets) end) end
     end
+
+    -- boutons + / - du jeu : au-dessus du bord doré (sinon cachés dessous)
+    C_Timer.After(1, function()
+        for _, z in ipairs({ mm.ZoomIn or _G.MinimapZoomIn, mm.ZoomOut or _G.MinimapZoomOut }) do
+            if z and z.SetFrameLevel then pcall(z.SetFrameLevel, z, mm:GetFrameLevel() + 10) end
+        end
+    end)
 
     -- molette = zoom
     mm:EnableMouseWheel(true)
