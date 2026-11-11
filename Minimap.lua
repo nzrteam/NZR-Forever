@@ -225,8 +225,21 @@ local function NameOf(o)
     local ok, n = pcall(o.GetName, o)
     return ok and type(n) == "string" and n or nil
 end
--- identifiant retrouvable après /reload : nom, sinon Parent.clé, sinon Parent#n (n-ième cadre)
--- ou Parent#rn (n-ième image)
+-- « empreinte » d'un cadre sans nom : sa taille et les clés de ses images (Background,
+-- Icon…), qui ne changent pas d'un chargement à l'autre (l'ordre des cadres, lui, peut changer)
+local function Sig(f)
+    local keys = {}
+    for _, r in ipairs({ f:GetRegions() }) do
+        local ok, k = pcall(function() return r:GetParentKey() end)
+        if ok and type(k) == "string" then keys[#keys + 1] = k end
+    end
+    if #keys == 0 then return end
+    table.sort(keys)
+    local w, h = f:GetSize()
+    return table.concat(keys, "+") .. ":" .. math.floor((w or 0) + 0.5) .. "x" .. math.floor((h or 0) + 0.5)
+end
+-- identifiant retrouvable après /reload : nom, sinon Parent.clé, sinon Parent@empreinte,
+-- sinon Parent#n (n-ième cadre) ou Parent#rn (n-ième image)
 local FrameId
 FrameId = function(o)
     local n = NameOf(o)
@@ -238,13 +251,25 @@ FrameId = function(o)
     local okK, key = pcall(function() return o:GetParentKey() end)
     if okK and type(key) == "string" then return pid .. "." .. key end
     local isTex = o.IsObjectType and o:IsObjectType("Texture")
+    if not isTex then
+        local sg = Sig(o)
+        if sg then return pid .. "@" .. sg end
+    end
     local list = isTex and { p:GetRegions() } or { p:GetChildren() }
     for i, c in ipairs(list) do if c == o then return pid .. (isTex and "#r" or "#") .. i end end
 end
 local Resolve
 Resolve = function(id)
     if _G[id] then return _G[id] end
-    local pid, sep, rest = id:match("^(.+)([%.#])([^%.#]+)$")
+    -- Parent@empreinte (l'empreinte peut contenir des points : on coupe au dernier @)
+    local apid, asig = id:match("^(.+)@([^@]+)$")
+    if apid then
+        local p = Resolve(apid)
+        if not p then return end
+        for _, c in ipairs({ p:GetChildren() }) do if Sig(c) == asig then return c end end
+        return
+    end
+    local pid, sep, rest = id:match("^(.+)([%.#])([^%.#@]+)$")
     if not pid then return end
     local p = Resolve(pid)
     if not p then return end
@@ -361,6 +386,12 @@ local function PickUnderMouse()
         local okA, alpha = pcall(o.GetEffectiveAlpha or o.GetAlpha, o)
         if okA and alpha and alpha < 0.05 then return end
         if TooBig(o) or not Over(o) then return end
+        -- une image dans un petit cadre : on prend le cadre entier (icône + contour + fond)
+        if o:IsObjectType("Texture") then
+            local p = o:GetParent()
+            local pid = p and FrameId(p)
+            if p and pid and not SKIP[pid] and not TooBig(p) and not p.nzrSkip then o = p end
+        end
         local id = FrameId(o)
         if not id or SKIP[id] or id:find("NZRF") then return end
         local w, h = o:GetSize()
@@ -384,7 +415,7 @@ end
 local function CleanExtra()
     for id in pairs(NZR.db.mmFreeExtra or {}) do
         local o = Resolve(id)
-        if SKIP[id] or id:find("Container") or (o and TooBig(o)) then
+        if SKIP[id] or id:find("Container$") or id:find("#") or (o and TooBig(o)) then
             NZR.db.mmFreeExtra[id] = nil
             if NZR.db.mmFreePos then NZR.db.mmFreePos[id] = nil end
         end
