@@ -69,14 +69,31 @@ local RING = "Interface\\AddOns\\NZRForever\\Media\\uf\\ring_square"
 local NOT_ADDON = { "^Minimap", "^MiniMap", "^GameTime", "^TimeManager", "^QueueStatus", "^ExpansionLanding",
     "^AddonCompartment", "^Garrison", "^NZRF", "^GuildInstance", "^Tracking", "^HybridMinimap", "^Calendar" }
 
+local PIN_NAMES = { "^QuestieFrame", "^Questie.*Pin", "^GatherMate", "^HandyNotes", "^TomTom", "^RareScanner", "Pin%d*$" }
+-- points de carte posés avec HereBeDragons (Questie, GatherMate, HandyNotes… presque tous)
+local function IsMapPin(c)
+    if not LibStub then return false end
+    for _, lib in ipairs({ "HereBeDragons-Pins-2.0", "HereBeDragons-Pins-1.0" }) do
+        local ok, hbd = pcall(LibStub, lib, true)
+        if ok and hbd then
+            if hbd.activeMinimapPins and hbd.activeMinimapPins[c] then return true end
+            if hbd.minimapPins and hbd.minimapPins[c] then return true end
+        end
+    end
+    return false
+end
+
 local function IsAddonButton(c)
     if not (c and c.IsObjectType and c:IsObjectType("Button")) then return false end
     local okN, n = pcall(c.GetName, c)
     if not okN or type(n) ~= "string" then return false end
     if n:find("^LibDBIcon10_") then return true end
     for _, pat in ipairs(NOT_ADDON) do if n:find(pat) then return false end end
+    -- les points posés sur la carte (quêtes Questie, minerais, repères…) ne sont pas des boutons
+    for _, pat in ipairs(PIN_NAMES) do if n:find(pat) then return false end end
+    if IsMapPin(c) then return false end
     local w, h = c:GetSize()
-    return w and h and w >= 14 and w <= 48 and math.abs(w - h) <= 8
+    return w and h and w >= 24 and w <= 48 and math.abs(w - h) <= 8
 end
 
 local function AllAddonButtons()
