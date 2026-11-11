@@ -4,7 +4,7 @@ local _, NZR = ...
 local M = NZR:Module("Options")
 local C = NZR.C
 
-local W, H = 820, 600
+local W, H = 820, 640
 local LIST_W = 170          -- colonne de gauche (catégories), comme les Options du jeu
 local win
 local snapshot = {}
@@ -619,7 +619,7 @@ local function BuildSection(content, title, items, name)
     local p = CreateFrame("Frame", nil, scroll)
     p:SetSize(PW, 100)
     scroll:SetScrollChild(p)
-    scroll:SetScript("OnShow", function(s) s:SetVerticalScroll(0) end)
+    scroll:SetScript("OnShow", function(s) s:SetVerticalScroll(0); if s.Layout then s.Layout() end end)
 
     scroll.controls = {}
     local st = GameText(p, "GameFontNormalLarge")
@@ -641,12 +641,12 @@ local function BuildSection(content, title, items, name)
         row:SetScript("OnLeave", function() hl:Hide() end)
 
         local label = GameText(row, "GameFontHighlight")
-        label:SetPoint("TOPLEFT", 14, -8)
+        label:SetPoint("TOPLEFT", 14, -10)
         label:SetText(item.label .. (item.r and "  |cff808080(recharge)|r" or ""))
         if item.r then reloadKeys[item.key] = true end
         local desc = GameText(row, "GameFontDisableSmall")
         desc:SetTextColor(0.62, 0.62, 0.62)
-        desc:SetPoint("TOPLEFT", label, "BOTTOMLEFT", 0, -4)
+        desc:SetPoint("TOPLEFT", label, "BOTTOMLEFT", 0, -5)
         desc:SetWordWrap(true)
         desc:SetText(item.desc)
 
@@ -675,16 +675,21 @@ local function BuildSection(content, title, items, name)
                 return NZR.db[item.key]
             end, changed, PW - 50)
         end
-        if item.t == "multi" or item.t == "custom" then
-            ctl:SetPoint("TOPLEFT", desc, "BOTTOMLEFT", -4, -6)
-            desc:SetPoint("RIGHT", row, "RIGHT", -14, 0)
-            rowH = 46 + ctl:GetHeight() + 6
+        local below = item.t == "multi" or item.t == "custom"
+        if below then
+            ctl:SetPoint("TOPLEFT", desc, "BOTTOMLEFT", -4, -8)
         else
             ctl:SetPoint("RIGHT", row, "RIGHT", -14, 0)
-            desc:SetPoint("RIGHT", ctl, "LEFT", -16, 0)
-            label:SetPoint("RIGHT", ctl, "LEFT", -16, 0)
         end
-        row:SetHeight(rowH)
+        -- hauteur de la ligne selon le texte (une description longue ne déborde plus)
+        function row.measure()
+            local w = PW - 14 - 14 - (below and 0 or (ctl:GetWidth() + 24))
+            label:SetWidth(w); desc:SetWidth(w)
+            local h = 10 + (label:GetStringHeight() or 14) + 5 + (desc:GetStringHeight() or 12) + 12
+            if below then h = h + 4 + ctl:GetHeight() end
+            return math.max(rowH, math.ceil(h))
+        end
+        row:SetHeight(row.measure())
         row.ctl = ctl
         table.insert(scroll.controls, ctl)
         table.insert(rows, row)
@@ -727,10 +732,11 @@ local function BuildSection(content, title, items, name)
     local function Layout()
         local y = -44
         local function place(row)
+            if row.measure then row:SetHeight(row.measure()) end
             row:ClearAllPoints()
             row:SetPoint("TOPLEFT", 0, y); row:SetPoint("TOPRIGHT", 0, y)
             row:Show()
-            y = y - row:GetHeight() - 2
+            y = y - row:GetHeight() - 4
         end
         for _, row in ipairs(rows) do if not (more and row.item.adv) then place(row) end end
         if more then
@@ -745,15 +751,13 @@ local function BuildSection(content, title, items, name)
         end
         p:SetHeight(-y + 10)
     end
+    scroll.Layout = Layout
     if more then
         more:SetScript("OnClick", function() open = not open; Layout(); PlaySound(open and 856 or 857) end)
     end
     for _, row in ipairs(rows) do
         if row.item.t == "custom" and row.ctl then
-            row.ctl.relayout = function()
-                row:SetHeight(46 + row.ctl:GetHeight() + 6)
-                Layout()
-            end
+            row.ctl.relayout = function() Layout() end
             row.ctl.relayout()
         end
     end
@@ -844,7 +848,7 @@ local function BuildHome(content)
     holder.controls = {}
     local COLS, GAP = 3, 8
     local CW = math.floor(((W - 16) - 2 * 10 - (COLS - 1) * GAP) / COLS)
-    local CH = 104
+    local CH = 114
     for i, m in ipairs(MODULES) do
         local col, line = (i - 1) % COLS, math.floor((i - 1) / COLS)
         local card = CreateFrame("Frame", nil, holder)
@@ -879,13 +883,14 @@ local function BuildHome(content)
         local state = GameText(card, "GameFontDisableSmall")
         state:SetPoint("TOPLEFT", name, "BOTTOMLEFT", 0, -3)
         local desc = GameText(card, "GameFontHighlightSmall")
-        desc:SetPoint("TOPLEFT", ic, "BOTTOMLEFT", 0, -6)
-        desc:SetPoint("RIGHT", card, "RIGHT", -10, 0)
+        desc:SetPoint("TOPLEFT", ic, "BOTTOMLEFT", 0, -8)
+        desc:SetPoint("RIGHT", card, "RIGHT", -12, 0)
         desc:SetWordWrap(true)
+        if desc.SetMaxLines then desc:SetMaxLines(2) end
         desc:SetText(m.desc)
 
         local go = PushButton(card, function() return "Régler" end, function() NZR:OpenOptionsAt(m.page, m.section) end)
-        go:SetPoint("BOTTOMRIGHT", -8, 8)
+        go:SetPoint("BOTTOMRIGHT", -10, 10)
         -- l'état suit la case (et le rechargement)
         local ref = sw.Refresh
         function sw:Refresh()
