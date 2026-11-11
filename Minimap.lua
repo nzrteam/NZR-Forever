@@ -165,6 +165,14 @@ local function Skin(b)
         if r:GetObjectType() == "Texture" and r ~= icon and r:GetDrawLayer() ~= "HIGHLIGHT"
             and not (iconIsNormal and r == pushed) then r:SetAlpha(0) end
     end
+    -- contour rond posé dans un sous-cadre (lune…) : effacé aussi
+    if not b:IsObjectType("Button") then
+        for _, c in ipairs({ b:GetChildren() }) do
+            for _, r in ipairs({ c:GetRegions() }) do
+                if r:IsObjectType("Texture") and r ~= icon and r:GetDrawLayer() ~= "HIGHLIGHT" then r:SetAlpha(0) end
+            end
+        end
+    end
     -- bouton dont l'icône est la texture « normale » : la version enfoncée prend la même forme
     if iconIsNormal and pushed then
         pushed:ClearAllPoints(); pushed:SetPoint("TOPLEFT", 5, -5); pushed:SetPoint("BOTTOMRIGHT", -3, 3)
@@ -324,8 +332,10 @@ FrameId = function(o)
     local list = isTex and { p:GetRegions() } or { p:GetChildren() }
     for i, c in ipairs(list) do if c == o then return pid .. (isTex and "#r" or "#") .. i end end
 end
+local extraObj = {}          -- éléments déjà libérés (ils ont quitté la minicarte : on garde l'objet)
 local Resolve
 Resolve = function(id)
+    if extraObj[id] then return extraObj[id] end
     if _G[id] then return _G[id] end
     -- Parent@empreinte (l'empreinte peut contenir des points : on coupe au dernier @)
     local apid, asig = id:match("^(.+)@([^@]+)$")
@@ -384,6 +394,7 @@ local function FreeExtra(name)
     local f = Resolve(name)
     if not f or f.nzrFree or InCombatLockdown() or TooBig(f) then return end
     f.nzrFree = true
+    extraObj[name] = f
     local cx, cy = f:GetCenter()
     local s = f:GetEffectiveScale() / UIParent:GetEffectiveScale()
     local target = f
@@ -719,8 +730,51 @@ end
 NZR.MinimapFreeAll = FreeAll
 NZR.MinimapFreeButton = FreeButton
 
+-- la lune / le soleil de la minicarte (jour / nuit) : petit cadre sans nom de la minicarte,
+-- avec une image « Background » ; on le cache entièrement si l'option est cochée
+local function FindMoon()
+    for id, o in pairs(extraObj) do
+        if id:find("@Background") and o.GetObjectType and o:GetObjectType() ~= "Texture" then return o end
+    end
+    local roots = {}
+    local cl = _G.MinimapCluster
+    if cl and cl.MinimapContainer then roots[#roots + 1] = cl.MinimapContainer end
+    if Minimap then roots[#roots + 1] = Minimap end
+    if cl then roots[#roots + 1] = cl end
+    for _, root in ipairs(roots) do
+        for _, c in ipairs({ root:GetChildren() }) do
+            if c ~= Minimap and not NameOf(c) then
+                local w, h = c:GetSize()
+                if w and w >= 16 and w <= 60 and h <= 60 then
+                    for _, r in ipairs({ c:GetRegions() }) do
+                        local ok, k = pcall(function() return r:GetParentKey() end)
+                        if ok and k == "Background" then return c end
+                    end
+                end
+            end
+        end
+    end
+end
+local function HideMoon()
+    local m = FindMoon()
+    if not m or m.nzrHidden then return m ~= nil end
+    m.nzrHidden = true
+    m:Hide()
+    hooksecurefunc(m, "Show", function(self) self:Hide() end)
+    return true
+end
+NZR.MinimapFindMoon = FindMoon
+
 function M:Init()
     if NZR.withUI then return end
+    if NZR.db.mmHideMoon and Minimap then
+        local tries = 0
+        local function go()
+            tries = tries + 1
+            if not HideMoon() and tries < 5 then C_Timer.After(2, go) end
+        end
+        C_Timer.After(1, go)
+    end
     -- éléments choisis à la main (lune…) : remis à leur place même sans l'option « mmFree »
     if not NZR.db.mmFree and Minimap and next(NZR.db.mmFreeExtra or {}) then
         local ev = CreateFrame("Frame")

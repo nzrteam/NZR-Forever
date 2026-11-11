@@ -164,6 +164,7 @@ local PAGES = {
         { t = "switch", key = "tooltipCursor", section = "Infobulles", label = "Infobulle à la souris", desc = "Elle s'affiche juste à côté du curseur, en haut à gauche.", r = true },
         { t = "switch", key = "squareMinimap", section = "Minicarte", label = "Minicarte carrée", desc = "Carte carrée avec le bord des infobulles du jeu ; boutons et nom de zone inchangés. Molette = zoom.", r = true },
         { t = "switch", key = "mmFree", section = "Minicarte", label = "Boutons d'addons libres", desc = "Les boutons des autres addons sur la minicarte (Questie, GearQuest, DBM… n'importe lequel) deviennent libres de se glisser où tu veux sur l'écran (forme au choix ci-dessous). Leurs clics restent les mêmes. Les icônes NZR restent à part.", r = true },
+        { t = "switch", key = "mmHideMoon", section = "Minicarte", label = "Cacher la lune (jour / nuit)", desc = "Retire l'icône de la lune / du soleil et son cadre sur la minicarte.", r = true },
         { t = "choice", key = "mmShape", section = "Minicarte", label = "Forme des boutons libres", desc = "Pour les boutons d'addons et les éléments choisis dans l'onglet Édition (lune…). Carré : anneau doré NZR. Rond : le look d'origine.", r = true,
           choices = function() return { { "square", "Carré" }, { "round", "Rond" } } end },
         { t = "switch", key = "mmButtonsSave", section = "Minicarte", label = "Retenir la place des boutons d'addons", desc = "Les petits boutons ronds autour de la minicarte (Questie…) restent où tu les as glissés, même après un /reload.", r = true },
