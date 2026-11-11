@@ -260,16 +260,16 @@ local PAGES = {
               NZR:Print("positions des blocs remises par défaut.")
           end },
       } },
-    { id = "paladin", name = "Paladin", desc = "Assistant de bénédictions (comme PallyPower) : répartition entre paladins du groupe et barre pour les lancer. Désactivé de base.",
+    { id = "paladin", name = "Classe", desc = "Les outils propres à ta classe. Paladin : assistant de bénédictions (comme PallyPower). Les autres classes arriveront ici plus tard.",
       items = {
-        { t = "switch", section = "Assistant", key = "paladin", label = "Assistant de bénédictions", desc = "Seulement si tu joues un paladin. Les autres paladins avec NZR Forever partagent la même répartition.", r = true },
-        { t = "button", section = "Assistant", label = "Répartition des bénédictions", desc = "Qui donne quoi à quelle classe (aussi /nzr bene, ou clic droit sur la barre).",
+        { t = "switch", section = "Paladin : bénédictions", key = "paladin", label = "Assistant de bénédictions", desc = "Seulement si tu joues un paladin. Les autres paladins avec NZR Forever partagent la même répartition.", r = true },
+        { t = "button", section = "Paladin : bénédictions", label = "Répartition des bénédictions", desc = "Qui donne quoi à quelle classe (aussi /nzr bene, ou clic droit sur la barre).",
           text = function() return "Ouvrir" end,
           click = function() if NZR.BlessOpen then NZR:ToggleOptions(false); NZR.BlessOpen() else NZR:Print("active d'abord l'assistant, puis clique sur Recharger.") end end },
-        { t = "switch", key = "blessGreater", section = "Barre", label = "Bénédictions supérieures au clic gauche", desc = "Toute la classe d'un coup (demande un Symbole des rois). Clic droit = version simple." },
-        { t = "switch", key = "blessSolo", section = "Barre", label = "Afficher la barre même seul", desc = "Sinon, elle n'apparaît qu'en groupe ou en raid.", r = true },
-        { t = "switch", key = "blessLock", section = "Barre", label = "Verrouiller la barre", desc = "Sinon, glisse-la par son titre pour la déplacer." },
-        { t = "slider", key = "blessScale", section = "Barre", label = "Taille de la barre", desc = "Taille des boutons de bénédiction.", min = 0.6, max = 1.6, step = 0.05,
+        { t = "switch", key = "blessGreater", section = "Paladin : barre", label = "Bénédictions supérieures au clic gauche", desc = "Toute la classe d'un coup (demande un Symbole des rois). Clic droit = version simple." },
+        { t = "switch", key = "blessSolo", section = "Paladin : barre", label = "Afficher la barre même seul", desc = "Sinon, elle n'apparaît qu'en groupe ou en raid.", r = true },
+        { t = "switch", key = "blessLock", section = "Paladin : barre", label = "Verrouiller la barre", desc = "Sinon, glisse-la par son titre pour la déplacer." },
+        { t = "slider", key = "blessScale", section = "Paladin : barre", label = "Taille de la barre", desc = "Taille des boutons de bénédiction.", min = 0.6, max = 1.6, step = 0.05,
           apply = function() local b = _G.NZRF_BlessBar; if b and not InCombatLockdown() then b:SetScale(NZR.db.blessScale) end end },
       } },
 }
@@ -291,7 +291,7 @@ local MODULES = {
     { key = "compass", name = "Flèche de quête", icon = "Interface\\Icons\\INV_Misc_Spyglass_03", page = "quest", section = "Flèche de quête", desc = "Flèche vers ta quête suivie ou ton cadavre." },
     { key = "questHL", name = "Surbrillance des quêtes", icon = "Interface\\Icons\\INV_Misc_Gem_Pearl_04", page = "quest", section = "Surbrillance", desc = "Effet sur ce qu'il faut ramasser ou tuer." },
     { key = "respawn", name = "Respawn (Alpha)", icon = "Interface\\Icons\\INV_Misc_PocketWatch_01", page = "quest", section = "Temps de respawn (Alpha)", desc = "Quand les monstres reviennent. En test." },
-    { key = "paladin", name = "Bénédictions", icon = "Interface\\Icons\\Spell_Holy_GreaterBlessingofKings", page = "paladin", section = "Assistant", desc = "Répartition entre paladins et barre à lancer." },
+    { key = "paladin", name = "Bénédictions", icon = "Interface\\Icons\\Spell_Holy_GreaterBlessingofKings", page = "paladin", section = "Paladin : bénédictions", desc = "Répartition entre paladins et barre à lancer." },
 }
 
 -- réglages « avancés » : repliés sous « Plus de réglages » (le reste = l'essentiel)
@@ -312,7 +312,7 @@ local NEEDS_SECTION = {
     ["Barres des monstres"] = "plates", ["Texte de combat"] = "sct",
     ["Surbrillance"] = "questHL", ["Surbrillance : sur quoi"] = "questHL",
     ["Temps de respawn (Alpha)"] = "respawn", ["Guide de progression"] = "guide", ["Flèche de quête"] = "compass",
-    ["Assistant"] = "paladin", ["Barre"] = "paladin",
+    ["Paladin : bénédictions"] = "paladin", ["Paladin : barre"] = "paladin",
 }
 local NEEDS_KEY = { tooltipAlpha = "tooltipOpaque", guideIcon = "guide", respawnIcon = "respawn" }
 local KEY_LABEL = {}

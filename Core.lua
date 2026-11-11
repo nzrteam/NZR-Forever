@@ -1024,10 +1024,12 @@ SlashCmdList.NZRF = function(msg)
     elseif cmd == "diag" and arg == "combat" then
         NZR.sctDebug = not NZR.sctDebug
         NZR:Print("diagnostic du texte de combat " .. (NZR.sctDebug and "activé : stun un monstre, puis envoie une capture du chat. Refais /nzr diag combat pour l'arrêter." or "arrêté."))
+    elseif cmd == "libre" or cmd == "free" then
+        if NZR.MinimapFreeUnderMouse then NZR.MinimapFreeUnderMouse() end
     elseif cmd == "respawn" or cmd == "rsp" then
         if NZR.RespawnCmd then NZR.RespawnCmd(arg) else NZR:Print("active « Temps de respawn » dans /nzr > Quêtes, puis recharge.") end
     elseif cmd == "bene" or cmd == "benedictions" or cmd == "pally" then
-        if NZR.BlessOpen then NZR.BlessOpen() else NZR:Print("active l'assistant de bénédictions dans les réglages (onglet Paladin).") end
+        if NZR.BlessOpen then NZR.BlessOpen() else NZR:Print("active l'assistant de bénédictions dans les réglages (onglet Classe).") end
     elseif cmd == "inspecte" or cmd == "inspect" then
         if NZR.StartInspector then NZR.StartInspector() end
     elseif cmd == "barre" then

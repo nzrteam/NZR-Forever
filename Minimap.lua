@@ -174,6 +174,7 @@ end
 DragFree = function(name, b)
     freed[name] = b
     b:SetMovable(true); b:SetClampedToScreen(true)
+    if b.EnableMouse then b:EnableMouse(true) end
     b:RegisterForDrag("LeftButton")
     b:SetScript("OnDragStart", function(self)
         self.nzrDrag = true; dragging = true
@@ -211,6 +212,55 @@ local function FreeGameTime()
         NZR.db.mmFreePos.GameTimeFrame = { cx * s / g:GetScale(), cy * s / g:GetScale() }
     end
     DragFree("GameTimeFrame", g)
+end
+
+
+-- n'importe quel élément de la minicarte : souris dessus + /nzr libre (la lune, un bouton
+-- sans nom connu…) ; il garde son look et devient libre de se placer, retenu après /reload
+local SKIP = { UIParent = true, Minimap = true, MinimapCluster = true, MinimapBackdrop = true, WorldFrame = true }
+local function FreeExtra(name)
+    local f = _G[name]
+    if not f or f.nzrFree or InCombatLockdown() then return end
+    f.nzrFree = true
+    local cx, cy = f:GetCenter()
+    local s = f:GetEffectiveScale() / UIParent:GetEffectiveScale()
+    pcall(f.SetParent, f, UIParent)
+    f:SetFrameStrata("MEDIUM")
+    if not (NZR.db.mmFreePos and NZR.db.mmFreePos[name]) and cx then
+        NZR.db.mmFreePos = NZR.db.mmFreePos or {}
+        NZR.db.mmFreePos[name] = { cx * s / f:GetScale(), cy * s / f:GetScale() }
+    end
+    DragFree(name, f)
+end
+function NZR.MinimapFreeUnderMouse()
+    if InCombatLockdown() then NZR:Print("Hors combat seulement.") return end
+    local foci = GetMouseFoci and GetMouseFoci() or { GetMouseFocus and GetMouseFocus() }
+    local f = foci and foci[1]
+    -- on remonte jusqu'au premier cadre qui a un nom
+    local chain = {}
+    while f and f ~= UIParent do
+        local ok, n = pcall(f.GetName, f)
+        if ok and type(n) == "string" then
+            table.insert(chain, n)
+            if not SKIP[n] then break end
+        end
+        f = f.GetParent and f:GetParent()
+    end
+    local name = chain[#chain]
+    if not name or SKIP[name] then
+        NZR:Print("Rien à libérer sous la souris" .. (#chain > 0 and (" (" .. table.concat(chain, " > ") .. ")") or "") .. ". Mets la souris sur l'icône puis tape /nzr libre.")
+        return
+    end
+    NZR.db.mmFreeExtra = NZR.db.mmFreeExtra or {}
+    if NZR.db.mmFreeExtra[name] then
+        NZR.db.mmFreeExtra[name] = nil
+        if NZR.db.mmFreePos then NZR.db.mmFreePos[name] = nil end
+        NZR:Print("« " .. name .. " » remis à sa place d'origine après /reload.")
+        return
+    end
+    NZR.db.mmFreeExtra[name] = true
+    FreeExtra(name)
+    NZR:Print("« " .. name .. " » est libre : glisse-le où tu veux. Refais /nzr libre dessus pour l'annuler.")
 end
 
 local function FreeButton(name, b)
@@ -262,6 +312,7 @@ local function FreeAll()
     if InCombatLockdown() then return end
     for name, b in pairs(AllAddonButtons()) do pcall(FreeButton, name, b) end
     pcall(FreeGameTime)
+    for n in pairs(NZR.db.mmFreeExtra or {}) do pcall(FreeExtra, n) end
 end
 
 local function SetupFreeButtons()
