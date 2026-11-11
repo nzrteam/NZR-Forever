@@ -218,8 +218,9 @@ end
 -- n'importe quel élément de la minicarte : souris dessus + /nzr libre (la lune, un bouton
 -- sans nom connu…) ; il garde son look et devient libre de se placer, retenu après /reload
 local SKIP = { UIParent = true, Minimap = true, MinimapCluster = true, MinimapBackdrop = true, WorldFrame = true }
+local FreeExtraResolve
 local function FreeExtra(name)
-    local f = _G[name]
+    local f = FreeExtraResolve and FreeExtraResolve(name) or _G[name]
     if not f or f.nzrFree or InCombatLockdown() then return end
     f.nzrFree = true
     local cx, cy = f:GetCenter()
@@ -232,23 +233,52 @@ local function FreeExtra(name)
     end
     DragFree(name, f)
 end
+-- nom « retrouvable » d'un cadre : son nom, sinon Parent.clé (cadres du jeu sans nom)
+local function FrameId(f)
+    local ok, n = pcall(f.GetName, f)
+    if ok and type(n) == "string" then return n end
+    local p = f.GetParent and f:GetParent()
+    local okK, key = pcall(function() return f:GetParentKey() end)
+    local pn = p and select(2, pcall(p.GetName, p))
+    if okK and type(key) == "string" and type(pn) == "string" then return pn .. "." .. key end
+end
+local function Resolve(id)
+    if _G[id] then return _G[id] end
+    local pn, key = id:match("^(.-)%.([^%.]+)$")
+    local p = pn and _G[pn]
+    return p and p[key]
+end
+NZR.MinimapResolve = Resolve
+FreeExtraResolve = Resolve
+
+-- le plus petit cadre visible sous la souris autour de la minicarte (même s'il ignore la souris)
+local function PickUnderMouse()
+    local best, area
+    local function walk(f, depth)
+        if depth > 4 or not f or not f.GetChildren then return end
+        for _, c in ipairs({ f:GetChildren() }) do
+            local okV, vis = pcall(c.IsVisible, c)
+            if okV and vis then
+                local okM, over = pcall(c.IsMouseOver, c)
+                local w, h = c:GetSize()
+                local id = FrameId(c)
+                if okM and over and w and w > 4 and id and not SKIP[id] and not id:find("^NZRF") then
+                    local a = w * h
+                    if not area or a < area then best, area = id, a end
+                end
+                walk(c, depth + 1)
+            end
+        end
+    end
+    for _, root in ipairs({ _G.MinimapCluster, Minimap, _G.MinimapBackdrop }) do walk(root, 1) end
+    return best
+end
+
 function NZR.MinimapFreeUnderMouse()
     if InCombatLockdown() then NZR:Print("Hors combat seulement.") return end
-    local foci = GetMouseFoci and GetMouseFoci() or { GetMouseFocus and GetMouseFocus() }
-    local f = foci and foci[1]
-    -- on remonte jusqu'au premier cadre qui a un nom
-    local chain = {}
-    while f and f ~= UIParent do
-        local ok, n = pcall(f.GetName, f)
-        if ok and type(n) == "string" then
-            table.insert(chain, n)
-            if not SKIP[n] then break end
-        end
-        f = f.GetParent and f:GetParent()
-    end
-    local name = chain[#chain]
-    if not name or SKIP[name] then
-        NZR:Print("Rien à libérer sous la souris" .. (#chain > 0 and (" (" .. table.concat(chain, " > ") .. ")") or "") .. ". Mets la souris sur l'icône puis tape /nzr libre.")
+    local name = PickUnderMouse()
+    if not name then
+        NZR:Print("Rien à libérer sous la souris. Mets la souris sur l'icône (sans cliquer) puis tape /nzr libre.")
         return
     end
     NZR.db.mmFreeExtra = NZR.db.mmFreeExtra or {}
@@ -377,6 +407,23 @@ function M:Init()
         local e = mm:CreateTexture(nil, "BACKGROUND", nil, -8)
         e:SetColorTexture(0, 0, 0, 1)
         e:SetPoint("TOPLEFT", -2, 2); e:SetPoint("BOTTOMRIGHT", 2, -2)
+    end
+
+    -- mode Édition du jeu : le bloc de la minicarte est plus large que la carte carrée ;
+    -- on laisse dépasser ce vide hors de l'écran pour coller la carte au bord
+    local cl = _G.MinimapCluster
+    if cl and cl.SetClampRectInsets then
+        local function Insets()
+            local cl_l, cl_r = cl:GetLeft(), cl:GetRight()
+            local ml, mr = mm:GetLeft(), mm:GetRight()
+            if not (cl_l and ml) then return end
+            local s = mm:GetEffectiveScale() / cl:GetEffectiveScale()
+            local gl = math.max(0, ml * s - cl_l - 6)
+            local gr = math.max(0, cl_r - mr * s - 6)
+            pcall(cl.SetClampRectInsets, cl, gl, -gr, 0, 0)
+        end
+        C_Timer.After(1, Insets)
+        if EditModeManagerFrame then EditModeManagerFrame:HookScript("OnShow", function() C_Timer.After(0.1, Insets) end) end
     end
 
     -- molette = zoom
