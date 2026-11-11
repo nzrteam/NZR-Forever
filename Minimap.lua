@@ -92,16 +92,39 @@ local function AllAddonButtons()
     return list
 end
 
--- trouver l'icône d'un bouton (LibDBIcon : .icon ; sinon la plus grande texture « dessin »)
+-- trouver l'icône d'un bouton, quel que soit l'addon : LibDBIcon (.icon), texture
+-- « normale » du bouton (SetNormalTexture), ou la plus grande texture qui n'est pas
+-- un bord / fond / surbrillance, dans n'importe quelle couche (même dans un sous-cadre)
+local DECOR_ID = { [136430] = true, [136467] = true, [136477] = true, [136466] = true }
+local function IsDecor(r)
+    local okT, tex = pcall(r.GetTexture, r)
+    local okA, atlas = pcall(r.GetAtlas, r)
+    if not (okT and tex) and not (okA and atlas) then return true end      -- vide
+    if type(tex) == "number" and DECOR_ID[tex] then return true end
+    local n = ((type(tex) == "string" and tex or "") .. " " .. (okA and atlas or "")):lower()
+    return n:find("border") or n:find("background") or n:find("highlight") or n:find("trackingborder") or n:find("minimap%-") and not n:find("icon")
+end
+local function Textures(f, out)
+    for _, r in ipairs({ f:GetRegions() }) do
+        if r:GetObjectType() == "Texture" then table.insert(out, r) end
+    end
+    return out
+end
 local function FindIcon(b)
-    local ic = b.icon or b.Icon or b.iconTexture
-    if ic and ic.GetObjectType and ic:GetObjectType() == "Texture" then return ic end
-    local best, area = nil, 0
-    for _, r in ipairs({ b:GetRegions() }) do
-        if r:GetObjectType() == "Texture" and r ~= b.nzrRing then
-            local layer = r:GetDrawLayer()
+    local ic = b.icon or b.Icon or b.iconTexture or b.texture
+    if ic and ic.GetObjectType and ic:GetObjectType() == "Texture" and not IsDecor(ic) then return ic end
+    local list = Textures(b, {})
+    local nt = b.GetNormalTexture and b:GetNormalTexture()
+    if nt then table.insert(list, nt) end
+    for _, c in ipairs({ b:GetChildren() }) do Textures(c, list) end
+    local best, score = nil, 0
+    for _, r in ipairs(list) do
+        if r ~= b.nzrRing and r:GetDrawLayer() ~= "HIGHLIGHT" and not IsDecor(r) then
             local w, h = r:GetSize()
-            if (layer == "ARTWORK" or layer == "BORDER") and w and h and w * h > area then best, area = r, w * h end
+            w, h = w or 0, h or 0
+            if w == 0 or h == 0 then w, h = b:GetSize() end      -- texture étirée sur tout le bouton
+            local sc = w * h + (r:GetDrawLayer() == "ARTWORK" and 1 or 0)
+            if sc > score then best, score = r, sc end
         end
     end
     return best
@@ -139,17 +162,25 @@ local function FreeButton(name, b)
     end
     -- look : on efface le rond (bord, fond), icône recadrée en carré, anneau doré NZR
     local icon = FindIcon(b)
+    local pushed = b.GetPushedTexture and b:GetPushedTexture()
+    local iconIsNormal = icon and b.GetNormalTexture and icon == b:GetNormalTexture()
     for _, r in ipairs({ b:GetRegions() }) do
-        if r:GetObjectType() == "Texture" and r ~= icon and r:GetDrawLayer() ~= "HIGHLIGHT" then r:SetAlpha(0) end
+        if r:GetObjectType() == "Texture" and r ~= icon and r:GetDrawLayer() ~= "HIGHLIGHT"
+            and not (iconIsNormal and r == pushed) then r:SetAlpha(0) end
+    end
+    -- bouton dont l'icône est la texture « normale » : la version enfoncée prend la même forme
+    if iconIsNormal and pushed then
+        pushed:ClearAllPoints(); pushed:SetPoint("TOPLEFT", 5, -5); pushed:SetPoint("BOTTOMRIGHT", -3, 3)
+        pushed:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     end
     if b.border then b.border:SetAlpha(0) end
     if b.background then b.background:SetAlpha(0) end
     if icon then
-        icon:ClearAllPoints(); icon:SetPoint("TOPLEFT", 4, -4); icon:SetPoint("BOTTOMRIGHT", -4, 4)
+        icon:ClearAllPoints(); icon:SetPoint("TOPLEFT", b, "TOPLEFT", 4, -4); icon:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", -4, 4)
         icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-        icon:SetAlpha(1)
+        icon:SetAlpha(1); icon:Show()
         -- LibDBIcon décale l'icône quand on clique : on la remet carrée
-        b:HookScript("OnMouseUp", function() icon:ClearAllPoints(); icon:SetPoint("TOPLEFT", 4, -4); icon:SetPoint("BOTTOMRIGHT", -4, 4); icon:SetTexCoord(0.08, 0.92, 0.08, 0.92) end)
+        b:HookScript("OnMouseUp", function() icon:ClearAllPoints(); icon:SetPoint("TOPLEFT", b, "TOPLEFT", 4, -4); icon:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", -4, 4); icon:SetTexCoord(0.08, 0.92, 0.08, 0.92) end)
     end
     local ring = b:CreateTexture(nil, "OVERLAY", nil, 7)
     ring:SetAllPoints(); ring:SetTexture(RING)

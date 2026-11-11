@@ -274,6 +274,58 @@ local PAGES = {
       } },
 }
 
+-- onglet Accueil : un aperçu de chaque module (construit à part, voir BuildHome)
+table.insert(PAGES, 1, { id = "home", name = "Accueil", home = true,
+    desc = "Coche les modules que tu veux, puis clique sur Recharger. « Régler » ouvre les réglages du module. Tout est désactivé de base, sauf le meter." })
+
+-- les modules de l'Accueil : réglage oui/non, onglet et catégorie à ouvrir
+local MODULES = {
+    { key = "meter", name = "DPS meter", icon = "Interface\\Icons\\Ability_DualWield", page = "meter", section = "Affichage", desc = "Dégâts, soins et DPS de chacun du groupe." },
+    { key = "sct", name = "Texte de combat", icon = "Interface\\Icons\\Ability_Warrior_BattleShout", page = "look", section = "Texte de combat", desc = "Tes coups, dégâts reçus, XP, buffs, étourdi…" },
+    { key = "unitFrames", name = "Cadres joueur et cible", icon = "Interface\\Icons\\Achievement_Character_Dwarf_Male", page = "frames", section = "Joueur et cible", desc = "Cadres dorés plus lisibles : vie, mana, buffs." },
+    { key = "groupFrames", name = "Groupe et raid", icon = "Interface\\Icons\\Achievement_GuildPerk_EverybodysFriend", page = "frames", section = "Groupe et raid", desc = "Cases de groupe : classe, rôle, débuffs à dissiper." },
+    { key = "plates", name = "Barres des monstres", icon = "Interface\\Icons\\Ability_Hunter_SniperShot", page = "frames", section = "Barres des monstres", desc = "Texte de vie et couleur au-dessus des monstres." },
+    { key = "theme", name = "Barres d'action", icon = "Interface\\Icons\\INV_Misc_Book_11", page = "look", section = "Sorts et buffs", desc = "Sorts et buffs plus nets, raccourcis lisibles." },
+    { key = "squareMinimap", name = "Minicarte carrée", icon = "Interface\\Icons\\INV_Misc_Map_01", page = "look", section = "Minicarte", desc = "Carte carrée au bord du jeu, molette = zoom." },
+    { key = "guide", name = "Guide de progression", icon = "Interface\\Icons\\INV_Misc_Book_09", page = "quest", section = "Guide de progression", desc = "Talents à prendre selon ton niveau." },
+    { key = "compass", name = "Flèche de quête", icon = "Interface\\Icons\\INV_Misc_Spyglass_03", page = "quest", section = "Flèche de quête", desc = "Flèche vers ta quête suivie ou ton cadavre." },
+    { key = "questHL", name = "Surbrillance des quêtes", icon = "Interface\\Icons\\INV_Misc_Gem_Pearl_04", page = "quest", section = "Surbrillance", desc = "Effet sur ce qu'il faut ramasser ou tuer." },
+    { key = "respawn", name = "Respawn (Alpha)", icon = "Interface\\Icons\\INV_Misc_PocketWatch_01", page = "quest", section = "Temps de respawn (Alpha)", desc = "Quand les monstres reviennent. En test." },
+    { key = "paladin", name = "Bénédictions", icon = "Interface\\Icons\\Spell_Holy_GreaterBlessingofKings", page = "paladin", section = "Assistant", desc = "Répartition entre paladins et barre à lancer." },
+}
+
+-- réglages « avancés » : repliés sous « Plus de réglages » (le reste = l'essentiel)
+local ADV = {}
+for _, k in ipairs({ "meterCardFill", "meterBarColor", "meterExtras", "meterRowSize",
+    "ufName", "ufOutline", "ufFontSize", "ufHealthShade", "ufPowerShade", "ufPowerColor",
+    "grpNameColor", "grpColor", "grpText", "grpDebuffAll", "grpAlpha", "grpCellScale",
+    "npOutline", "npFontSize", "npFont",
+    "tooltipAlpha", "mmButtonsSave", "reopenWindows", "lootKey",
+    "sctPower", "sctErrors", "sctHideXP", "sctBuffs", "sctAround", "sctStartBtn", "sctOthers", "sctHideBlizz", "sctSize",
+    "hlSize", "hlSound", "respawnScale", "respawnTip", "respawnAge", "respawnSound", "blessLock" }) do ADV[k] = true end
+
+-- dépendances : ces réglages ne servent à rien si le module est coupé (grisés)
+local NEEDS_SECTION = {
+    ["Quand l'afficher"] = "meter", ["Meter réduit"] = "meter", ["Présentation Détaillé"] = "meter", ["Tableau et Barres"] = "meter",
+    ["Joueur et cible"] = "unitFrames", ["Texte des barres"] = "unitFrames",
+    ["Groupe et raid"] = "groupFrames", ["Groupe : buffs"] = "groupFrames", ["Groupe : taille"] = "groupFrames",
+    ["Barres des monstres"] = "plates", ["Texte de combat"] = "sct",
+    ["Surbrillance"] = "questHL", ["Surbrillance : sur quoi"] = "questHL",
+    ["Temps de respawn (Alpha)"] = "respawn", ["Guide de progression"] = "guide", ["Flèche de quête"] = "compass",
+    ["Assistant"] = "paladin", ["Barre"] = "paladin",
+}
+local NEEDS_KEY = { tooltipAlpha = "tooltipOpaque", guideIcon = "guide", respawnIcon = "respawn" }
+local KEY_LABEL = {}
+for _, page in ipairs(PAGES) do
+    for _, item in ipairs(page.items or {}) do
+        if item.key and not KEY_LABEL[item.key] then KEY_LABEL[item.key] = item.label end
+        if item.key and ADV[item.key] then item.adv = true end
+        local need = (item.key and NEEDS_KEY[item.key]) or NEEDS_SECTION[item.section or ""]
+        if need and need ~= item.key then item.needs = need end
+    end
+end
+local dimRows = {}          -- lignes à griser quand leur module est coupé
+
 ---------------------------------------------------------------------------
 -- Widgets au style du jeu (modèles Blizzard : cases, boutons rouges, onglets)
 ---------------------------------------------------------------------------
@@ -500,10 +552,10 @@ local function BuildSection(content, title, items, name)
     if not ln:GetAtlas() then ln:SetColorTexture(1, 1, 1, 0.12); ln:SetHeight(1) end
     ln:SetPoint("TOPLEFT", st, "BOTTOMLEFT", -4, -4)
     ln:SetPoint("RIGHT", p, "RIGHT", -8, 0)
-    local y = -44
+    local rows = {}
     for _, item in ipairs(items) do
         local row = CreateFrame("Frame", nil, p)
-        row:SetPoint("TOPLEFT", 0, y); row:SetPoint("TOPRIGHT", 0, y)
+        row.item = item
         local hl = row:CreateTexture(nil, "BACKGROUND")
         hl:SetAllPoints(); hl:SetColorTexture(1, 1, 1, 0.04); hl:Hide()
         row:EnableMouse(true)
@@ -554,10 +606,78 @@ local function BuildSection(content, title, items, name)
         end
         row:SetHeight(rowH)
         table.insert(scroll.controls, ctl)
-        y = y - rowH - 2
+        table.insert(rows, row)
+
+        -- module coupé : la ligne est grisée et un voile bloque les clics
+        if item.needs then
+            local veil = CreateFrame("Frame", nil, row)
+            veil:SetAllPoints()
+            veil:SetFrameLevel(row:GetFrameLevel() + 20)
+            veil:EnableMouse(true)
+            veil:SetScript("OnEnter", function(v)
+                hl:Show()
+                GameTooltip:SetOwner(v, "ANCHOR_TOP")
+                GameTooltip:SetText("Active d'abord « " .. (KEY_LABEL[item.needs] or item.needs) .. " »", 1, 0.82, 0)
+                GameTooltip:Show()
+            end)
+            veil:SetScript("OnLeave", function() hl:Hide(); GameTooltip:Hide() end)
+            row.veil = veil
+            table.insert(dimRows, row)
+        end
     end
-    p:SetHeight(-y + 10)
+
+    -- l'essentiel d'abord ; le reste replié sous « Plus de réglages »
+    local nAdv = 0
+    for _, row in ipairs(rows) do if row.item.adv then nAdv = nAdv + 1 end end
+    local more
+    if nAdv > 0 and nAdv < #rows then
+        more = CreateFrame("Button", nil, p)
+        more:SetHeight(28)
+        local mt = more:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        mt:SetPoint("LEFT", 14, 0)
+        local mh = more:CreateTexture(nil, "HIGHLIGHT")
+        mh:SetAllPoints(); mh:SetColorTexture(1, 1, 1, 0.05)
+        local ml = more:CreateTexture(nil, "ARTWORK")
+        ml:SetColorTexture(0.55, 0.45, 0.25, 0.5); ml:SetHeight(1)
+        ml:SetPoint("TOPLEFT", 8, 0); ml:SetPoint("TOPRIGHT", -8, 0)
+        more.text = mt
+    end
+    local open = false
+    local function Layout()
+        local y = -44
+        local function place(row)
+            row:ClearAllPoints()
+            row:SetPoint("TOPLEFT", 0, y); row:SetPoint("TOPRIGHT", 0, y)
+            row:Show()
+            y = y - row:GetHeight() - 2
+        end
+        for _, row in ipairs(rows) do if not (more and row.item.adv) then place(row) end end
+        if more then
+            more.text:SetText((open and "–  Moins de réglages" or "+  Plus de réglages") .. "  |cff808080(" .. nAdv .. ")|r")
+            y = y - 6
+            place(more)
+            for _, row in ipairs(rows) do
+                if row.item.adv then
+                    if open then place(row) else row:Hide() end
+                end
+            end
+        end
+        p:SetHeight(-y + 10)
+    end
+    if more then
+        more:SetScript("OnClick", function() open = not open; Layout(); PlaySound(open and 856 or 857) end)
+    end
+    Layout()
     return scroll
+end
+
+-- grise les réglages dont le module est coupé (après chaque changement)
+local function RefreshDim()
+    for _, row in ipairs(dimRows) do
+        local off = not NZR.db[row.item.needs]
+        row:SetAlpha(off and 0.4 or 1)
+        row.veil:SetShown(off)
+    end
 end
 
 -- un onglet = colonne de catégories à gauche + la catégorie choisie à droite
@@ -569,7 +689,7 @@ local function BuildPage(content, page, idx)
 
     -- regroupe les réglages par catégorie, dans l'ordre
     local groups, byName = {}, {}
-    for _, item in ipairs(page.items) do
+    for _, item in ipairs(page.items or {}) do
         local s = item.section or "Général"
         if not byName[s] then byName[s] = { name = s, items = {} }; table.insert(groups, byName[s]) end
         table.insert(byName[s].items, item)
@@ -626,6 +746,152 @@ local function BuildPage(content, page, idx)
     return holder
 end
 
+-- onglet Accueil : une carte par module (icône, une phrase, oui/non, « Régler »)
+local function BuildHome(content)
+    local holder = CreateFrame("Frame", nil, content)
+    holder:SetAllPoints()
+    holder:Hide()
+    holder.controls = {}
+    local COLS, GAP = 3, 8
+    local CW = math.floor(((W - 16) - 2 * 10 - (COLS - 1) * GAP) / COLS)
+    local CH = 104
+    for i, m in ipairs(MODULES) do
+        local col, line = (i - 1) % COLS, math.floor((i - 1) / COLS)
+        local card = CreateFrame("Frame", nil, holder)
+        card:SetSize(CW, CH)
+        card:SetPoint("TOPLEFT", 10 + col * (CW + GAP), -10 - line * (CH + GAP))
+        local bg = card:CreateTexture(nil, "BACKGROUND")
+        bg:SetAllPoints(); bg:SetColorTexture(0, 0, 0, 0.3)
+        for _, e in ipairs({ { "TOPLEFT", "TOPRIGHT", true }, { "BOTTOMLEFT", "BOTTOMRIGHT", true }, { "TOPLEFT", "BOTTOMLEFT" }, { "TOPRIGHT", "BOTTOMRIGHT" } }) do
+            local t = card:CreateTexture(nil, "BORDER")
+            t:SetColorTexture(0.55, 0.45, 0.25, 0.6)
+            t:SetPoint(e[1]); t:SetPoint(e[2])
+            if e[3] then t:SetHeight(1) else t:SetWidth(1) end
+        end
+        local ic = card:CreateTexture(nil, "ARTWORK")
+        ic:SetSize(36, 36)
+        ic:SetPoint("TOPLEFT", 10, -10)
+        ic:SetTexture(m.icon)
+        ic:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
+        local sw = Switch(card, function() return NZR.db[m.key] end, function(v)
+            NZR.db[m.key] = v
+            win.Update()
+        end)
+        sw:SetPoint("TOPRIGHT", -6, -8)
+        table.insert(holder.controls, sw)
+
+        local name = GameText(card, "GameFontNormal")
+        name:SetPoint("TOPLEFT", ic, "TOPRIGHT", 8, -2)
+        name:SetPoint("RIGHT", sw, "LEFT", -4, 0)
+        name:SetWordWrap(false)
+        name:SetText(m.name)
+        local state = GameText(card, "GameFontDisableSmall")
+        state:SetPoint("TOPLEFT", name, "BOTTOMLEFT", 0, -3)
+        local desc = GameText(card, "GameFontHighlightSmall")
+        desc:SetPoint("TOPLEFT", ic, "BOTTOMLEFT", 0, -6)
+        desc:SetPoint("RIGHT", card, "RIGHT", -10, 0)
+        desc:SetWordWrap(true)
+        desc:SetText(m.desc)
+
+        local go = PushButton(card, function() return "Régler" end, function() NZR:OpenOptionsAt(m.page, m.section) end)
+        go:SetPoint("BOTTOMRIGHT", -8, 8)
+        -- l'état suit la case (et le rechargement)
+        local ref = sw.Refresh
+        function sw:Refresh()
+            ref(self)
+            local on = NZR.db[m.key] and true or false
+            if on ~= (snapshot[m.key] and true or false) then state:SetText("|cffffd100À recharger|r")
+            elseif on then state:SetText("|cff40ff40Activé|r")
+            else state:SetText("|cff9d9d9dDésactivé|r") end
+            ic:SetDesaturated(not on)
+        end
+        sw:Refresh()
+        reloadKeys[m.key] = true
+    end
+    return holder
+end
+
+-- recherche : texte sans accents ni majuscules
+local FOLD = { ["à"] = "a", ["â"] = "a", ["ä"] = "a", ["é"] = "e", ["è"] = "e", ["ê"] = "e", ["ë"] = "e",
+    ["î"] = "i", ["ï"] = "i", ["ô"] = "o", ["ö"] = "o", ["û"] = "u", ["ù"] = "u", ["ü"] = "u", ["ç"] = "c",
+    ["À"] = "a", ["Â"] = "a", ["É"] = "e", ["È"] = "e", ["Ê"] = "e", ["Î"] = "i", ["Ô"] = "o", ["Û"] = "u", ["Ç"] = "c",
+    ["œ"] = "oe", ["Œ"] = "oe", ["’"] = "'" }
+local function Fold(t)
+    t = tostring(t or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+    t = t:gsub("[\195\197\226][\128-\191]+", function(c) return FOLD[c] or c end)
+    return t:lower()
+end
+
+-- page des résultats : une ligne cliquable par réglage trouvé
+local function BuildResults(content)
+    local scroll = Make("ScrollFrame", "NZRF_OptionsSearch", content, "UIPanelScrollFrameTemplate")
+    scroll:SetPoint("TOPLEFT", 6, -6)
+    scroll:SetPoint("BOTTOMRIGHT", -28, 6)
+    scroll:Hide()
+    local PW = (W - 16) - 6 - 34
+    local p = CreateFrame("Frame", nil, scroll)
+    p:SetSize(PW, 100)
+    scroll:SetScrollChild(p)
+    local head = GameText(p, "GameFontNormalLarge")
+    head:SetPoint("TOPLEFT", 8, -10)
+    local empty = GameText(p, "GameFontDisable")
+    empty:SetPoint("TOPLEFT", 14, -48)
+    empty:SetText("Aucun réglage trouvé. Essaie un autre mot (police, taille, buffs, groupe…).")
+    local pool = {}
+    local function Row(i)
+        if pool[i] then return pool[i] end
+        local b = CreateFrame("Button", nil, p)
+        b:SetHeight(44)
+        local h = b:CreateTexture(nil, "HIGHLIGHT")
+        h:SetAllPoints(); h:SetColorTexture(1, 1, 1, 0.06)
+        b.where = GameText(b, "GameFontNormalSmall")
+        b.where:SetPoint("TOPLEFT", 14, -5)
+        b.label = GameText(b, "GameFontHighlight")
+        b.label:SetPoint("TOPLEFT", b.where, "BOTTOMLEFT", 0, -3)
+        b.desc = GameText(b, "GameFontDisableSmall")
+        b.desc:SetPoint("LEFT", b.label, "RIGHT", 10, 0)
+        b.desc:SetPoint("RIGHT", b, "RIGHT", -90, 0)
+        b.desc:SetWordWrap(false)
+        b.go = GameText(b, "GameFontNormal")
+        b.go:SetPoint("RIGHT", -14, 0)
+        b.go:SetText("Voir  >")
+        pool[i] = b
+        return b
+    end
+    function scroll.Run(text)
+        local q = Fold(text)
+        local n = 0
+        for _, page in ipairs(PAGES) do
+            for _, item in ipairs(page.items or {}) do
+                local hay = Fold((item.label or "") .. " " .. (item.desc or "") .. " " .. (item.section or "") .. " " .. page.name)
+                if hay:find(q, 1, true) then
+                    n = n + 1
+                    local b = Row(n)
+                    b:ClearAllPoints()
+                    b:SetPoint("TOPLEFT", 0, -40 - (n - 1) * 46); b:SetPoint("RIGHT", p, "RIGHT", 0, 0)
+                    b.where:SetText(page.name .. "  >  " .. (item.section or ""))
+                    b.label:SetText(item.label)
+                    b.desc:SetText(item.desc or "")
+                    local pid, sec = page.id, item.section
+                    b:SetScript("OnClick", function()
+                        if win.search then win.search:SetText(""); win.search:ClearFocus() end
+                        NZR:OpenOptionsAt(pid, sec)
+                        PlaySound(856)
+                    end)
+                    b:Show()
+                end
+            end
+        end
+        for i = n + 1, #pool do pool[i]:Hide() end
+        head:SetText(n .. (n > 1 and " réglages trouvés" or " réglage trouvé"))
+        empty:SetShown(n == 0)
+        p:SetHeight(40 + n * 46 + 20)
+        scroll:SetVerticalScroll(0)
+    end
+    return scroll
+end
+
 local function Create()
     win = Make("Frame", "NZRF_Options", UIParent, "ButtonFrameTemplate")
     win:SetSize(W, H)
@@ -654,7 +920,7 @@ local function Create()
     local inset = win.Inset or win
     win.desc = GameText(win, "GameFontNormal")
     win.desc:SetPoint("TOPLEFT", 16, -64)
-    win.desc:SetPoint("RIGHT", win, "RIGHT", -16, 0)
+    win.desc:SetPoint("RIGHT", win, "RIGHT", -230, 0)
     win.desc:SetWordWrap(true)
     if win.Inset then
         win.Inset:ClearAllPoints()
@@ -663,15 +929,19 @@ local function Create()
     end
 
     win.pages, win.tabs = {}, {}
+    local results = BuildResults(inset)
     local Show
     Show = function(i)
+        results:Hide()
         for j, p in ipairs(win.pages) do p:SetShown(j == i) end
         if PanelTemplates_SetTab then pcall(PanelTemplates_SetTab, win, i) end
         win.current = i
         win.desc:SetText(PAGES[i].desc)
+        for _, c in ipairs(win.pages[i].controls) do if c.Refresh then c:Refresh() end end
+        RefreshDim()
     end
     for i, page in ipairs(PAGES) do
-        win.pages[i] = BuildPage(inset, page, i)
+        win.pages[i] = page.home and BuildHome(inset) or BuildPage(inset, page, i)
         -- onglets en haut (modèle du jeu « onglet du dessus », sinon onglet classique)
         local tab, top = Make("Button", "NZRF_OptionsTab" .. i, win, "PanelTopTabButtonTemplate")
         if not top then tab = Make("Button", "NZRF_OptionsTab" .. i .. "b", win, "PanelTabButtonTemplate") end
@@ -684,6 +954,40 @@ local function Create()
         win.tabs[i] = tab
     end
     win.Tabs = win.tabs
+
+    -- recherche dans tous les réglages
+    local sb, ok = Make("EditBox", "NZRF_OptionsSearchBox", win, "SearchBoxTemplate")
+    if not ok then
+        sb:SetFontObject(ChatFontNormal or GameFontHighlight)
+        sb:SetAutoFocus(false)
+        local bg = sb:CreateTexture(nil, "BACKGROUND")
+        bg:SetAllPoints(); bg:SetColorTexture(0, 0, 0, 0.5)
+        sb:SetTextInsets(6, 6, 0, 0)
+    end
+    sb:SetSize(190, 22)
+    sb:SetPoint("TOPRIGHT", win, "TOPRIGHT", -22, -60)
+    local ph = sb.Instructions
+    if not ph then
+        ph = sb:CreateFontString(nil, "ARTWORK", "GameFontDisable")
+        ph:SetPoint("LEFT", ok and 18 or 6, 0)
+    end
+    ph:SetText("Rechercher un réglage")
+    sb:SetScript("OnTextChanged", function(self, user)
+        if SearchBoxTemplate_OnTextChanged and ok then pcall(SearchBoxTemplate_OnTextChanged, self) end
+        local t = self:GetText() or ""
+        if not ok then ph:SetShown(t == "") end
+        if #t >= 2 then
+            for _, p in ipairs(win.pages) do p:Hide() end
+            results:Show()
+            results.Run(t)
+            win.desc:SetText("Clique sur un réglage pour l'ouvrir. Efface la recherche pour revenir.")
+        elseif results:IsShown() then
+            Show(win.current or 1)
+        end
+    end)
+    sb:SetScript("OnEscapePressed", function(self) self:SetText(""); self:ClearFocus() end)
+    sb:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+    win.search = sb
     if PanelTemplates_SetNumTabs then pcall(PanelTemplates_SetNumTabs, win, #PAGES) end
 
     -- bas : tout réinitialiser, recharger, fermer (boutons du jeu)
@@ -708,6 +1012,9 @@ local function Create()
     function win.Update()
         local need = NeedsReload()
         if need then reload:LockHighlight() else reload:UnlockHighlight() end
+        RefreshDim()
+        local hp = win.pages[1]
+        if hp and hp:IsShown() then for _, c in ipairs(hp.controls) do c:Refresh() end end
         hint:SetText(need and "|cffffd100Clique sur Recharger pour appliquer.|r" or "Réglages enregistrés automatiquement.")
     end
 
@@ -779,7 +1086,7 @@ end
 function M:Init()
     -- valeurs de départ pour savoir si un rechargement est nécessaire
     for _, page in ipairs(PAGES) do
-        for _, item in ipairs(page.items) do
+        for _, item in ipairs(page.items or {}) do
             if item.key then snapshot[item.key] = NZR.db[item.key] end
         end
     end
