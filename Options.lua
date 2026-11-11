@@ -163,7 +163,9 @@ local PAGES = {
         { t = "switch", key = "moveTooltip", section = "Infobulles", label = "Infobulle déplaçable", desc = "Puis « Placer l'infobulle et les sacs » pour choisir l'endroit.", r = true },
         { t = "switch", key = "tooltipCursor", section = "Infobulles", label = "Infobulle à la souris", desc = "Elle s'affiche juste à côté du curseur, en haut à gauche.", r = true },
         { t = "switch", key = "squareMinimap", section = "Minicarte", label = "Minicarte carrée", desc = "Carte carrée avec le bord des infobulles du jeu ; boutons et nom de zone inchangés. Molette = zoom.", r = true },
-        { t = "switch", key = "mmFree", section = "Minicarte", label = "Boutons d'addons carrés et libres", desc = "Les boutons des autres addons sur la minicarte (Questie, GearQuest, DBM… n'importe lequel) prennent l'anneau doré carré de NZR et se glissent où tu veux sur l'écran. Leurs clics restent les mêmes. Les icônes NZR restent à part.", r = true },
+        { t = "switch", key = "mmFree", section = "Minicarte", label = "Boutons d'addons libres", desc = "Les boutons des autres addons sur la minicarte (Questie, GearQuest, DBM… n'importe lequel) deviennent libres de se glisser où tu veux sur l'écran (forme au choix ci-dessous). Leurs clics restent les mêmes. Les icônes NZR restent à part.", r = true },
+        { t = "choice", key = "mmShape", section = "Minicarte", label = "Forme des boutons libres", desc = "Pour les boutons d'addons et les éléments choisis dans l'onglet Édition (lune…). Carré : anneau doré NZR. Rond : le look d'origine.", r = true,
+          choices = function() return { { "square", "Carré" }, { "round", "Rond" } } end },
         { t = "switch", key = "mmButtonsSave", section = "Minicarte", label = "Retenir la place des boutons d'addons", desc = "Les petits boutons ronds autour de la minicarte (Questie…) restent où tu les as glissés, même après un /reload.", r = true },
         { t = "switch", key = "moveWindows", section = "Fenêtres et sacs", label = "Toutes les fenêtres du jeu déplaçables", desc = "Personnage, carte, sorts, talents, collections, PNJ, quêtes… Glisse par la barre de titre ; clic droit dessus = place d'origine.", r = true },
         { t = "switch", key = "moveBags", section = "Fenêtres et sacs", label = "Sacs déplaçables", desc = "Toute la pile de sacs du jeu suit l'endroit choisi. Sans effet avec un addon de sacs (Baganator, Bagnon…) : place-les avec ses propres réglages.", r = true },
@@ -258,6 +260,27 @@ local PAGES = {
           click = function()
               for key, hd in pairs(NZR.holders) do NZRF_DB.pos[key] = nil; NZR:PlaceHolder(hd) end
               NZR:Print("positions des blocs remises par défaut.")
+          end },
+        { t = "button", section = "Éléments déplacés", label = "Choisir un élément", desc = "Les réglages se ferment : un cadre doré suit ce qui est sous ta souris autour de la minicarte (boutons d'addons, lune, calendrier…). Clic = il devient libre, glisse-le où tu veux. Clic droit ou Échap = annuler.",
+          text = function() return "Choisir" end,
+          click = function()
+              if not NZR.MinimapPickMode then return end
+              local st = NZR.OptionsState and NZR.OptionsState()
+              NZR:ToggleOptions(false)
+              NZR.MinimapPickMode(function() if NZR.OptionsRestore then NZR.OptionsRestore(st) end end)
+          end },
+        { t = "custom", section = "Éléments déplacés", label = "Déjà déplacés", desc = "Annuler : revient où il était avant ton dernier glissé (un cran à la fois). Par défaut : sa place d'origine, après /reload.",
+          build = function(row, width) return NZR.OptionsFreedList and NZR.OptionsFreedList(row, width) end },
+        { t = "button", section = "Éléments déplacés", label = "Tout remettre par défaut", desc = "Tous les boutons et éléments de la minicarte reprennent leur place d'origine (après /reload).",
+          text = function() return "Tout remettre" end,
+          click = function()
+              StaticPopupDialogs["NZRF_MMRESET"] = {
+                  text = "Remettre tous les éléments déplacés de la minicarte à leur place d'origine ?\nL'interface sera rechargée.",
+                  button1 = "Remettre", button2 = "Annuler",
+                  OnAccept = function() if NZR.MinimapDefaultAll then NZR.MinimapDefaultAll() end; ReloadUI() end,
+                  timeout = 0, whileDead = true, hideOnEscape = true,
+              }
+              StaticPopup_Show("NZRF_MMRESET")
           end },
       } },
     { id = "paladin", name = "Classe", desc = "Les outils propres à ta classe. Paladin : assistant de bénédictions (comme PallyPower). Les autres classes arriveront ici plus tard.",
@@ -518,7 +541,61 @@ end
 ---------------------------------------------------------------------------
 -- Fenêtre (cadre du jeu, onglets en bas comme Personnage ou Collections)
 ---------------------------------------------------------------------------
+-- liste des éléments déplacés (onglet Édition) : nom, Annuler, Par défaut
+function NZR.OptionsFreedList(parent, width)
+    local f = CreateFrame("Frame", nil, parent)
+    f:SetSize(width, 24)
+    f.rows = {}
+    local empty = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    empty:SetPoint("TOPLEFT", 4, -4)
+    empty:SetText("Rien pour l'instant. Utilise « Choisir un élément » ou l'option « Boutons d'addons libres » (onglet Interface).")
+    empty:SetWidth(width - 8); empty:SetJustifyH("LEFT")
+    local function Row(i)
+        if f.rows[i] then return f.rows[i] end
+        local r = CreateFrame("Frame", nil, f)
+        r:SetHeight(26)
+        r:SetPoint("TOPLEFT", 0, -(i - 1) * 28); r:SetPoint("RIGHT", f, "RIGHT", 0, 0)
+        local bg = r:CreateTexture(nil, "BACKGROUND")
+        bg:SetAllPoints(); bg:SetColorTexture(1, 1, 1, (i % 2 == 0) and 0.03 or 0.06)
+        r.name = r:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        r.name:SetPoint("LEFT", 8, 0); r.name:SetJustifyH("LEFT")
+        r.def = PushButton(r, function() return "Par défaut" end, function()
+            if r.id and NZR.MinimapDefault then NZR.MinimapDefault(r.id) end
+            f:Refresh(); if win then win.Update() end
+        end)
+        r.def:SetPoint("RIGHT", -4, 0)
+        r.undo = PushButton(r, function() return "Annuler" end, function()
+            if r.id and NZR.MinimapUndo then NZR.MinimapUndo(r.id) end
+            f:Refresh()
+        end)
+        r.undo:SetPoint("RIGHT", r.def, "LEFT", -6, 0)
+        r.name:SetPoint("RIGHT", r.undo, "LEFT", -8, 0)
+        f.rows[i] = r
+        return r
+    end
+    function f:Refresh()
+        local list = NZR.MinimapFreedList and NZR.MinimapFreedList() or {}
+        for i, e in ipairs(list) do
+            local r = Row(i)
+            r.id = e.id
+            r.name:SetText(e.label)
+            r.undo:SetEnabled(e.undo and true or false)
+            r:Show()
+        end
+        for i = #list + 1, #f.rows do f.rows[i]:Hide() end
+        empty:SetShown(#list == 0)
+        local h = #list == 0 and 24 or #list * 28
+        if math.abs(f:GetHeight() - h) > 0.5 then
+            f:SetHeight(h)
+            if f.relayout then f.relayout() end
+        end
+    end
+    f:Refresh()
+    return f
+end
+
 local function NeedsReload()
+    if NZR.pendingReload then return true end
     for key in pairs(reloadKeys) do
         if NZR.db[key] ~= snapshot[key] then return true end
     end
@@ -588,6 +665,8 @@ local function BuildSection(content, title, items, name)
             ctl = Slider(row, item)
         elseif item.t == "button" then
             ctl = PushButton(row, item.text, item.click)
+        elseif item.t == "custom" then
+            ctl = item.build(row, PW - 30) or CreateFrame("Frame", nil, row)
         elseif item.t == "multi" then
             ctl = Multi(row, item.choices(), function()
                 if item.flat then return NZR.db end         -- cases = réglages oui/non séparés
@@ -595,7 +674,7 @@ local function BuildSection(content, title, items, name)
                 return NZR.db[item.key]
             end, changed, PW - 50)
         end
-        if item.t == "multi" then
+        if item.t == "multi" or item.t == "custom" then
             ctl:SetPoint("TOPLEFT", desc, "BOTTOMLEFT", -4, -6)
             desc:SetPoint("RIGHT", row, "RIGHT", -14, 0)
             rowH = 46 + ctl:GetHeight() + 6
@@ -605,6 +684,7 @@ local function BuildSection(content, title, items, name)
             label:SetPoint("RIGHT", ctl, "LEFT", -16, 0)
         end
         row:SetHeight(rowH)
+        row.ctl = ctl
         table.insert(scroll.controls, ctl)
         table.insert(rows, row)
 
@@ -666,6 +746,15 @@ local function BuildSection(content, title, items, name)
     end
     if more then
         more:SetScript("OnClick", function() open = not open; Layout(); PlaySound(open and 856 or 857) end)
+    end
+    for _, row in ipairs(rows) do
+        if row.item.t == "custom" and row.ctl then
+            row.ctl.relayout = function()
+                row:SetHeight(46 + row.ctl:GetHeight() + 6)
+                Layout()
+            end
+            row.ctl.relayout()
+        end
     end
     Layout()
     return scroll

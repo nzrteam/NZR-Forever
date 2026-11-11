@@ -97,6 +97,11 @@ end
 -- un bord / fond / surbrillance, dans n'importe quelle couche (même dans un sous-cadre)
 local DECOR_ID = { [136430] = true, [136467] = true, [136477] = true, [136466] = true }
 local function IsDecor(r)
+    local okK, key = pcall(function() return r:GetParentKey() end)
+    if okK and type(key) == "string" then
+        local k = key:lower()
+        if k:find("border") or k:find("background") or k:find("ring") or k:find("highlight") or k:find("mask") then return true end
+    end
     local okT, tex = pcall(r.GetTexture, r)
     local okA, atlas = pcall(r.GetAtlas, r)
     if not (okT and tex) and not (okA and atlas) then return true end      -- vide
@@ -128,6 +133,39 @@ local function FindIcon(b)
         end
     end
     return best
+end
+
+
+-- look carré NZR : on efface le rond (bord, fond), icône recadrée en carré, anneau doré
+local function Skin(b)
+    if b.nzrRing then return end
+    -- look : on efface le rond (bord, fond), icône recadrée en carré, anneau doré NZR
+    local icon = FindIcon(b)
+    local pushed = b.GetPushedTexture and b:GetPushedTexture()
+    local iconIsNormal = icon and b.GetNormalTexture and icon == b:GetNormalTexture()
+    for _, r in ipairs({ b:GetRegions() }) do
+        if r:GetObjectType() == "Texture" and r ~= icon and r:GetDrawLayer() ~= "HIGHLIGHT"
+            and not (iconIsNormal and r == pushed) then r:SetAlpha(0) end
+    end
+    -- bouton dont l'icône est la texture « normale » : la version enfoncée prend la même forme
+    if iconIsNormal and pushed then
+        pushed:ClearAllPoints(); pushed:SetPoint("TOPLEFT", 5, -5); pushed:SetPoint("BOTTOMRIGHT", -3, 3)
+        pushed:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    end
+    if b.border then b.border:SetAlpha(0) end
+    if b.background then b.background:SetAlpha(0) end
+    if icon then
+        icon:ClearAllPoints(); icon:SetPoint("TOPLEFT", b, "TOPLEFT", 4, -4); icon:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", -4, 4)
+        icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        icon:SetAlpha(1); icon:Show()
+        -- LibDBIcon décale l'icône quand on clique : on la remet carrée
+        b:HookScript("OnMouseUp", function() icon:ClearAllPoints(); icon:SetPoint("TOPLEFT", b, "TOPLEFT", 4, -4); icon:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", -4, 4); icon:SetTexCoord(0.08, 0.92, 0.08, 0.92) end)
+    end
+    local ring = b:CreateTexture(nil, "OVERLAY", nil, 7)
+    ring:SetAllPoints(); ring:SetTexture(RING)
+    b.nzrRing = ring
+    local hl = b.GetHighlightTexture and b:GetHighlightTexture()
+    if hl then hl:ClearAllPoints(); hl:SetPoint("TOPLEFT", 4, -4); hl:SetPoint("BOTTOMRIGHT", -4, 4); hl:SetColorTexture(1, 0.82, 0, 0.25) end
 end
 
 local DragFree
@@ -177,6 +215,16 @@ DragFree = function(name, b)
     if b.EnableMouse then b:EnableMouse(true) end
     b:RegisterForDrag("LeftButton")
     b:SetScript("OnDragStart", function(self)
+        -- historique : la place d'avant ce glissé (pour « Annuler »)
+        local cur = NZR.db.mmFreePos and NZR.db.mmFreePos[name]
+        if not cur then local x, y = self:GetCenter(); cur = x and { x, y } end
+        if cur then
+            NZR.db.mmFreeHist = NZR.db.mmFreeHist or {}
+            local h = NZR.db.mmFreeHist[name] or {}
+            table.insert(h, { cur[1], cur[2] })
+            while #h > 20 do table.remove(h, 1) end
+            NZR.db.mmFreeHist[name] = h
+        end
         self.nzrDrag = true; dragging = true
         GameTooltip:Hide()
         self:StartMoving()
@@ -215,7 +263,7 @@ local function FreeGameTime()
 end
 
 
--- n'importe quel élément de la minicarte : souris dessus + /nzr libre (la lune, un bouton
+-- n'importe quel élément de la minicarte : onglet Édition > Choisir un élément (la lune, un bouton
 -- sans nom…) ; il garde son look et devient libre de se placer, retenu après /reload.
 -- Un cadre se déplace tel quel ; une simple image (texture) suit une poignée invisible NZR.
 local SKIP = { UIParent = true, Minimap = true, MinimapCluster = true, MinimapBackdrop = true, WorldFrame = true }
@@ -364,6 +412,7 @@ local function FreeExtra(name)
         NZR.db.mmFreePos = NZR.db.mmFreePos or {}
         NZR.db.mmFreePos[name] = { cx * s / f:GetScale(), cy * s / f:GetScale() }
     end
+    if NZR.db.mmShape ~= "round" then f:SetSize(30, 30); Skin(f) end
     DragFree(name, target)
 end
 
@@ -379,7 +428,7 @@ end
 
 -- le plus petit élément visible (cadre ou image) sous la souris, autour de la minicarte
 local function PickUnderMouse()
-    local best, area
+    local best, area, bestObj
     local function consider(o)
         local okV, vis = pcall(o.IsVisible, o)
         if not (okV and vis) or o.nzrSkip then return end
@@ -395,7 +444,7 @@ local function PickUnderMouse()
         local id = FrameId(o)
         if not id or SKIP[id] or id:find("NZRF") then return end
         local w, h = o:GetSize()
-        if not area or w * h < area then best, area = id, w * h end
+        if not area or w * h < area then best, area, bestObj = id, w * h, o end
     end
     local function walk(f, depth)
         if depth > 5 or not f or f.nzrSkip then return end
@@ -408,7 +457,7 @@ local function PickUnderMouse()
         end
     end
     for _, root in ipairs({ _G.MinimapCluster, Minimap, _G.MinimapBackdrop }) do walk(root, 1) end
-    return best
+    return best, bestObj
 end
 
 -- anciens essais : jamais de gros conteneur (la carte elle-même) dans la liste
@@ -422,23 +471,134 @@ local function CleanExtra()
     end
 end
 
-function NZR.MinimapFreeUnderMouse()
-    if InCombatLockdown() then NZR:Print("Hors combat seulement.") return end
-    local name = PickUnderMouse()
-    if not name then
-        NZR:Print("Rien à libérer sous la souris. Mets la souris sur l'icône (sans cliquer) puis tape /nzr libre.")
-        return
-    end
+-- libérer un élément choisi (mode « Choisir un élément » des réglages)
+local function FreeId(name)
     NZR.db.mmFreeExtra = NZR.db.mmFreeExtra or {}
-    if NZR.db.mmFreeExtra[name] then
-        NZR.db.mmFreeExtra[name] = nil
-        if NZR.db.mmFreePos then NZR.db.mmFreePos[name] = nil end
-        NZR:Print("Remis à sa place d'origine après /reload.")
-        return
-    end
     NZR.db.mmFreeExtra[name] = true
     FreeExtra(name)
-    NZR:Print("Libéré : glisse-le où tu veux. Refais /nzr libre dessus pour l'annuler. |cff808080(" .. name .. ")|r")
+end
+
+-- mode « Choisir un élément » : un cadre doré suit ce qui est sous la souris
+-- autour de la minicarte ; clic gauche = libéré, clic droit ou Échap = annuler
+local picker
+function NZR.MinimapPickMode(onDone)
+    if InCombatLockdown() then NZR:Print("Hors combat seulement.") return end
+    if not picker then
+        picker = CreateFrame("Frame", "NZRF_MinimapPicker", UIParent)
+        picker:SetAllPoints(UIParent)
+        picker:SetFrameStrata("TOOLTIP")
+        picker:EnableMouse(true)
+        picker:EnableKeyboard(true)
+        local tip = picker:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+        tip:SetPoint("TOP", 0, -120)
+        tip:SetText("Clique sur un élément de la minicarte pour le rendre libre\n|cffffffffClic droit ou Échap : annuler|r")
+        local box = CreateFrame("Frame", nil, picker)
+        box:SetFrameLevel(picker:GetFrameLevel() + 5)
+        local fill = box:CreateTexture(nil, "BACKGROUND")
+        fill:SetAllPoints(); fill:SetColorTexture(1, 0.82, 0, 0.18)
+        for _, e in ipairs({ { "TOPLEFT", "TOPRIGHT", true }, { "BOTTOMLEFT", "BOTTOMRIGHT", true }, { "TOPLEFT", "BOTTOMLEFT" }, { "TOPRIGHT", "BOTTOMRIGHT" } }) do
+            local t = box:CreateTexture(nil, "OVERLAY")
+            t:SetColorTexture(1, 0.82, 0, 1)
+            t:SetPoint(e[1]); t:SetPoint(e[2])
+            if e[3] then t:SetHeight(2) else t:SetWidth(2) end
+        end
+        box.label = box:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        box.label:SetPoint("BOTTOM", box, "TOP", 0, 4)
+        picker.box = box
+        local function Stop()
+            picker:Hide()
+            if picker.done then local d = picker.done; picker.done = nil; pcall(d) end
+        end
+        picker.Stop = Stop
+        picker:SetScript("OnUpdate", function(self)
+            local id, obj = PickUnderMouse()
+            self.cur = id
+            if obj and obj.GetLeft and obj:GetLeft() then
+                local sc = obj:GetEffectiveScale() / UIParent:GetEffectiveScale()
+                box:ClearAllPoints()
+                box:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", obj:GetLeft() * sc - 2, obj:GetBottom() * sc - 2)
+                box:SetPoint("TOPRIGHT", UIParent, "BOTTOMLEFT", obj:GetRight() * sc + 2, obj:GetTop() * sc + 2)
+                box.label:SetText(NZR.MinimapLabel(id))
+                box:Show()
+            else
+                box:Hide()
+            end
+        end)
+        picker:SetScript("OnMouseDown", function(self, btn)
+            if btn == "LeftButton" and self.cur then
+                local id = self.cur
+                if NZR.db.mmFreeExtra and NZR.db.mmFreeExtra[id] then
+                    NZR:Print("Déjà libre : glisse-le où tu veux.")
+                else
+                    FreeId(id)
+                    NZR:Print("Libéré : glisse-le où tu veux. Pour revenir en arrière : réglages, onglet Édition.")
+                end
+            end
+            Stop()
+        end)
+        picker:SetScript("OnKeyDown", function(self, key)
+            if key == "ESCAPE" then
+                self:SetPropagateKeyboardInput(false); Stop()
+            else
+                self:SetPropagateKeyboardInput(true)
+            end
+        end)
+    end
+    picker.done = onDone
+    picker:Show()
+end
+
+-- nom lisible d'un élément pour la liste des réglages
+local LABELS = { GameTimeFrame = "Calendrier" }
+function NZR.MinimapLabel(id)
+    if not id then return "" end
+    if LABELS[id] then return LABELS[id] end
+    local lib = id:match("^LibDBIcon10_(.+)$")
+    if lib then return lib end
+    if id:find("@") or id:find("#") then
+        local keys = id:match("@([^:]+):")
+        return "Élément de la minicarte" .. (keys and (" (" .. keys:gsub("%+", ", ") .. ")") or "")
+    end
+    return (id:gsub("^MinimapCluster%.", ""):gsub("Minimap", "Minicarte "):gsub("Button$", ""))
+end
+
+-- liste de tout ce qui est libre ou a une place enregistrée
+function NZR.MinimapFreedList()
+    local seen, list = {}, {}
+    local function add(id)
+        if id and not seen[id] then
+            seen[id] = true
+            local h = NZR.db.mmFreeHist and NZR.db.mmFreeHist[id]
+            list[#list + 1] = { id = id, label = NZR.MinimapLabel(id), undo = h and #h > 0,
+                moved = (NZR.db.mmFreePos and NZR.db.mmFreePos[id]) and true or false }
+        end
+    end
+    for id in pairs(freed) do add(id) end
+    for id in pairs(NZR.db.mmFreeExtra or {}) do add(id) end
+    table.sort(list, function(a, b) return a.label:lower() < b.label:lower() end)
+    return list
+end
+
+-- revenir au placement d'avant le dernier glissé
+function NZR.MinimapUndo(id)
+    local h = NZR.db.mmFreeHist and NZR.db.mmFreeHist[id]
+    if not (h and #h > 0) or InCombatLockdown() then return end
+    local p = table.remove(h)
+    NZR.db.mmFreePos = NZR.db.mmFreePos or {}
+    NZR.db.mmFreePos[id] = p
+    if freed[id] then Place(id, freed[id]) end
+end
+
+-- place d'origine du jeu (après /reload)
+function NZR.MinimapDefault(id)
+    if NZR.db.mmFreePos then NZR.db.mmFreePos[id] = nil end
+    if NZR.db.mmFreeHist then NZR.db.mmFreeHist[id] = nil end
+    if NZR.db.mmFreeExtra then NZR.db.mmFreeExtra[id] = nil end
+    NZR.pendingReload = true
+end
+function NZR.MinimapDefaultAll()
+    NZR.db.mmFreePos, NZR.db.mmFreeHist, NZR.db.mmFreeExtra = {}, {}, {}
+    NZR.pendingReload = true
 end
 
 local function FreeButton(name, b)
@@ -450,38 +610,11 @@ local function FreeButton(name, b)
     pcall(b.SetParent, b, UIParent)
     b:SetScale(1)
     b:SetFrameStrata("MEDIUM"); b:SetFrameLevel(20)
-    b:SetSize(30, 30)
     if not (NZR.db.mmFreePos and NZR.db.mmFreePos[name]) and cx then
         NZR.db.mmFreePos = NZR.db.mmFreePos or {}
         NZR.db.mmFreePos[name] = { cx * s, cy * s }
     end
-    -- look : on efface le rond (bord, fond), icône recadrée en carré, anneau doré NZR
-    local icon = FindIcon(b)
-    local pushed = b.GetPushedTexture and b:GetPushedTexture()
-    local iconIsNormal = icon and b.GetNormalTexture and icon == b:GetNormalTexture()
-    for _, r in ipairs({ b:GetRegions() }) do
-        if r:GetObjectType() == "Texture" and r ~= icon and r:GetDrawLayer() ~= "HIGHLIGHT"
-            and not (iconIsNormal and r == pushed) then r:SetAlpha(0) end
-    end
-    -- bouton dont l'icône est la texture « normale » : la version enfoncée prend la même forme
-    if iconIsNormal and pushed then
-        pushed:ClearAllPoints(); pushed:SetPoint("TOPLEFT", 5, -5); pushed:SetPoint("BOTTOMRIGHT", -3, 3)
-        pushed:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-    end
-    if b.border then b.border:SetAlpha(0) end
-    if b.background then b.background:SetAlpha(0) end
-    if icon then
-        icon:ClearAllPoints(); icon:SetPoint("TOPLEFT", b, "TOPLEFT", 4, -4); icon:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", -4, 4)
-        icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-        icon:SetAlpha(1); icon:Show()
-        -- LibDBIcon décale l'icône quand on clique : on la remet carrée
-        b:HookScript("OnMouseUp", function() icon:ClearAllPoints(); icon:SetPoint("TOPLEFT", b, "TOPLEFT", 4, -4); icon:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", -4, 4); icon:SetTexCoord(0.08, 0.92, 0.08, 0.92) end)
-    end
-    local ring = b:CreateTexture(nil, "OVERLAY", nil, 7)
-    ring:SetAllPoints(); ring:SetTexture(RING)
-    b.nzrRing = ring
-    local hl = b:GetHighlightTexture()
-    if hl then hl:ClearAllPoints(); hl:SetPoint("TOPLEFT", 4, -4); hl:SetPoint("BOTTOMRIGHT", -4, 4); hl:SetColorTexture(1, 0.82, 0, 0.25) end
+    if NZR.db.mmShape ~= "round" then b:SetSize(30, 30); Skin(b) end
     -- glisser : librement, n'importe où ; la place est retenue
     DragFree(name, b)
 end
@@ -515,6 +648,19 @@ NZR.MinimapFreeButton = FreeButton
 
 function M:Init()
     if NZR.withUI then return end
+    -- éléments choisis à la main (lune…) : remis à leur place même sans l'option « mmFree »
+    if not NZR.db.mmFree and Minimap and next(NZR.db.mmFreeExtra or {}) then
+        local ev = CreateFrame("Frame")
+        ev:RegisterEvent("PLAYER_ENTERING_WORLD")
+        ev:SetScript("OnEvent", function()
+            local function go()
+                if InCombatLockdown() then return end
+                pcall(CleanExtra)
+                for n in pairs(NZR.db.mmFreeExtra or {}) do pcall(FreeExtra, n) end
+            end
+            C_Timer.After(1, go); C_Timer.After(4, go)
+        end)
+    end
     if NZR.db.mmFree and Minimap then SetupFreeButtons()
     elseif NZR.db.mmButtonsSave and Minimap then SetupButtonMemory() end
     if not NZR.db.squareMinimap then return end
