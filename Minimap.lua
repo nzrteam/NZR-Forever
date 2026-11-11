@@ -124,7 +124,8 @@ local function IsDecor(r)
     if not (okT and tex) and not (okA and atlas) then return true end      -- vide
     if type(tex) == "number" and DECOR_ID[tex] then return true end
     local n = ((type(tex) == "string" and tex or "") .. " " .. (okA and atlas or "")):lower()
-    return n:find("border") or n:find("background") or n:find("highlight") or n:find("trackingborder") or n:find("minimap%-") and not n:find("icon")
+    return n:find("border") or n:find("background") or n:find("highlight") or n:find("trackingborder")
+        or n:find("%-frame") or n:find("ring") or n:find("minimap%-") and not n:find("icon") and not n:find("cycle")
 end
 local function Textures(f, out)
     for _, r in ipairs({ f:GetRegions() }) do
@@ -156,6 +157,8 @@ end
 -- look carré NZR : on efface le rond (bord, fond), icône recadrée en carré, anneau doré
 local function Skin(b)
     if b.nzrRing then return end
+    local sw, sh = b:GetSize()
+    if not sw or math.abs(sw - sh) > 8 then return end      -- barre, bandeau… : on garde sa forme
     if not FindIcon(b) then return end      -- pas d'icône trouvée : on garde son look d'origine
     -- look : on efface le rond (bord, fond), icône recadrée en carré, anneau doré NZR
     local icon = FindIcon(b)
@@ -292,7 +295,7 @@ end
 -- n'importe quel élément de la minicarte : onglet Édition > Choisir un élément (la lune, un bouton
 -- sans nom…) ; il garde son look et devient libre de se placer, retenu après /reload.
 -- Un cadre se déplace tel quel ; une simple image (texture) suit une poignée invisible NZR.
-local SKIP = { UIParent = true, Minimap = true, MinimapCluster = true, MinimapBackdrop = true, WorldFrame = true }
+local SKIP = { UIParent = true, MinimapCluster = true, MinimapBackdrop = true, WorldFrame = true }
 local MAX_SIZE = 80            -- plus grand = un conteneur (la carte elle-même), jamais libéré
 
 local function NameOf(o)
@@ -366,7 +369,8 @@ end
 local function TooBig(o)
     local w, h = o:GetSize()
     if not w or w < 4 or h < 4 then return true end
-    if HoldsMinimap(o) then return true end                 -- la carte ou un de ses conteneurs
+    if o == Minimap then return false end                    -- la carte elle-même : oui
+    if HoldsMinimap(o) then return true end                 -- ses conteneurs : non
     if o.IsObjectType and o:IsObjectType("Texture") then return w > MAX_SIZE or h > MAX_SIZE end
     return w > 260 or h > 120                               -- barre de zone, horloge… oui ; gros blocs non
 end
@@ -463,13 +467,23 @@ local function FreeExtra(name)
         Stick()
         return
     end
+    if f == Minimap then
+        -- la carte garde son parent (le jeu en a besoin) ; seule sa place change
+        if not (NZR.db.mmFreePos and NZR.db.mmFreePos[name]) and cx then
+            NZR.db.mmFreePos = NZR.db.mmFreePos or {}
+            NZR.db.mmFreePos[name] = { cx, cy }
+        end
+        DragFree(name, f)
+        return
+    end
     pcall(f.SetParent, f, UIParent)
     f:SetFrameStrata("MEDIUM")
     if not (NZR.db.mmFreePos and NZR.db.mmFreePos[name]) and cx then
         NZR.db.mmFreePos = NZR.db.mmFreePos or {}
         NZR.db.mmFreePos[name] = { cx * s / f:GetScale(), cy * s / f:GetScale() }
     end
-    if NZR.db.mmShape ~= "round" and FindIcon(f) then f:SetSize(30, 30); Skin(f) end
+    local fw, fh = f:GetSize()
+    if NZR.db.mmShape ~= "round" and f ~= Minimap and fw and math.abs(fw - fh) <= 8 and FindIcon(f) then f:SetSize(30, 30); Skin(f) end
     DragFree(name, target)
 end
 
@@ -515,6 +529,8 @@ local function PickUnderMouse()
         end
     end
     for _, root in ipairs({ _G.MinimapCluster, Minimap, _G.MinimapBackdrop }) do walk(root, 1) end
+    -- rien de plus petit sous la souris, mais sur la carte : la carte entière
+    if not best and Minimap and Minimap:IsVisible() and Over(Minimap) then best, bestObj = "Minimap", Minimap end
     return best, bestObj
 end
 
@@ -607,10 +623,11 @@ function NZR.MinimapPickMode(onDone)
 end
 
 -- nom lisible d'un élément pour la liste des réglages
-local LABELS = { GameTimeFrame = "Calendrier" }
+local LABELS = { GameTimeFrame = "Calendrier", Minimap = "Minicarte", ["MinimapCluster.ZoneTextButton"] = "Nom de la zone", AddonCompartmentFrame = "Compteur d'addons" }
 function NZR.MinimapLabel(id)
     if not id then return "" end
     if LABELS[id] then return LABELS[id] end
+    if id:find("MinimapContainer@Background") then return "Lune (jour / nuit)" end
     local lib = id:match("^LibDBIcon10_(.+)$")
     if lib then return lib end
     if id:find("@") or id:find("#") then
