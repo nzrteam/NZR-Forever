@@ -1,4 +1,4 @@
-# NZR Forever 1.0.5 (WoW Forever)
+# NZR Forever 1.0.6 (WoW Forever)
 
 Le DPS meter NZR et quelques petits plus, sans dénaturer le jeu.
 
@@ -9,6 +9,9 @@ Le DPS meter NZR et quelques petits plus, sans dénaturer le jeu.
 ## Réglages
 Bouton **NZR Forever** dans le menu Échap, l'icône dorée NZR près de la minicarte, `/nzr`, ou clic droit sur le meter.
 L'onglet **Accueil** montre chaque module avec sa case oui/non et un bouton « Régler » ; la **recherche** en haut à droite trouve n'importe quel réglage. Les réglages fins sont repliés sous « Plus de réglages », et ceux d'un module coupé sont grisés.
+
+## Nouveau en 1.0.6
+- **Cadres joueur et cible** : un peu plus grands, nom plus lisible dans un bandeau plus haut, portrait carré aligné sur le panneau, case du niveau carrée et plus grande, buffs de la cible toujours affichés (même en combat).
 
 ## Nouveau en 1.0.5
 - **Texte de combat** : polices façon SBT, icône de l'arme, XP gagnée, monstre tué, buffs et procs, étourdissements, début et fin de combat avec icône, tes coups visibles en groupe (bouton « Jouer »), messages rouges du jeu dans la même police.
