@@ -247,10 +247,10 @@ local function Create(unit, holderKey, default, mirror)
 
     -- niveau : petite boîte au même bord doré, chiffre centré
     local lv = CreateFrame("Frame", nil, pf)
-    local LW, LH = 26, 26                      -- carré
+    local LW, LH = 32, 32                      -- carré, bien visible
     lv:SetSize(LW, LH)
     lv:SetFrameLevel(pf:GetFrameLevel() + 4)
-    if mirror then lv:SetPoint("CENTER", pf, "BOTTOMRIGHT", -4, 4) else lv:SetPoint("CENTER", pf, "BOTTOMLEFT", 4, 4) end
+    if mirror then lv:SetPoint("CENTER", pf, "BOTTOMRIGHT", -6, 6) else lv:SetPoint("CENTER", pf, "BOTTOMLEFT", 6, 6) end
     local lvbg = lv:CreateTexture(nil, "BACKGROUND")
     lvbg:SetPoint("TOPLEFT", 2, -2); lvbg:SetPoint("BOTTOMRIGHT", -2, 2); lvbg:SetColorTexture(0.05, 0.04, 0.03, 0.95)
     local lvH = CreateFrame("Frame", nil, lv)
@@ -261,9 +261,10 @@ local function Create(unit, holderKey, default, mirror)
     if lvns.Center then lvns.Center:Hide() end
     local lvTop = CreateFrame("Frame", nil, lv); lvTop:SetAllPoints(); lvTop:SetFrameLevel(lv:GetFrameLevel() + 3)
     f.level = lvTop:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    f.level:SetPoint("CENTER", lv, "CENTER", 0, 0)
+    -- texte de la largeur de la case, centré dans les deux sens (+1 px : les chiffres penchent à gauche)
+    f.level:SetPoint("TOPLEFT", lv, "TOPLEFT", 1, 0); f.level:SetPoint("BOTTOMRIGHT", lv, "BOTTOMRIGHT", 1, 0)
     f.level:SetJustifyH("CENTER"); f.level:SetJustifyV("MIDDLE")
-    f.level.nzrSize = 11
+    f.level.nzrSize = 14
     NZR.FramesFont(f.level)
 
     -- élite / rare : petit mot doré sous le nom
