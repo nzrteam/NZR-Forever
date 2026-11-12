@@ -264,7 +264,7 @@ local function Create(unit, holderKey, default, mirror)
     -- texte de la largeur de la case, centré dans les deux sens (+1 px : les chiffres penchent à gauche)
     f.level:SetPoint("TOPLEFT", lv, "TOPLEFT", 1, 0); f.level:SetPoint("BOTTOMRIGHT", lv, "BOTTOMRIGHT", 1, 0)
     f.level:SetJustifyH("CENTER"); f.level:SetJustifyV("MIDDLE")
-    f.level.nzrSize = 14
+    f.level.nzrSize = 12
     NZR.FramesFont(f.level)
 
     -- élite / rare : petit mot doré sous le nom
