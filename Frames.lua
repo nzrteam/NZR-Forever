@@ -8,7 +8,7 @@ local plain = NZR.plain
 local MEDIA = "Interface\\AddOns\\NZRForever\\Media\\uf\\"
 local BAR = "Interface\\TargetingFrame\\UI-StatusBar"
 
-local PANEL_W, PORT, PANEL_H = 214, 60, 58
+local PANEL_W, PORT, PANEL_H = 226, 64, 62
 local frames = {}
 local AURA_SIZE, AURA_PER_ROW, AURA_MAX = 21, 8, 16
 
@@ -176,12 +176,14 @@ local function Create(unit, holderKey, default, mirror)
     f.name = barBox:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     f.name:SetPoint("TOPLEFT", mirror and 8 or 14, -1)
     f.name:SetPoint("TOPRIGHT", mirror and -14 or -8, -1)
-    f.name:SetHeight(12)
+    f.name:SetHeight(14)
+    f.name.nzrSize = 12
+    NZR.FramesFont(f.name)
     f.name:SetJustifyH("CENTER")
     f.name:SetWordWrap(false)
 
     local l, r = mirror and 9 or 16, mirror and -16 or -9
-    f.health = Bar(barBox, 16)
+    f.health = Bar(barBox, 18)
     f.health:SetPoint("TOPLEFT", l, -20); f.health:SetPoint("TOPRIGHT", r, -20)
     -- soins en approche (les tiens et ceux des autres), comme le cadre du jeu :
     -- une barre verte claire qui part du bout de la vie ; coupée au bord de la barre
@@ -205,18 +207,18 @@ local function Create(unit, holderKey, default, mirror)
         txt:SetAllPoints(); txt:SetFrameLevel(hb:GetFrameLevel() + 3)
         hb.center:SetParent(txt); hb.right:SetParent(txt)
     end
-    f.power = Bar(barBox, 10)
+    f.power = Bar(barBox, 11)
     f.power:SetPoint("TOPLEFT", f.health, "BOTTOMLEFT", 0, -2); f.power:SetPoint("TOPRIGHT", f.health, "BOTTOMRIGHT", 0, -2)
 
     -- portrait rond ou carré, cerclé d'or
     local pf = CreateFrame("Frame", nil, f)
     local square = DB().ufPortrait == "square"
     -- carré : même hauteur que le panneau doré et bien aligné dessus (haut et bas)
-    local PS = square and (PORT + 5) or PORT
+    local PS = square and (PORT + 6) or PORT   -- nombre pair : pas de demi-pixel, même rendu à gauche et à droite
     pf:SetSize(PS, PS)
     pf:SetFrameLevel(p:GetFrameLevel() + 3)
     local dx = square and (mirror and 2 or -2) or 0
-    local dy = square and 1 or 0
+    local dy = 0                         -- carré centré sur le panneau (haut et bas alignés)
     if mirror then pf:SetPoint("RIGHT", f, "RIGHT", dx, dy) else pf:SetPoint("LEFT", f, "LEFT", dx, dy) end
     f.portrait = pf:CreateTexture(nil, "ARTWORK")
     f.portrait:SetPoint("TOPLEFT", 5, -5); f.portrait:SetPoint("BOTTOMRIGHT", -5, 5)
