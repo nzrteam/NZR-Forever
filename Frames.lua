@@ -251,7 +251,7 @@ local function Create(unit, holderKey, default, mirror)
 
     -- niveau : petite boîte au même bord doré, chiffre centré
     local lv = CreateFrame("Frame", nil, pf)
-    local LW, LH = 32, 32                      -- carré, bien visible
+    local LW, LH = 30, 30                      -- carré, bien visible
     lv:SetSize(LW, LH)
     lv:SetFrameLevel(pf:GetFrameLevel() + 4)
     if mirror then lv:SetPoint("CENTER", pf, "BOTTOMRIGHT", -6, 6) else lv:SetPoint("CENTER", pf, "BOTTOMLEFT", 6, 6) end
