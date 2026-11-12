@@ -167,24 +167,26 @@ local function Create(unit, holderKey, default, mirror)
     f.panel = p
 
     -- même cadre que le DPS meter (fenêtre du jeu en réduit) : le nom dans la barre de titre
-    local SCALE = 0.58                          -- assez petit pour que les pièces du jeu tiennent sans dépasser
+    -- bandeau du nom plus haut (échelle 0.62) ; le cadre doit garder au moins 100 de haut à
+    -- cette échelle pour que les pièces du jeu tiennent : 62 / 0.62 = 100
+    local SCALE = PANEL_H / 100
     p.nzrNoFont = true
     local over = NZR:WowFrame(p, nil, 0.9, SCALE)
     over:SetFrameLevel(p:GetFrameLevel() + 6)
     local barBox = over
     f.barBox = barBox
     f.name = barBox:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    f.name:SetPoint("TOPLEFT", mirror and 8 or 14, -1)
-    f.name:SetPoint("TOPRIGHT", mirror and -14 or -8, -1)
-    f.name:SetHeight(14)
-    f.name.nzrSize = 12
+    f.name:SetPoint("TOPLEFT", mirror and 8 or 14, 0)
+    f.name:SetPoint("TOPRIGHT", mirror and -14 or -8, 0)
+    f.name:SetHeight(13)                         -- hauteur du bandeau marron
+    f.name.nzrSize = 11
     NZR.FramesFont(f.name)
     f.name:SetJustifyH("CENTER")
     f.name:SetWordWrap(false)
 
     local l, r = mirror and 9 or 16, mirror and -16 or -9
     f.health = Bar(barBox, 18)
-    f.health:SetPoint("TOPLEFT", l, -20); f.health:SetPoint("TOPRIGHT", r, -20)
+    f.health:SetPoint("TOPLEFT", l, -22); f.health:SetPoint("TOPRIGHT", r, -22)
     -- soins en approche (les tiens et ceux des autres), comme le cadre du jeu :
     -- une barre verte claire qui part du bout de la vie ; coupée au bord de la barre
     do
