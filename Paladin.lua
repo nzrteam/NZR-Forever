@@ -892,12 +892,13 @@ local function CreateWindow()
     drag:SetScript("OnDragStop", function() win:StopMovingOrSizing() end)
 
     local hint = win:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    hint:SetPoint("TOPLEFT", 16, -32); hint:SetPoint("RIGHT", -16, 0); hint:SetJustifyH("LEFT")
-    hint:SetText("Une ligne par paladin, une colonne par classe. Clique une case pour choisir la bénédiction. "
-        .. "Les autres paladins qui ont NZR Forever voient la même répartition. "
-        .. "Ceux qui ont PallyPower aussi. Un paladin sans aucun des deux : sa ligne montre ce qu'il lance vraiment, et la tienne s'adapte pour ne pas l'écraser.")
-    win.grid = CreateFrame("Frame", nil, win)
-    win.grid:SetPoint("TOPLEFT", 10, -82); win.grid:SetPoint("BOTTOMRIGHT", -10, 70)
+    hint:SetPoint("TOPLEFT", 24, -34); hint:SetPoint("RIGHT", -24, 0); hint:SetJustifyH("CENTER")
+    hint:SetSpacing(2)
+    hint:SetText("Une ligne par paladin, une colonne par classe. Clique une case pour choisir la bénédiction.\n"
+        .. "|cffaaaaaaNZR Forever et PallyPower partagent la répartition. Sans addon : on montre ce qu'il lance.|r")
+    win.hint = hint
+    -- la grille commence sous le texte, quelle que soit sa hauteur
+    win.grid:SetPoint("TOPLEFT", hint, "BOTTOMLEFT", -14, -14); win.grid:SetPoint("BOTTOMRIGHT", -10, 70)
 
     local function Btn(text, onClick, anchor, x)
         local b = CreateFrame("Button", nil, win, "UIPanelButtonTemplate")
