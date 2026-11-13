@@ -24,7 +24,7 @@ jobs:
         run: |
           mkdir -p build/NZRForever
           git archive HEAD | tar -x -C build/NZRForever
-          rm -rf build/NZRForever/.github build/NZRForever/.gitignore build/NZRForever/README.md
+          rm -rf build/NZRForever/.github build/NZRForever/.gitignore build/NZRForever/README.md build/NZRForever/README.fr.md
           cd build && zip -qr ../NZRForever-v${{ steps.v.outputs.version }}.zip NZRForever
       - name: Publier la release
         if: steps.v.outputs.existe != '1'
