@@ -1,16 +1,26 @@
 # NZR Forever
 
-DPS meter NZR et petits plus pour **WoW Forever**, sans dénaturer le jeu.
+L'interface tout-en-un pour **WoW Forever**, au style doré du jeu. Chaque module s'active d'une case : rien n'est changé tant que tu ne l'actives pas.
 
-- DPS meter : vues Détaillé, Tableau et Barres ; teinte Jeu, Noir ou Violet.
-- Sorts et buffs au look NZR (facultatif).
-- Cadres joueur et cible au style du jeu, plus lisibles (désactivé de base).
-- Surbrillance des quêtes : Ping, Éclat ou Halo (désactivée de base).
-- Paladin (désactivé de base) : assistant de bénédictions en français, façon PallyPower.
-- Flèche de quête (Forever Compass intégré, désactivé de base).
-- Pratique : bouton « Tout ramasser » avec touche, butin vide fermé tout seul, minicarte carrée, infobulles opaques, toutes les fenêtres du jeu déplaçables.
+![NZR Forever](.github/media/planche.png)
 
-Réglages : `/nzr` ou Échap > NZR Forever.
+## Modules
+- **DPS meter** : dégâts, soins et dégâts subis de chacun du groupe ; vues Détaillé, Tableau et Barres ; teinte Jeu, Noir ou Violet.
+- **Texte de combat** : tes coups, dégâts reçus, XP, monstres tués, buffs et procs, étourdissements, début et fin de combat.
+- **Cadres joueur, cible, groupe et raid** : portrait, niveau, vie, mana, buffs et débuffs, bien lisibles.
+- **Barres des monstres** : texte de vie et couleurs.
+- **Sorts et buffs** : barres nettes, raccourcis lisibles.
+- **Minicarte carrée** : boutons des autres addons libres (carrés ou ronds), à placer où tu veux, avec Annuler et Par défaut.
+- **Quêtes** : guide de progression (talents), flèche vers ta quête, surbrillance de ce qu'il faut ramasser ou tuer, temps de respawn des monstres (Alpha).
+- **Bénédictions (paladin)** : répartition entre paladins, compatible **PallyPower** ; un paladin sans addon n'est jamais écrasé.
+- **Pratique** : mode édition pour tout placer, infobulles opaques, fenêtres du jeu déplaçables, butin rapide.
+
+Réglages : `/nzr`, l'icône dorée près de la minicarte, ou Échap > NZR Forever. L'onglet **Accueil** montre chaque module ; la **recherche** trouve n'importe quel réglage.
+
+| | |
+|---|---|
+| ![Réglages](.github/media/capture-options.png) | ![DPS meter](.github/media/capture-meter.png) |
+| ![Minicarte](.github/media/capture-minimap.png) | ![Bénédictions](.github/media/capture-bless.png) |
 
 ## Installation et mises à jour avec WowUp
 1. Installe [WowUp](https://wowup.io) et ajoute ton dossier `_forever_`.
