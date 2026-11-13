@@ -112,7 +112,9 @@ local function DB() return NZR.db end
 -- Groupe et paladins
 ---------------------------------------------------------------------------
 local roster = {}        -- [classFile] = { unit, unit, ... }
-local paladins = {}      -- [nom] = { known = { key = true }, me = bool }
+local paladins = {}      -- [nom] = { known = { key = true }, me = bool, nzr = bool (a NZR Forever) }
+-- ce que les paladins SANS NZR Forever lancent vraiment, vu sur le groupe : [nom][classe] = clé
+local seen = {}
 
 local function Units()
     local list = {}
@@ -151,6 +153,8 @@ local function ScanRoster()
     local me = MyName()
     paladins[me] = paladins[me] or { known = {} }
     paladins[me].me = true
+    paladins[me].nzr = true
+    for n in pairs(seen) do if not paladins[n] then seen[n] = nil end end
     for _, b in ipairs(BLESS) do paladins[me].known[b.key] = KnowsSpell(b.id, b.name) or nil end
 end
 
@@ -177,7 +181,12 @@ local function SortedPaladins()
     return list
 end
 
-local function Assign(pal, cls) return DB().blessAssign[pal] and DB().blessAssign[pal][cls] end
+local function HasNZR(pal) return paladins[pal] and paladins[pal].nzr end
+-- répartition d'un paladin : la sienne s'il a NZR Forever, sinon ce qu'on le voit lancer
+local function Assign(pal, cls)
+    if paladins[pal] and not paladins[pal].nzr then return seen[pal] and seen[pal][cls] end
+    return DB().blessAssign[pal] and DB().blessAssign[pal][cls]
+end
 local function SetAssign(pal, cls, key)
     DB().blessAssign[pal] = DB().blessAssign[pal] or {}
     DB().blessAssign[pal][cls] = key
@@ -238,8 +247,10 @@ local function OnMessage(msg, sender)
     local from, isMe = ResolveSender(sender)
     if isMe or from == MyName() then return end
     local kind, a, b, c = strsplit("|", msg)
+    if paladins[from] then paladins[from].nzr = true end
     if kind == "H" then
         paladins[from] = paladins[from] or { known = {} }
+        paladins[from].nzr = true
         wipe(paladins[from].known)
         for k in (a or ""):gmatch("[^,]+") do paladins[from].known[k] = true end
         DB().blessAssign[from] = {}
@@ -304,6 +315,82 @@ local function ClassStatus(cls, b)
     -- tout le monde l'a : on vise le plus pressé à rafraîchir (premier de la classe)
     local any = (roster[cls] or {})[1]
     return missing, minLeft, target or targetFar or any
+end
+
+---------------------------------------------------------------------------
+-- Paladins sans NZR Forever : on regarde qui a posé quelle bénédiction sur qui
+-- (hors combat : en combat le jeu cache le lanceur), et je m'adapte pour ne pas l'écraser
+---------------------------------------------------------------------------
+local function CasterPaladin(aura)
+    local src = aura and aura.sourceUnit
+    if not plain(src) or type(src) ~= "string" then return end
+    local ok, mine = pcall(UnitIsUnit, src, "player")
+    if not ok or mine then return end
+    local okC, _, cls = pcall(UnitClass, src)
+    if not okC or cls ~= "PALADIN" then return end
+    local okN, n = pcall(UnitName, src)
+    if okN and plain(n) then return n end
+end
+
+local function Observe()
+    if InCombatLockdown() or not (C_UnitAuras and C_UnitAuras.GetAuraDataBySpellName) then return false end
+    local fresh = {}
+    for cls, units in pairs(roster) do
+        for _, u in ipairs(units) do
+            if UnitExists(u) and UnitIsConnected(u) then
+                for _, b in ipairs(BLESS) do
+                    for _, n in ipairs({ b.name, b.gname }) do
+                        if n then
+                            local ok, aura = pcall(C_UnitAuras.GetAuraDataBySpellName, u, n, "HELPFUL")
+                            local pal = ok and CasterPaladin(aura)
+                            if pal and paladins[pal] and not paladins[pal].nzr then
+                                fresh[pal] = fresh[pal] or {}
+                                fresh[pal][cls] = b.key
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    -- on garde le dernier vu tant qu'il est là (une bénédiction expirée ne l'efface pas tout de suite)
+    local changed = false
+    for pal, list in pairs(fresh) do
+        seen[pal] = seen[pal] or {}
+        for cls, key in pairs(list) do
+            if seen[pal][cls] ~= key then seen[pal][cls] = key; changed = true end
+        end
+    end
+    return changed
+end
+
+-- ma bénédiction pour une classe est déjà posée par un paladin sans NZR : je passe à la suivante libre
+local function Adapt()
+    local me = MyName()
+    if not paladins[me] then return end
+    local known = paladins[me].known or {}
+    for _, cls in ipairs(GroupClasses()) do
+        local mine = DB().blessAssign[me] and DB().blessAssign[me][cls]
+        if mine then
+            local used, by = {}, nil
+            for n in pairs(paladins) do
+                if n ~= me then
+                    local k = Assign(n, cls)
+                    if k then used[k] = true; if k == mine and not HasNZR(n) then by = n end end
+                end
+            end
+            if by then
+                local new
+                for _, key in ipairs(PRIO[cls] or PRIO_DEFAULT) do
+                    if (next(known) == nil or known[key]) and not used[key] then new = key; break end
+                end
+                SetAssign(me, cls, new); SendAssign(me, cls, new)
+                NZR:Print(("Bénédictions : %s pose déjà %s sur la classe %s, tu passes %s."):format(
+                    by, BY_KEY[mine].short, ClassName(cls),
+                    new and ("à " .. BY_KEY[new].short) or "à rien (plus de bénédiction libre)"))
+            end
+        end
+    end
 end
 
 ---------------------------------------------------------------------------
@@ -525,10 +612,15 @@ local function CycleKnown(pal, cls, dir)
 end
 
 local function AutoAssign()
-    local pals = SortedPaladins()
+    local pals = {}
+    for _, n in ipairs(SortedPaladins()) do if HasNZR(n) then pals[#pals + 1] = n end end
     for _, n in ipairs(pals) do DB().blessAssign[n] = {} end
     for _, cls in ipairs(GroupClasses()) do
         local used = {}
+        -- ce que les paladins sans NZR posent déjà : pris
+        for n in pairs(paladins) do
+            if not HasNZR(n) and seen[n] and seen[n][cls] then used[seen[n][cls]] = true end
+        end
         local free = {}
         for _, n in ipairs(pals) do free[#free + 1] = n end
         for _, key in ipairs(PRIO[cls] or PRIO_DEFAULT) do
@@ -640,7 +732,11 @@ local function BuildGrid()
         kn:ClearAllPoints(); kn:SetPoint("TOPLEFT", nm, "BOTTOMLEFT", 0, -3)
         local list = {}
         for _, b in ipairs(BLESS) do if paladins[pal].known[b.key] then list[#list + 1] = b.short end end
-        kn:SetText(#list > 0 and table.concat(list, ", ") or (paladins[pal].me and "Aucune connue" or "Sans NZR Forever ?"))
+        if not HasNZR(pal) then
+            kn:SetText("|cffff9933Sans NZR Forever|r · vu en jeu")
+        else
+            kn:SetText(#list > 0 and table.concat(list, ", ") or (paladins[pal].me and "Aucune connue" or "Aucune connue"))
+        end
         kn:SetWidth(140); kn:SetJustifyH("LEFT")
         for i, cls in ipairs(classes) do
             local c = Cell()
@@ -651,6 +747,22 @@ local function BuildGrid()
             c.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
             if key then c.icon:SetTexture(BY_KEY[key].icon); c.icon:Show(); c.plus:Hide()
             else c.icon:Hide(); c.plus:Show() end
+            c.icon:SetDesaturated(false)
+            if not HasNZR(pal) then
+                -- pas de NZR chez lui : on montre ce qu'il lance, sans pouvoir le changer ;
+                -- rien vu sur cette classe = case vide (pas de « + », on ne peut rien y choisir)
+                if key then c.icon:SetAlpha(1) else c.plus:Hide(); c.bg:SetColorTexture(0, 0, 0, 0.25); c.edge:Hide() end
+                c:SetScript("OnClick", nil)
+                c:SetScript("OnEnter", function(s)
+                    GameTooltip:SetOwner(s, "ANCHOR_TOP")
+                    GameTooltip:AddLine(pal .. "  -  " .. ClassName(cls), 1, 0.82, 0)
+                    GameTooltip:AddLine(key and BY_KEY[key].name or "Rien vu pour l'instant", 1, 1, 1)
+                    GameTooltip:AddLine("Il n'a pas NZR Forever : on montre ce qu'il lance vraiment (vu hors combat). Ta répartition s'adapte pour ne pas l'écraser.", 0.7, 0.7, 0.7, true)
+                    GameTooltip:Show()
+                end)
+                c:SetScript("OnLeave", function() GameTooltip:Hide() end)
+            else
+            c.icon:SetAlpha(1)
             c:SetScript("OnClick", function(_, btn)
                 local newKey
                 if IsShiftKeyDown() then newKey = nil
@@ -668,10 +780,11 @@ local function BuildGrid()
                 GameTooltip:Show()
             end)
             c:SetScript("OnLeave", function() GameTooltip:Hide() end)
+            end
         end
     end
     local w = math.max(520, x0 + #classes * (CELL + 6) + 24)
-    local h = 170 + (CELL + 10) + #pals * (CELL + 8)
+    local h = 182 + (CELL + 10) + #pals * (CELL + 8)
     win:SetSize(w, h)
 end
 
@@ -701,9 +814,10 @@ local function CreateWindow()
     local hint = win:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     hint:SetPoint("TOPLEFT", 16, -32); hint:SetPoint("RIGHT", -16, 0); hint:SetJustifyH("LEFT")
     hint:SetText("Une ligne par paladin, une colonne par classe. Clique une case pour choisir la bénédiction. "
-        .. "Les autres paladins qui ont NZR Forever voient la même répartition.")
+        .. "Les autres paladins qui ont NZR Forever voient la même répartition. "
+        .. "Un paladin sans NZR Forever : sa ligne montre ce qu'il lance vraiment, et la tienne s'adapte pour ne pas l'écraser.")
     win.grid = CreateFrame("Frame", nil, win)
-    win.grid:SetPoint("TOPLEFT", 10, -70); win.grid:SetPoint("BOTTOMRIGHT", -10, 70)
+    win.grid:SetPoint("TOPLEFT", 10, -82); win.grid:SetPoint("BOTTOMRIGHT", -10, 70)
 
     local function Btn(text, onClick, anchor, x)
         local b = CreateFrame("Button", nil, win, "UIPanelButtonTemplate")
@@ -790,7 +904,15 @@ function M:Init()
             if a1 == PREFIX and a2 then pcall(OnMessage, a2, a4) end
             return
         end
-        if e == "UNIT_AURA" then return end           -- la barre se met à jour chaque seconde
+        if e == "UNIT_AURA" then
+            -- regarder ce que lancent les paladins sans NZR (au plus toutes les 2 s, hors combat)
+            if GetTime() - (M.obsAt or 0) > 2 and not InCombatLockdown() then
+                M.obsAt = GetTime()
+                local ok, changed = pcall(Observe)
+                if ok and changed then pcall(Adapt); refreshAll() end
+            end
+            return
+        end
         if e == "PLAYER_REGEN_ENABLED" then
             if pending then pending = false; refreshAll() end
             return
@@ -802,6 +924,12 @@ function M:Init()
         if GetTime() - helloAt > 3 then
             helloAt = GetTime()
             C_Timer.After(1, SendHello)
+            -- qui a NZR Forever ? les autres répondent par leur « bonjour »
+            if e == "GROUP_ROSTER_UPDATE" or e == "PLAYER_ENTERING_WORLD" then C_Timer.After(1.5, function() Send("Q") end) end
+        end
+        if e == "PLAYER_REGEN_ENABLED" or e == "GROUP_ROSTER_UPDATE" then
+            local ok, changed = pcall(Observe)
+            if ok and changed then pcall(Adapt) end
         end
     end)
     refreshAll()
