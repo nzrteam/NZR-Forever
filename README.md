@@ -22,6 +22,11 @@ Réglages : `/nzr`, l'icône dorée près de la minicarte, ou Échap > NZR Forev
 | ![Réglages](.github/media/capture-options.png) | ![DPS meter](.github/media/capture-meter.png) |
 | ![Minicarte](.github/media/capture-minimap.png) | ![Bénédictions](.github/media/capture-bless.png) |
 
+## Fait avec Claude, et on l'assume
+Oui, NZR Forever est développé avec l'aide de **Claude** (l'IA d'Anthropic). On est en plein « vibe coding », et franchement, des connaissances couplées à l'IA, il n'y a pas mieux.
+
+L'IA fait gagner un temps énorme : écrire le code, chercher comment marche l'API du jeu, corriger un bug en quelques minutes. Mais elle ne remplace pas le reste : savoir ce qu'on veut, connaître le jeu, tester en vrai, repérer ce qui cloche au pixel près et choisir la direction du projet. C'est ce duo qui donne l'addon.
+
 ## Installation et mises à jour avec WowUp
 1. Installe [WowUp](https://wowup.io) et ajoute ton dossier `_forever_`.
 2. *Get Addons* > *Install from URL* > colle l'adresse de ce dépôt.
