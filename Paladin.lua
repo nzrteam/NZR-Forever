@@ -214,8 +214,43 @@ local function SendHello()
     Send("H|" .. table.concat(known, ",") .. "|" .. table.concat(assign, ";"))
 end
 
+---------------------------------------------------------------------------
+-- Compatibilité PallyPower (même canal d'addon « PLPWR ») : un paladin avec PallyPower
+-- compte comme s'il avait NZR Forever. On ne reprend aucun code de PallyPower, seulement
+-- le format de ses messages : SELF (sorts connus @ répartition par classe), ASSIGN, PASSIGN, REQ.
+---------------------------------------------------------------------------
+local PP_PREFIX = "PLPWR"
+local PP_SKILL = { "wisdom", "might", "kings", "salv", "light", "sanc" }        -- 1 à 6
+local PP_SKILL_ID = {}; for i, k in ipairs(PP_SKILL) do PP_SKILL_ID[k] = i end
+local PP_CLASS = { "WARRIOR", "ROGUE", "PRIEST", "DRUID", "PALADIN", "HUNTER", "MAGE", "WARLOCK", "SHAMAN" }
+local PP_CLASS_ID = {}; for i, c in ipairs(PP_CLASS) do PP_CLASS_ID[c] = i end
+
+local function SendPP(msg)
+    local ch = Channel()
+    if not ch or not (C_ChatInfo and C_ChatInfo.SendAddonMessage) then return end
+    pcall(C_ChatInfo.SendAddonMessage, PP_PREFIX, msg, ch)
+end
+
+-- mon « SELF » façon PallyPower : 6 × (rang, talent) puis @ et 9 cases de répartition
+local function SendPPSelf()
+    local me = MyName()
+    local known = paladins[me] and paladins[me].known or {}
+    local s = ""
+    for _, k in ipairs(PP_SKILL) do s = s .. (known[k] and "10" or "nn") end
+    s = s .. "@"
+    local mine = DB().blessAssign[me] or {}
+    for _, cls in ipairs(PP_CLASS) do
+        local k = mine[cls]
+        s = s .. (k and PP_SKILL_ID[k] and tostring(PP_SKILL_ID[k]) or "n")
+    end
+    SendPP("SELF " .. s)
+end
+
 local function SendAssign(pal, cls, key)
     Send("A|" .. pal .. "|" .. cls .. "|" .. (key or "-"))
+    -- les paladins avec PallyPower suivent aussi le changement
+    local cid = PP_CLASS_ID[cls]
+    if cid then SendPP(("ASSIGN %s %d %d"):format(pal, cid, key and PP_SKILL_ID[key] or 0)) end
 end
 
 local refreshAll   -- défini plus bas
@@ -241,6 +276,49 @@ local function ResolveSender(sender)
         end
     end
     return short, short == MyName()
+end
+
+local function OnPPMessage(msg, sender)
+    local from, isMe = ResolveSender(sender)
+    if isMe or from == MyName() then return end
+    if msg == "REQ" then SendPPSelf(); return end
+    local function apply(pal, list)
+        DB().blessAssign[pal] = {}
+        for i, cls in ipairs(PP_CLASS) do
+            local c = list:sub(i, i)
+            local key = PP_SKILL[tonumber(c) or 0]
+            if key then DB().blessAssign[pal][cls] = key end
+        end
+    end
+    local ranks, list = msg:match("^SELF ([0-9a-fn]*)@([0-9n]*)")
+    if ranks then
+        paladins[from] = paladins[from] or { known = {} }
+        paladins[from].nzr, paladins[from].pp = true, true
+        wipe(paladins[from].known)
+        for i, k in ipairs(PP_SKILL) do
+            local r = ranks:sub((i - 1) * 2 + 1, (i - 1) * 2 + 1)
+            if r ~= "" and r ~= "n" then paladins[from].known[k] = true end
+        end
+        apply(from, list or "")
+        refreshAll()
+        return
+    end
+    local name, cid, sid = msg:match("^ASSIGN (.+) (%d+) (%d+)$")
+    if name then
+        local pal = ResolveSender(name)
+        local cls = PP_CLASS[tonumber(cid)]
+        if pal and cls then
+            SetAssign(pal, cls, PP_SKILL[tonumber(sid)])
+            if paladins[pal] then paladins[pal].nzr = true end
+            refreshAll()
+        end
+        return
+    end
+    local pname, plist = msg:match("^PASSIGN (.+)@([0-9n]*)$")
+    if pname then
+        local pal = ResolveSender(pname)
+        if pal then apply(pal, plist); refreshAll() end
+    end
 end
 
 local function OnMessage(msg, sender)
@@ -734,6 +812,8 @@ local function BuildGrid()
         for _, b in ipairs(BLESS) do if paladins[pal].known[b.key] then list[#list + 1] = b.short end end
         if not HasNZR(pal) then
             kn:SetText("|cffff9933Sans NZR Forever|r · vu en jeu")
+        elseif paladins[pal].pp then
+            kn:SetText("|cff66ccffPallyPower|r · " .. (#list > 0 and table.concat(list, ", ") or ""))
         else
             kn:SetText(#list > 0 and table.concat(list, ", ") or (paladins[pal].me and "Aucune connue" or "Aucune connue"))
         end
@@ -815,7 +895,7 @@ local function CreateWindow()
     hint:SetPoint("TOPLEFT", 16, -32); hint:SetPoint("RIGHT", -16, 0); hint:SetJustifyH("LEFT")
     hint:SetText("Une ligne par paladin, une colonne par classe. Clique une case pour choisir la bénédiction. "
         .. "Les autres paladins qui ont NZR Forever voient la même répartition. "
-        .. "Un paladin sans NZR Forever : sa ligne montre ce qu'il lance vraiment, et la tienne s'adapte pour ne pas l'écraser.")
+        .. "Ceux qui ont PallyPower aussi. Un paladin sans aucun des deux : sa ligne montre ce qu'il lance vraiment, et la tienne s'adapte pour ne pas l'écraser.")
     win.grid = CreateFrame("Frame", nil, win)
     win.grid:SetPoint("TOPLEFT", 10, -82); win.grid:SetPoint("BOTTOMRIGHT", -10, 70)
 
@@ -851,7 +931,7 @@ local function CreateWindow()
     all:SetScript("OnLeave", function() GameTooltip:Hide() end)
     local close = Btn("Fermer", function() win:Hide() end)
     close:SetPoint("BOTTOMRIGHT", -12, 12)
-    win:SetScript("OnShow", function() ScanRoster(); Send("Q"); BuildGrid() end)
+    win:SetScript("OnShow", function() ScanRoster(); Send("Q"); SendPP("REQ"); BuildGrid() end)
     win:Hide()
 end
 
@@ -887,7 +967,10 @@ function M:Init()
     if cls ~= "PALADIN" then return end
 
     LoadNames()
-    if C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix then pcall(C_ChatInfo.RegisterAddonMessagePrefix, PREFIX) end
+    if C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix then
+        pcall(C_ChatInfo.RegisterAddonMessagePrefix, PREFIX)
+        pcall(C_ChatInfo.RegisterAddonMessagePrefix, PP_PREFIX)
+    end
     CreateBar()
     ScanRoster()
 
@@ -901,7 +984,8 @@ function M:Init()
     local helloAt = 0
     ev:SetScript("OnEvent", function(_, e, a1, a2, a3, a4)
         if e == "CHAT_MSG_ADDON" then
-            if a1 == PREFIX and a2 then pcall(OnMessage, a2, a4) end
+            if a1 == PREFIX and a2 then pcall(OnMessage, a2, a4)
+            elseif a1 == PP_PREFIX and a2 then pcall(OnPPMessage, a2, a4) end
             return
         end
         if e == "UNIT_AURA" then
@@ -925,7 +1009,9 @@ function M:Init()
             helloAt = GetTime()
             C_Timer.After(1, SendHello)
             -- qui a NZR Forever ? les autres répondent par leur « bonjour »
-            if e == "GROUP_ROSTER_UPDATE" or e == "PLAYER_ENTERING_WORLD" then C_Timer.After(1.5, function() Send("Q") end) end
+            if e == "GROUP_ROSTER_UPDATE" or e == "PLAYER_ENTERING_WORLD" then
+                C_Timer.After(1.5, function() Send("Q"); SendPP("REQ"); SendPPSelf() end)
+            end
         end
         if e == "PLAYER_REGEN_ENABLED" or e == "GROUP_ROSTER_UPDATE" then
             local ok, changed = pcall(Observe)
