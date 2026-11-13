@@ -898,6 +898,7 @@ local function CreateWindow()
         .. "|cffaaaaaaNZR Forever et PallyPower partagent la répartition. Sans addon : on montre ce qu'il lance.|r")
     win.hint = hint
     -- la grille commence sous le texte, quelle que soit sa hauteur
+    win.grid = CreateFrame("Frame", nil, win)
     win.grid:SetPoint("TOPLEFT", hint, "BOTTOMLEFT", -14, -14); win.grid:SetPoint("BOTTOMRIGHT", -10, 70)
 
     local function Btn(text, onClick, anchor, x)
