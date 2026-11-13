@@ -87,6 +87,14 @@ local function SpawnNow(area, value, r, g, b, icon, crit)
     if now - lastSpawn[area] < 0.25 then stagger[area] = (stagger[area] + 1) % 4 else stagger[area] = 0 end
     lastSpawn[area] = now
     f.area, f.t, f.crit = a, 0, crit
+    -- vitesse et style de défilement (les messages du centre montent toujours, pour rester lisibles)
+    f.dur = a.dur / math.max(0.3, DB().sctSpeed or 1)
+    f.style = (area == "note") and "rise" or (DB().sctAnim or "rise")
+    f.dir = (area == "inc") and -1 or 1                       -- dégâts reçus : de l'autre côté
+    if f.style == "arc" and area == "out" then
+        stagger.side = -(stagger.side or 1)                   -- fontaine : un coup à droite, le suivant à gauche
+        f.dir = stagger.side
+    end
     f.x0 = a.x + (area == "note" and 0 or stagger[area] * (area == "out" and 26 or -26))
     if area == "note" then stagger.note = 0 end
     f.y0 = a.y - stagger[area] * 18 * (a.dy > 0 and 1 or -1)
@@ -114,22 +122,41 @@ local function Animate(_, e)
         local f = active[i]
         f.t = f.t + e
         local a = f.area
-        local p = f.t / a.dur
+        local p = f.t / (f.dur or a.dur)
         if p >= 1 then
             f:Hide(); table.remove(active, i); table.insert(pools[f.kind or "plain"], f)
         else
-            -- coup critique : petit « pop » qui se résorbe
-            if f.crit then f:SetScale(1 + math.max(0, 0.6 - f.t * 3)) end
             -- départ rapide puis ralenti (plus agréable à lire)
             local ease = 1 - (1 - p) * (1 - p)
+            local style = f.style or "rise"
+            -- coup critique : petit « pop » qui se résorbe ; style Éclat : chaque coup « pope »
+            local pop = f.crit and math.max(0, 0.6 - f.t * 3) or 0
+            if style == "pop" then pop = math.max(pop, 0.7 * math.max(0, 1 - p / 0.14)) end
+            f:SetScale(1 + pop)
+            -- trajet selon le style (décalage par rapport au point de départ)
+            local ox, oy
+            if style == "down" then
+                ox, oy = (a.dx or 0) * ease, -math.abs(a.dy) * ease
+            elseif style == "arc" then
+                -- fontaine : part en biais, monte, puis retombe en courbe
+                ox = f.dir * 120 * p
+                oy = 4 * 85 * p * (1 - p) - 50 * p
+            elseif style == "pop" then
+                ox, oy = 0, 22 * p                                -- apparaît en grand, se pose, monte à peine
+            elseif style == "slide" then
+                ox, oy = f.dir * 170 * ease, 10 * p               -- file sur le côté (coups à droite, reçus à gauche)
+            else
+                ox, oy = (a.dx or 0) * ease, a.dy * ease          -- Monter (reçus : descendent)
+            end
             -- largeur remesurée à chaque image : le jeu peut la donner un peu en retard
             local okW, tw = pcall(f.text.GetStringWidth, f.text)
             if okW and plain(tw) and type(tw) == "number" and tw > 0 then f.half = ((f.iconW or 0) + tw) / 2 end
             -- position en coordonnées d'écran, ramenée à l'échelle du texte (le « pop » ne décale plus)
             local sc = f:GetScale()
             f:ClearAllPoints()
-            f:SetPoint("LEFT", UIParent, "CENTER", (f.x0 + (a.dx or 0) * ease) / sc - (f.half or 0), (f.y0 + a.dy * ease) / sc)
-            f:SetAlpha(f.t < 0.08 and f.t / 0.08 or (p < 0.75 and 1 or (1 - (p - 0.75) / 0.25)))
+            f:SetPoint("LEFT", UIParent, "CENTER", (f.x0 + ox) / sc - (f.half or 0), (f.y0 + oy) / sc)
+            local fadeIn = style == "pop" and 0.04 or 0.08
+            f:SetAlpha(f.t < fadeIn and f.t / fadeIn or (p < 0.75 and 1 or (1 - (p - 0.75) / 0.25)))
         end
     end
     if #active == 0 then driver:Hide() end
